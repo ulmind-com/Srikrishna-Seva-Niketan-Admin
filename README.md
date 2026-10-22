@@ -122,9 +122,9 @@ src/
 
 ## 🚢 Deployment
 
-Static SPA — build with `npm run build` and serve `dist/` from any static host
-(Vercel/Netlify/Render). Set `VITE_API_BASE_URL` at build time. A `vercel.json`
-is included for SPA routing fallbacks.
+Static SPA — deploys to **Vercel** in a few clicks. Full step-by-step guide
+(env vars, CORS wiring, troubleshooting): **[DEPLOYMENT.md](DEPLOYMENT.md)**.
+A `vercel.json` with SPA routing fallbacks is included.
 
 ---
 
