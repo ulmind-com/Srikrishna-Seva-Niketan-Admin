@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
-import { normalizeError } from "@/services/api/client";
+import { describeError } from "@/services/api/client";
 import { staffAdminService } from "@/services/staff-portal.service";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -153,7 +153,7 @@ function ReviewCard({
       toast.success(`${staff.name} verified — documents are ready`);
       onDone();
     },
-    onError: (err) => toast.error(normalizeError(err).message),
+    onError: (err) => toast.error(describeError(err)),
   });
 
   const reject = useMutation({
@@ -163,7 +163,7 @@ function ReviewCard({
       setShowReject(false);
       onDone();
     },
-    onError: (err) => toast.error(normalizeError(err).message),
+    onError: (err) => toast.error(describeError(err)),
   });
 
   return (

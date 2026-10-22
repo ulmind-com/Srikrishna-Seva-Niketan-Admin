@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { useStaffAuth } from "@/contexts/StaffAuthContext";
-import { normalizeError } from "@/services/api/client";
+import { describeError } from "@/services/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,7 +33,7 @@ export function StaffLoginPage() {
       toast.success("Welcome back!");
       navigate("/staff-portal", { replace: true });
     } catch (err) {
-      toast.error(normalizeError(err).message);
+      toast.error(describeError(err));
     }
   };
 

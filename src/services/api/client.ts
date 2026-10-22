@@ -138,6 +138,22 @@ export function normalizeError(error: unknown): NormalizedError {
   };
 }
 
+/**
+ * A message worth showing the user.
+ *
+ * The backend answers a failed validation with a generic `"Validation failed"`
+ * and puts the useful part in `errors[].message`. Showing only the envelope
+ * message tells the user nothing, so field messages win when present.
+ */
+export function describeError(error: unknown): string {
+  const normalized = normalizeError(error);
+  const fieldMessages = Object.values(normalized.fields ?? {});
+  if (fieldMessages.length) {
+    return fieldMessages.join(" · ");
+  }
+  return normalized.message;
+}
+
 /** Perform a request and unwrap the `data` field of the envelope. */
 export async function apiRequest<T>(config: AxiosRequestConfig): Promise<T> {
   const response = await rawClient.request<ApiEnvelope<T>>(config);

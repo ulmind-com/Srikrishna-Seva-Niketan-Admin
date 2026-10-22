@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useStaffAuth } from "@/contexts/StaffAuthContext";
-import { normalizeError } from "@/services/api/client";
+import { describeError } from "@/services/api/client";
 import {
   staffPortalService,
   type StaffOnboardingPayload,
@@ -134,7 +134,7 @@ function OnboardingForm({ staff }: { staff: Employee }) {
       setPhotoPreview(asset.url);
       toast.success("Photo uploaded");
     } catch (err) {
-      toast.error(normalizeError(err).message);
+      toast.error(describeError(err));
     } finally {
       setPhotoUploading(false);
     }
@@ -171,7 +171,7 @@ function OnboardingForm({ staff }: { staff: Employee }) {
       toast.success("Submitted! A super admin will review your profile.");
       navigate("/staff-portal", { replace: true });
     } catch (err) {
-      toast.error(normalizeError(err).message);
+      toast.error(describeError(err));
     } finally {
       setSubmitting(false);
     }

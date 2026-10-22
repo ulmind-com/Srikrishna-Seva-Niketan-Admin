@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Building2, Eye, EyeOff, Lock, Mail, User } from "lucide-react";
 import { toast } from "sonner";
 import { useStaffAuth } from "@/contexts/StaffAuthContext";
-import { normalizeError } from "@/services/api/client";
+import { describeError } from "@/services/api/client";
 import { staffPortalService } from "@/services/staff-portal.service";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,7 +47,7 @@ export function StaffRegisterPage() {
       toast.success("Account created — let's complete your profile");
       navigate("/staff/onboarding", { replace: true });
     } catch (err) {
-      toast.error(normalizeError(err).message);
+      toast.error(describeError(err));
     }
   };
 
@@ -135,7 +135,19 @@ export function StaffRegisterPage() {
               className="pl-9 pr-9"
               {...register("password", {
                 required: "Password is required",
-                minLength: { value: 8, message: "At least 8 characters" },
+                minLength: { value: 8, message: "Use at least 8 characters" },
+                // Mirrors the backend rule so the problem is named here
+                // rather than coming back as a generic server error.
+                validate: (value) =>
+                  !/[A-Z]/.test(value)
+                    ? "Add at least one capital letter (A–Z)"
+                    : !/[a-z]/.test(value)
+                      ? "Add at least one small letter (a–z)"
+                      : !/\d/.test(value)
+                        ? "Add at least one number (0–9)"
+                        : !/[\W_]/.test(value)
+                          ? "Add at least one symbol (@ # ! …)"
+                          : true,
               })}
             />
             <button
