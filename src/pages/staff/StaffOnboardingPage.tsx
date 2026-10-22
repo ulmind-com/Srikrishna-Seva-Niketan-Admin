@@ -60,11 +60,49 @@ const CATEGORIES = [
 ];
 
 const ID_TYPES = [
-  { label: "Aadhaar Card", value: "Aadhaar", hint: "12-digit number (e.g. 1234 5678 9012)" },
-  { label: "Voter ID Card", value: "Voter ID", hint: "EPIC alphanumeric number (e.g. ABC1234567)" },
-  { label: "PAN Card", value: "PAN", hint: "10-character alphanumeric (e.g. ABCDE1234F)" },
+  { label: "Aadhaar Card", value: "Aadhaar", hint: "e.g. 1234 5678 9012" },
+  { label: "PAN Card", value: "PAN", hint: "e.g. ABCDE 1234 F" },
+  { label: "Voter ID Card", value: "Voter ID", hint: "e.g. ABC 1234567" },
   { label: "Driving Licence", value: "Driving Licence", hint: "State DL number" },
 ];
+
+/**
+ * Auto-format government ID numbers as the user types:
+ * - Aadhaar: "1234 5678 9012" (4-digit blocks)
+ * - PAN: "ABCDE 1234 F" (5 letters, 4 digits, 1 letter)
+ * - Voter ID: "ABC 1234567" (3 letters, 7 digits)
+ */
+function formatGovernmentId(type: string, raw: string): string {
+  const t = type.toLowerCase();
+  if (t.includes("aadhaar")) {
+    const digits = raw.replace(/\D/g, "").slice(0, 12);
+    const parts: string[] = [];
+    for (let i = 0; i < digits.length; i += 4) {
+      parts.push(digits.slice(i, i + 4));
+    }
+    return parts.join(" ");
+  }
+
+  if (t.includes("pan")) {
+    const clean = raw.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
+    if (clean.length > 5 && clean.length <= 9) {
+      return `${clean.slice(0, 5)} ${clean.slice(5)}`;
+    } else if (clean.length > 9) {
+      return `${clean.slice(0, 5)} ${clean.slice(5, 9)} ${clean.slice(9, 10)}`;
+    }
+    return clean;
+  }
+
+  if (t.includes("voter")) {
+    const clean = raw.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
+    if (clean.length > 3) {
+      return `${clean.slice(0, 3)} ${clean.slice(3)}`;
+    }
+    return clean;
+  }
+
+  return raw.toUpperCase();
+}
 
 type FormValues = StaffOnboardingPayload;
 
@@ -127,6 +165,8 @@ function OnboardingForm({ staff }: { staff: Employee }) {
     handleSubmit,
     trigger,
     watch,
+    setValue,
+    getValues,
     formState: { errors },
   } = useForm<FormValues>({
     defaultValues: {
@@ -511,7 +551,17 @@ function OnboardingForm({ staff }: { staff: Employee }) {
                   <Field label="Government ID Type" required>
                     <select
                       className="flex h-10 w-full rounded-xl border border-border bg-card px-3 text-sm outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/15"
-                      {...register("id_proof_type", { required: "Please select an ID type" })}
+                      value={selectedIdType}
+                      onChange={(e) => {
+                        const newType = e.target.value;
+                        setValue("id_proof_type", newType);
+                        const curr = getValues("id_proof_number") || "";
+                        if (curr) {
+                          setValue("id_proof_number", formatGovernmentId(newType, curr), {
+                            shouldValidate: true,
+                          });
+                        }
+                      }}
                     >
                       {ID_TYPES.map((id) => (
                         <option key={id.value} value={id.value}>
@@ -524,11 +574,12 @@ function OnboardingForm({ staff }: { staff: Employee }) {
                   <Field label={`${selectedIdType} Number`} required error={errors.id_proof_number?.message}>
                     <Input
                       placeholder={ID_TYPES.find((t) => t.value === selectedIdType)?.hint ?? "Enter ID Number"}
-                      className="font-mono text-sm uppercase"
-                      {...register("id_proof_number", {
-                        required: `${selectedIdType} number is required`,
-                        minLength: { value: 6, message: "Enter a valid ID number" },
-                      })}
+                      className="font-mono text-sm uppercase tracking-wider"
+                      value={selectedIdNumber}
+                      onChange={(e) => {
+                        const formatted = formatGovernmentId(selectedIdType, e.target.value);
+                        setValue("id_proof_number", formatted, { shouldValidate: true });
+                      }}
                     />
                   </Field>
                 </div>

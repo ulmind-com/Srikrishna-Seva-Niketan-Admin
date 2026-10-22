@@ -70,6 +70,8 @@ export const endpoints = {
   staffPortal: {
     branches: "/staff-portal/branches",
     register: "/staff-portal/register",
+    sendOtp: "/staff-portal/send-otp",
+    verifyOtp: "/staff-portal/verify-otp",
     login: "/staff-portal/login",
     refresh: "/staff-portal/refresh",
     google: "/staff-portal/google",

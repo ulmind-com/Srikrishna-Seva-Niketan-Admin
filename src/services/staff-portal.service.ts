@@ -45,11 +45,26 @@ export const staffPortalService = {
       url: endpoints.staffPortal.branches,
     }),
 
+  sendOtp: (email: string) =>
+    staffRequest<{ email: string }>({
+      method: "POST",
+      url: endpoints.staffPortal.sendOtp,
+      data: { email },
+    }),
+
+  verifyOtp: (email: string, otp: string) =>
+    staffRequest<{ email: string; verified: boolean }>({
+      method: "POST",
+      url: endpoints.staffPortal.verifyOtp,
+      data: { email, otp },
+    }),
+
   register: (payload: {
     name: string;
     email: string;
     password: string;
     location_id: string;
+    otp?: string;
   }) =>
     staffRequest<StaffSession>({
       method: "POST",

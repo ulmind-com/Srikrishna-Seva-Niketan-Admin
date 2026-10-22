@@ -1,8 +1,21 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
-import { Building2, Eye, EyeOff, Lock, Mail, User } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Building2,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Lock,
+  Mail,
+  RefreshCw,
+  Send,
+  ShieldCheck,
+  User,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useStaffAuth } from "@/contexts/StaffAuthContext";
 import { describeError } from "@/services/api/client";
@@ -10,6 +23,7 @@ import { staffPortalService } from "@/services/staff-portal.service";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { GoogleButton, StaffAuthShell } from "./StaffAuthShell";
 
 interface RegisterForm {
@@ -17,6 +31,7 @@ interface RegisterForm {
   email: string;
   password: string;
   location_id: string;
+  otp?: string;
 }
 
 export function StaffRegisterPage() {
@@ -24,8 +39,25 @@ export function StaffRegisterPage() {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
 
-  // Public branch list — drives the mandatory branch choice. The branch is
-  // what scopes the staff member to a manager, so it is picked up-front.
+  // Email OTP Verification state
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
+  const [verifiedEmail, setVerifiedEmail] = useState("");
+  const [countdown, setCountdown] = useState(0);
+
+  // Timer countdown for resending OTP
+  useEffect(() => {
+    if (countdown <= 0) return;
+    const interval = setInterval(() => {
+      setCountdown((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [countdown]);
+
+  // Public branch list
   const { data: branches = [], isLoading: branchesLoading } = useQuery({
     queryKey: ["staff-portal", "branches"],
     queryFn: staffPortalService.branches,
@@ -34,16 +66,79 @@ export function StaffRegisterPage() {
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<RegisterForm>({
-    defaultValues: { name: "", email: "", password: "", location_id: "" },
+    defaultValues: { name: "", email: "", password: "", location_id: "", otp: "" },
   });
+
+  const emailValue = watch("email")?.trim().toLowerCase() || "";
+
+  // Reset verification state if user edits email
+  useEffect(() => {
+    if (isEmailVerified && emailValue !== verifiedEmail) {
+      setIsEmailVerified(false);
+      setOtpSent(false);
+      setOtpCode("");
+    }
+  }, [emailValue, isEmailVerified, verifiedEmail]);
 
   if (isAuthenticated) return <Navigate to="/staff-portal" replace />;
 
-  const onSubmit = async (values: RegisterForm) => {
+  /** Send 6-digit OTP via Resend */
+  const handleSendOtp = async () => {
+    if (!emailValue || !/\S+@\S+\.\S+/.test(emailValue)) {
+      toast.error("Please enter a valid email address first");
+      return;
+    }
+
+    setIsSendingOtp(true);
     try {
-      await createAccount(values);
+      await staffPortalService.sendOtp(emailValue);
+      setOtpSent(true);
+      setCountdown(60);
+      toast.success(`Verification code sent to ${emailValue}`);
+    } catch (err) {
+      toast.error(describeError(err));
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  /** Verify the entered 6-digit OTP code */
+  const handleVerifyOtp = async () => {
+    if (!otpCode || otpCode.trim().length < 6) {
+      toast.error("Please enter the complete 6-digit verification code");
+      return;
+    }
+
+    setIsVerifyingOtp(true);
+    try {
+      await staffPortalService.verifyOtp(emailValue, otpCode.trim());
+      setIsEmailVerified(true);
+      setVerifiedEmail(emailValue);
+      toast.success("Email verified successfully! You can now complete registration.");
+    } catch (err) {
+      toast.error(describeError(err));
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
+
+  const onSubmit = async (values: RegisterForm) => {
+    if (!isEmailVerified) {
+      toast.error("Please verify your email address with the OTP code first");
+      return;
+    }
+
+    try {
+      await createAccount({
+        name: values.name.trim(),
+        email: values.email.trim().toLowerCase(),
+        password: values.password,
+        location_id: values.location_id,
+        otp: otpCode.trim() || undefined,
+      });
       toast.success("Account created — let's complete your profile");
       navigate("/staff/onboarding", { replace: true });
     } catch (err) {
@@ -65,16 +160,17 @@ export function StaffRegisterPage() {
     <StaffAuthShell
       pageTitle="Staff registration"
       title="Create your account"
-      subtitle="Step 1 of 2 — we'll collect your details next."
+      subtitle="Step 1 of 2 — verify your email and set up your staff credentials."
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+        {/* Full Name */}
         <div className="space-y-1.5">
           <Label htmlFor="name">Full name</Label>
           <div className="relative">
             <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               id="name"
-              placeholder="Manisha Patel"
+              placeholder="e.g. Soumyajit Molla"
               className="pl-9"
               {...register("name", {
                 required: "Name is required",
@@ -87,24 +183,115 @@ export function StaffRegisterPage() {
           )}
         </div>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="email">Email address</Label>
-          <div className="relative">
-            <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              placeholder="you@example.com"
-              className="pl-9"
-              {...register("email", { required: "Email is required" })}
-            />
+        {/* Email Address with Resend OTP Verification */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="email">Email address</Label>
+            {isEmailVerified ? (
+              <Badge variant="success" className="gap-1 text-[11px] py-0.5">
+                <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                Email Verified
+              </Badge>
+            ) : null}
+          </div>
+
+          <div className="relative flex gap-2">
+            <div className="relative flex-1">
+              <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="email"
+                type="email"
+                autoComplete="email"
+                disabled={isEmailVerified}
+                placeholder="you@example.com"
+                className={`pl-9 pr-9 ${
+                  isEmailVerified
+                    ? "border-emerald-500 bg-emerald-50/40 text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-300"
+                    : ""
+                }`}
+                {...register("email", { required: "Email is required" })}
+              />
+              {isEmailVerified && (
+                <CheckCircle2 className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-600" />
+              )}
+            </div>
+
+            {!isEmailVerified && (
+              <Button
+                type="button"
+                variant="outline"
+                size="default"
+                onClick={handleSendOtp}
+                loading={isSendingOtp}
+                disabled={!emailValue || !/\S+@\S+\.\S+/.test(emailValue) || countdown > 0}
+                className="shrink-0"
+              >
+                {countdown > 0 ? (
+                  <span>Resend in {countdown}s</span>
+                ) : otpSent ? (
+                  <>
+                    <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Resend OTP
+                  </>
+                ) : (
+                  <>
+                    <Send className="mr-1.5 h-3.5 w-3.5 text-primary" /> Send OTP
+                  </>
+                )}
+              </Button>
+            )}
           </div>
           {errors.email && (
             <p className="text-xs font-medium text-destructive">{errors.email.message}</p>
           )}
+
+          {/* OTP Input Card */}
+          <AnimatePresence>
+            {!isEmailVerified && otpSent && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="rounded-xl border border-primary/30 bg-primary/5 p-3.5 text-xs space-y-2.5">
+                  <div className="flex items-center justify-between text-muted-foreground">
+                    <span className="font-medium flex items-center gap-1.5 text-foreground">
+                      <KeyRound className="h-4 w-4 text-primary" /> Enter 6-Digit Code
+                    </span>
+                    <span className="text-[11px]">Sent via Resend to {emailValue}</span>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      maxLength={6}
+                      placeholder="• • • • • •"
+                      value={otpCode}
+                      onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      className="font-mono text-center tracking-[0.3em] font-bold text-base h-10 bg-background"
+                      autoFocus
+                    />
+                    <Button
+                      type="button"
+                      size="default"
+                      onClick={handleVerifyOtp}
+                      loading={isVerifyingOtp}
+                      disabled={otpCode.length < 6}
+                      className="shrink-0 bg-primary hover:bg-primary/90"
+                    >
+                      <ShieldCheck className="mr-1.5 h-4 w-4" /> Verify Code
+                    </Button>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Check your spam or junk folder if you don't see the email within 30 seconds.
+                  </p>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
+        {/* Branch Selection */}
         <div className="space-y-1.5">
           <Label htmlFor="location_id">Which branch are you joining?</Label>
           <div className="relative">
@@ -133,6 +320,7 @@ export function StaffRegisterPage() {
           )}
         </div>
 
+        {/* Password */}
         <div className="space-y-1.5">
           <Label htmlFor="password">Password</Label>
           <div className="relative">
@@ -146,8 +334,6 @@ export function StaffRegisterPage() {
               {...register("password", {
                 required: "Password is required",
                 minLength: { value: 8, message: "Use at least 8 characters" },
-                // Mirrors the backend rule so the problem is named here
-                // rather than coming back as a generic server error.
                 validate: (value) =>
                   !/[A-Z]/.test(value)
                     ? "Add at least one capital letter (A–Z)"
@@ -177,8 +363,23 @@ export function StaffRegisterPage() {
           )}
         </div>
 
-        <Button type="submit" size="lg" className="w-full" loading={isSubmitting}>
-          Create account
+        {/* Submit Button */}
+        <Button
+          type="submit"
+          size="lg"
+          className="w-full"
+          loading={isSubmitting}
+          disabled={!isEmailVerified}
+        >
+          {isEmailVerified ? (
+            <>
+              Create account & continue <CheckCircle2 className="ml-2 h-4 w-4" />
+            </>
+          ) : (
+            <>
+              Verify email to continue <Lock className="ml-2 h-4 w-4" />
+            </>
+          )}
         </Button>
       </form>
 

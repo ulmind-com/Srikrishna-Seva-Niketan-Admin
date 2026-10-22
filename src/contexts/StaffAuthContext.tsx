@@ -24,6 +24,7 @@ interface StaffAuthValue {
     email: string;
     password: string;
     location_id: string;
+    otp?: string;
   }) => Promise<Employee>;
   logout: () => void;
   /** Re-read the profile after saving or submitting. */
@@ -92,6 +93,7 @@ export function StaffAuthProvider({ children }: { children: ReactNode }) {
       email: string;
       password: string;
       location_id: string;
+      otp?: string;
     }) => {
       const session = await staffPortalService.register(payload);
       staffTokenStore.set(session.access_token, session.refresh_token);
