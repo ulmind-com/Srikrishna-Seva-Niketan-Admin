@@ -149,6 +149,25 @@ function OnboardingForm({ staff }: { staff: Employee }) {
   const selectedIdType = watch("id_proof_type") || "Aadhaar";
   const selectedIdNumber = watch("id_proof_number") || "";
 
+  // Step 2 Verification State
+  const isStep2Verified = Boolean(
+    idDocPreview &&
+    !verifyingDoc &&
+    !idDocUploading &&
+    docVerification &&
+    docVerification.isVerified &&
+    docVerification.nameMatched &&
+    docVerification.idNumberMatched &&
+    docVerification.fraudRisk !== "high"
+  );
+
+  const isStep2Failed = Boolean(
+    docVerification &&
+    (!docVerification.nameMatched ||
+     !docVerification.idNumberMatched ||
+     docVerification.fraudRisk === "high")
+  );
+
   // Handle Document Upload + Real-Time Verification
   const handleIdDocument = async (file: File) => {
     if (!selectedIdNumber.trim()) {
@@ -783,11 +802,45 @@ function OnboardingForm({ staff }: { staff: Employee }) {
             </Button>
 
             {step < STEPS.length - 1 ? (
-              <Button type="button" onClick={next}>
-                Continue <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
+              step === 2 ? (
+                isStep2Failed ? (
+                  <div className="flex items-center gap-2 rounded-xl border border-rose-300 bg-rose-50 px-3.5 py-2 text-xs font-semibold text-rose-700 shadow-sm dark:border-rose-900 dark:bg-rose-950/70 dark:text-rose-300">
+                    <XCircle className="h-4 w-4 text-rose-600 animate-pulse flex-shrink-0" />
+                    <span>Verification Failed — Upload your own authentic ID to continue</span>
+                  </div>
+                ) : verifyingDoc || idDocUploading ? (
+                  <div className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3.5 py-2 text-xs font-semibold text-primary">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary flex-shrink-0" />
+                    <span>Verifying Document Authenticity…</span>
+                  </div>
+                ) : isStep2Verified ? (
+                  <Button
+                    type="button"
+                    onClick={next}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-md"
+                  >
+                    Continue <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button type="button" onClick={next} disabled={!idDocPreview}>
+                    Continue <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                )
+              ) : step === 3 ? (
+                <Button type="button" onClick={next} disabled={!photoPreview || photoUploading}>
+                  Continue <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              ) : (
+                <Button type="button" onClick={next}>
+                  Continue <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              )
             ) : (
-              <Button type="submit" loading={submitting}>
+              <Button
+                type="submit"
+                loading={submitting}
+                disabled={!hasSignature && !staff.signature?.url}
+              >
                 <Send className="mr-2 h-4 w-4" /> Submit for verification
               </Button>
             )}
