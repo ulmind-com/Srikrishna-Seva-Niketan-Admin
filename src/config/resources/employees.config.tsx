@@ -46,8 +46,15 @@ export const employeesConfig: ResourceConfig<Employee> = {
         { label: "Aaya", value: "aaya" },
         { label: "Attendant", value: "attendant" },
         { label: "Physio", value: "physio" },
-        { label: "Japa", value: "japa" },
         { label: "Other", value: "other" },
+      ],
+    },
+    {
+      key: "verification_status",
+      label: "Verification",
+      options: [
+        { label: "Verified Only", value: "verified" },
+        { label: "Pending Review", value: "pending" },
       ],
     },
   ],
@@ -77,7 +84,7 @@ export const employeesConfig: ResourceConfig<Employee> = {
       header: "ID Card",
       cell: (r) => (
         <Link
-          to={`/employees/${r.id}/id-card`}
+          to={`/employees/${r.id}/documents`}
           className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
         >
           <IdCard className="h-3.5 w-3.5" /> View

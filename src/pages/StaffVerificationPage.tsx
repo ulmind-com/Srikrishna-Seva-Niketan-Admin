@@ -10,6 +10,9 @@ import {
   Inbox,
   Loader2,
   XCircle,
+  ShieldCheck,
+  ExternalLink,
+  Eye,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -227,6 +230,88 @@ function ReviewCard({
                   className="sm:col-span-2"
                 />
               </div>
+
+              {/* Uploaded ID Document Preview & Anti-Fraud Audit */}
+              {staff.id_proof?.url && (
+                <div className="rounded-xl border border-border bg-card p-4 space-y-3 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                      <FileText className="h-4 w-4 text-primary" /> Uploaded {staff.id_proof_type || "Government ID"} Document
+                    </span>
+                    <a
+                      href={staff.id_proof.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline font-medium"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" /> View Original File
+                    </a>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-4 items-start">
+                    <a
+                      href={staff.id_proof.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="relative group h-32 w-48 shrink-0 overflow-hidden rounded-xl border border-border bg-muted/40 shadow-sm"
+                    >
+                      <img
+                        src={staff.id_proof.url}
+                        alt="Government ID"
+                        className="h-full w-full object-contain p-1 transition group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-medium gap-1">
+                        <Eye className="h-4 w-4" /> Enlarge
+                      </div>
+                    </a>
+
+                    <div className="flex-1 space-y-2 text-xs">
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant={
+                            staff.document_verification?.fraudRisk === "high"
+                              ? "danger"
+                              : staff.document_verification?.isVerified
+                              ? "success"
+                              : "warning"
+                          }
+                          className="text-[11px]"
+                        >
+                          <ShieldCheck className="mr-1 h-3.5 w-3.5" />
+                          {staff.document_verification?.isVerified
+                            ? `Authentic ID Verified (${staff.document_verification.confidenceScore}% Match)`
+                            : staff.document_verification?.fraudRisk === "high"
+                            ? "Fraud / Mismatch Detected"
+                            : "Document Attached (Awaiting Verification)"}
+                        </Badge>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-muted-foreground text-[11px]">
+                        <div>
+                          <strong>ID Number Match:</strong>{" "}
+                          <span className={staff.document_verification?.idNumberMatched ? "text-emerald-600 font-medium" : ""}>
+                            {staff.document_verification?.idNumberMatched ? "Confirmed Match" : "Manual verification required"}
+                          </span>
+                        </div>
+                        <div>
+                          <strong>Applicant Name Match:</strong>{" "}
+                          <span className={staff.document_verification?.nameMatched ? "text-emerald-600 font-medium" : ""}>
+                            {staff.document_verification?.nameMatched ? "Confirmed Match" : "Name not found on card"}
+                          </span>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <strong>Anti-Fraud Heuristic:</strong>{" "}
+                          <span className={staff.document_verification?.fraudRisk === "high" ? "text-rose-600 font-semibold" : "text-emerald-600"}>
+                            {staff.document_verification?.fraudFlags && staff.document_verification.fraudFlags.length > 0
+                              ? `Flagged: ${staff.document_verification.fraudFlags.join("; ")}`
+                              : "Clean Original (No AI templates, stock watermarks, or forged patterns detected)"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">

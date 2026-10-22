@@ -121,6 +121,17 @@ export interface Employee extends BaseDoc {
   submitted_at?: string | null;
   verified_at?: string | null;
   rejection_reason?: string | null;
+  document_verification?: {
+    isVerified?: boolean;
+    confidenceScore?: number;
+    idNumberMatched?: boolean;
+    nameMatched?: boolean;
+    photoMatched?: boolean;
+    fraudRisk?: "low" | "medium" | "high";
+    fraudFlags?: string[];
+    summary?: string;
+    verifiedAt?: string;
+  } | null;
 }
 
 /** Lifecycle of a self-registered staff member's onboarding. */

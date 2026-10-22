@@ -33,6 +33,7 @@ export interface StaffOnboardingPayload {
   previous_employer?: string;
   id_proof_type?: string;
   id_proof_number?: string;
+  document_verification?: Record<string, unknown>;
 }
 
 /** Calls made *as the staff member* (staff-scoped token). */
