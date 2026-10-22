@@ -36,7 +36,7 @@ export const staffTokenStore = {
 
 const rawStaffClient: AxiosInstance = axios.create({
   baseURL: env.API_BASE_URL,
-  timeout: 30_000,
+  timeout: 60_000,
   headers: { "Content-Type": "application/json" },
 });
 

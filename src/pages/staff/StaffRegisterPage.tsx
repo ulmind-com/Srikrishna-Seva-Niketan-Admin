@@ -47,7 +47,17 @@ export function StaffRegisterPage() {
       toast.success("Account created — let's complete your profile");
       navigate("/staff/onboarding", { replace: true });
     } catch (err) {
-      toast.error(describeError(err));
+      const msg = describeError(err);
+      if (msg.toLowerCase().includes("already exists")) {
+        toast.error("An account with this email already exists. Please sign in instead.", {
+          action: {
+            label: "Sign in",
+            onClick: () => navigate("/staff/login"),
+          },
+        });
+      } else {
+        toast.error(msg);
+      }
     }
   };
 
