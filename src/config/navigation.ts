@@ -1,4 +1,5 @@
 import {
+  BadgeCheck,
   LayoutDashboard,
   Stethoscope,
   CalendarCheck,
@@ -60,6 +61,8 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: "Branches", to: "/locations", icon: Building2, permission: "locations:view" },
       { label: "Staff Register", to: "/employees", icon: UserPlus, permission: "employees:view" },
+      { label: "Staff by Branch", to: "/staff-by-branch", icon: Building2, permission: "employees:view" },
+      { label: "Staff Verification", to: "/staff-verification", icon: BadgeCheck, permission: "employees:view" },
       { label: "Customers", to: "/customers", icon: Contact, permission: "customers:view" },
       { label: "Assignments", to: "/assignments", icon: CalendarClock, permission: "assignments:view" },
       { label: "Payments", to: "/payments", icon: Receipt, permission: "payments:view" },

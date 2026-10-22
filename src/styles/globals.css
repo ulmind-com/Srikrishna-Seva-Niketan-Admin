@@ -171,3 +171,47 @@
     color: transparent;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Printed staff documents (ID card + application forms)               */
+/* ------------------------------------------------------------------ */
+@layer utilities {
+  /* Handwriting face for signature wells, with safe system fallbacks. */
+  .font-signature {
+    font-family: "Segoe Script", "Bradley Hand", "Snell Roundhand", cursive;
+  }
+}
+
+/* Only the element marked .print-target reaches the paper. */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  .print-target,
+  .print-target * {
+    visibility: visible !important;
+  }
+  .print-target {
+    position: absolute;
+    left: 0;
+    top: 0;
+    margin: 0 !important;
+    box-shadow: none !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  /* Keep brand colours on paper instead of letting the browser strip them. */
+  .id-card,
+  .doc-sheet {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .doc-sheet {
+    width: 210mm !important;
+    padding: 14mm !important;
+  }
+  @page {
+    margin: 0;
+  }
+}

@@ -109,6 +109,43 @@ export interface Employee extends BaseDoc {
   join_date?: string | null;
   notes?: string | null;
   is_active: boolean;
+
+  // ---- Staff-portal fields (null for admin-created employees) ----
+  email?: string | null;
+  dob?: string | null;
+  designation?: string | null;
+  hrms_code?: string | null;
+  work_history?: string | null;
+  previous_employer?: string | null;
+  verification_status: StaffVerificationStatus;
+  submitted_at?: string | null;
+  verified_at?: string | null;
+  rejection_reason?: string | null;
+}
+
+/** Lifecycle of a self-registered staff member's onboarding. */
+export type StaffVerificationStatus = "draft" | "pending" | "verified" | "rejected";
+
+/** Per-branch staff counts powering the location-wise overview. */
+export interface LocationStaffStat {
+  location_id: string;
+  location_name: string;
+  location_code: string;
+  city?: string | null;
+  total: number;
+  verified: number;
+  pending: number;
+  rejected: number;
+  draft: number;
+  active: number;
+}
+
+/** A branch as exposed to the (unauthenticated) staff signup form. */
+export interface StaffBranchOption {
+  id: string;
+  name: string;
+  code: string;
+  city?: string | null;
 }
 
 export type CareType = "home" | "nursing_home" | "hospital";

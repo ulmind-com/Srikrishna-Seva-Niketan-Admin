@@ -20,6 +20,13 @@ import {
   PaymentsPage,
 } from "@/pages/resource-pages";
 import { EmployeeIdCardPage } from "@/pages/EmployeeIdCardPage";
+import { EmployeeDocumentsPage } from "@/pages/EmployeeDocumentsPage";
+import { StaffVerificationPage } from "@/pages/StaffVerificationPage";
+import { LocationStaffOverviewPage } from "@/pages/LocationStaffOverviewPage";
+import { StaffLoginPage } from "@/pages/staff/StaffLoginPage";
+import { StaffRegisterPage } from "@/pages/staff/StaffRegisterPage";
+import { StaffOnboardingPage } from "@/pages/staff/StaffOnboardingPage";
+import { StaffStatusPage } from "@/pages/staff/StaffStatusPage";
 import { ReportsPage } from "@/pages/ReportsPage";
 import { VideosPage } from "@/pages/VideosPage";
 import { BookingsPage } from "@/pages/bookings/BookingsPage";
@@ -50,6 +57,12 @@ export function AppRoutes() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
 
+      {/* ---- Self-service staff portal (own auth, outside the admin shell) ---- */}
+      <Route path="/staff/login" element={<StaffLoginPage />} />
+      <Route path="/staff/register" element={<StaffRegisterPage />} />
+      <Route path="/staff/onboarding" element={<StaffOnboardingPage />} />
+      <Route path="/staff-portal" element={<StaffStatusPage />} />
+
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route path="/" element={<DashboardPage />} />
@@ -65,6 +78,9 @@ export function AppRoutes() {
           <Route path="/locations" element={<LocationsPage />} />
           <Route path="/employees" element={<EmployeesPage />} />
           <Route path="/employees/:id/id-card" element={<EmployeeIdCardPage />} />
+          <Route path="/employees/:id/documents" element={<EmployeeDocumentsPage />} />
+          <Route path="/staff-verification" element={<StaffVerificationPage />} />
+          <Route path="/staff-by-branch" element={<LocationStaffOverviewPage />} />
           <Route path="/customers" element={<CustomersPage />} />
           <Route path="/assignments" element={<AssignmentsPage />} />
           <Route path="/expenses" element={<ExpensesPage />} />

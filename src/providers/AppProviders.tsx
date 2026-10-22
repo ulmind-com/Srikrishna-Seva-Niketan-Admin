@@ -4,6 +4,7 @@ import { HelmetProvider } from "react-helmet-async";
 import { BrowserRouter } from "react-router-dom";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { StaffAuthProvider } from "@/contexts/StaffAuthContext";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -24,10 +25,12 @@ export function AppProviders({ children }: { children: ReactNode }) {
         <BrowserRouter>
           <ThemeProvider>
             <AuthProvider>
-              <TooltipProvider delayDuration={200}>
-                {children}
-                <Toaster />
-              </TooltipProvider>
+              <StaffAuthProvider>
+                <TooltipProvider delayDuration={200}>
+                  {children}
+                  <Toaster />
+                </TooltipProvider>
+              </StaffAuthProvider>
             </AuthProvider>
           </ThemeProvider>
         </BrowserRouter>

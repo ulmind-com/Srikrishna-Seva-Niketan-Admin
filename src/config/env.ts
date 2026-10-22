@@ -14,4 +14,8 @@ export const STORAGE_KEYS = {
   user: "nupun.user",
   theme: "nupun.theme",
   sidebar: "nupun.sidebar_collapsed",
+  // Staff-portal session, kept under separate keys so a staff member and an
+  // admin can be signed in in the same browser without clobbering each other.
+  staffAccessToken: "ssn.staff.access_token",
+  staffRefreshToken: "ssn.staff.refresh_token",
 } as const;
