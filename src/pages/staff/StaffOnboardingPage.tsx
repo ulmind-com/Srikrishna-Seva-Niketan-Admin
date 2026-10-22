@@ -177,9 +177,14 @@ function OnboardingForm({ staff }: { staff: Employee }) {
       setDocVerification(result);
 
       if (result.fraudRisk === "high") {
-        toast.error("Fraud Alert: Uploaded document does not match or appears to be a sample/template.");
+        const primaryFlag =
+          result.fraudFlags[0] ||
+          "Fraud Alert: Uploaded document does not match your credentials or appears to be a downloaded sample.";
+        toast.error(`Verification Failed: ${primaryFlag}`);
+      } else if (!result.nameMatched) {
+        toast.error(`Name Mismatch: The name on this document does not match "${staff.name}".`);
       } else if (!result.idNumberMatched) {
-        toast.warning(`Note: ID number could not be clearly matched. Please ensure the document is clear.`);
+        toast.error(`ID Mismatch: The ${selectedIdType} number does not match "${selectedIdNumber}".`);
       } else {
         toast.success(`Government ID verified successfully (${result.confidenceScore}% match)`);
       }
@@ -235,8 +240,26 @@ function OnboardingForm({ staff }: { staff: Employee }) {
         toast.error("Please upload your Government ID document (Aadhaar / Voter ID / PAN)");
         return;
       }
-      if (docVerification?.fraudRisk === "high") {
-        toast.error("Please upload an authentic, original Government ID document without watermarks.");
+      if (
+        docVerification &&
+        (docVerification.fraudRisk === "high" ||
+          !docVerification.nameMatched ||
+          !docVerification.idNumberMatched)
+      ) {
+        if (!docVerification.nameMatched) {
+          toast.error(
+            `Verification Blocked: The name on the document does not match your registered name "${staff.name}". Upload your own authentic ID.`
+          );
+        } else if (!docVerification.idNumberMatched) {
+          toast.error(
+            `Verification Blocked: The ${selectedIdType} number on the document does not match "${selectedIdNumber}".`
+          );
+        } else {
+          toast.error(
+            docVerification.fraudFlags[0] ||
+              "Please upload an authentic, original Government ID document without watermarks or alterations."
+          );
+        }
         return;
       }
     }
@@ -253,6 +276,18 @@ function OnboardingForm({ staff }: { staff: Employee }) {
   const onSubmit = async (values: FormValues) => {
     if (!idDocPreview) {
       toast.error("Government ID document is mandatory");
+      setStep(2);
+      return;
+    }
+    if (
+      docVerification &&
+      (docVerification.fraudRisk === "high" ||
+        !docVerification.nameMatched ||
+        !docVerification.idNumberMatched)
+    ) {
+      toast.error(
+        "Government ID verification failed. Please upload your own authentic, original Government ID."
+      );
       setStep(2);
       return;
     }
@@ -550,6 +585,8 @@ function OnboardingForm({ staff }: { staff: Employee }) {
                       className={`rounded-xl border p-4 text-xs ${
                         docVerification.isVerified
                           ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/40"
+                          : docVerification.fraudRisk === "high" || !docVerification.nameMatched || !docVerification.idNumberMatched
+                          ? "border-rose-300 bg-rose-50/70 dark:border-rose-900/60 dark:bg-rose-950/40"
                           : "border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/40"
                       }`}
                     >
@@ -558,15 +595,23 @@ function OnboardingForm({ staff }: { staff: Employee }) {
                           {docVerification.isVerified ? (
                             <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                           ) : (
-                            <AlertTriangle className="h-4 w-4 text-amber-600" />
+                            <AlertTriangle className="h-4 w-4 text-rose-600" />
                           )}
                           AI Document Verification Audit
                         </span>
                         <Badge
-                          variant={docVerification.isVerified ? "success" : "warning"}
+                          variant={
+                            docVerification.isVerified
+                              ? "success"
+                              : docVerification.fraudRisk === "high" || !docVerification.nameMatched
+                              ? "danger"
+                              : "warning"
+                          }
                           className="font-mono text-[11px]"
                         >
-                          Match Score: {docVerification.confidenceScore}%
+                          {docVerification.isVerified
+                            ? `Match Score: ${docVerification.confidenceScore}% (Verified)`
+                            : `Match Score: ${docVerification.confidenceScore}% (Flagged / Mismatch)`}
                         </Badge>
                       </div>
 
@@ -577,7 +622,12 @@ function OnboardingForm({ staff }: { staff: Employee }) {
                           ) : (
                             <XCircle className="h-3.5 w-3.5 text-rose-500" />
                           )}
-                          <span>ID Number Match: {docVerification.idNumberMatched ? "Confirmed" : "Mismatch / Low Confidence"}</span>
+                          <span className={docVerification.idNumberMatched ? "text-emerald-700 dark:text-emerald-400 font-medium" : "text-rose-700 dark:text-rose-400 font-medium"}>
+                            ID Number Match:{" "}
+                            {docVerification.idNumberMatched
+                              ? "Confirmed Match"
+                              : `Mismatch / Not Found (${selectedIdNumber})`}
+                          </span>
                         </div>
 
                         <div className="flex items-center gap-1.5">
@@ -586,23 +636,41 @@ function OnboardingForm({ staff }: { staff: Employee }) {
                           ) : (
                             <XCircle className="h-3.5 w-3.5 text-rose-500" />
                           )}
-                          <span>Name Match: {docVerification.nameMatched ? "Confirmed" : "Name not found on card"}</span>
+                          <span className={docVerification.nameMatched ? "text-emerald-700 dark:text-emerald-400 font-medium" : "text-rose-700 dark:text-rose-400 font-medium"}>
+                            Name Match:{" "}
+                            {docVerification.nameMatched
+                              ? "Confirmed Match"
+                              : `Mismatch (Expected: "${staff.name}")`}
+                          </span>
                         </div>
 
                         <div className="flex items-center gap-1.5 sm:col-span-2">
-                          <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-                          <span>
-                            Anti-Fraud Scan: {docVerification.fraudFlags.length === 0 ? "Clean (Original Document)" : "Flagged"}
+                          <ShieldCheck
+                            className={`h-3.5 w-3.5 ${
+                              docVerification.fraudRisk === "high" ? "text-rose-600" : "text-primary"
+                            }`}
+                          />
+                          <span
+                            className={
+                              docVerification.fraudRisk === "high"
+                                ? "text-rose-700 dark:text-rose-400 font-semibold"
+                                : ""
+                            }
+                          >
+                            Anti-Fraud Scan:{" "}
+                            {docVerification.fraudFlags.length === 0
+                              ? "Clean (Original Document)"
+                              : `Flagged (${docVerification.fraudRisk.toUpperCase()} FRAUD RISK)`}
                           </span>
                         </div>
                       </div>
 
                       {docVerification.fraudFlags.length > 0 && (
-                        <div className="mt-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 p-2 text-rose-700 dark:text-rose-300">
-                          <p className="font-semibold flex items-center gap-1">
-                            <AlertTriangle className="h-3.5 w-3.5" /> Warning / Fraud Flags:
+                        <div className="mt-2.5 rounded-lg bg-rose-100/80 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-900 p-2.5 text-rose-800 dark:text-rose-200">
+                          <p className="font-semibold flex items-center gap-1 text-[11px]">
+                            <AlertTriangle className="h-3.5 w-3.5 text-rose-600" /> Fraud & Verification Warnings:
                           </p>
-                          <ul className="list-disc list-inside mt-1 space-y-0.5">
+                          <ul className="list-disc list-inside mt-1 space-y-0.5 text-[11px]">
                             {docVerification.fraudFlags.map((f, i) => (
                               <li key={i}>{f}</li>
                             ))}
