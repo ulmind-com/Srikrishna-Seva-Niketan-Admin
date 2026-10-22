@@ -4,19 +4,23 @@ import { Helmet } from "react-helmet-async";
 import {
   CalendarCheck,
   Clock,
-  CheckCircle2,
   Stethoscope,
-  Package,
   FileUser,
-  Newspaper,
   Mail,
   ArrowRight,
   Plus,
-  ClipboardList,
+  Users,
+  IndianRupee,
+  Activity,
+  UserCheck,
+  HeartPulse,
+  TrendingUp,
+  Building2,
+  MapPin,
+  ShieldCheck,
 } from "lucide-react";
 import { dashboardService } from "@/services/dashboard.service";
 import { useAuth } from "@/contexts/AuthContext";
-import { PageHeader } from "@/components/common/PageHeader";
 import { CardsSkeleton } from "@/components/common/TableSkeleton";
 import { EmptyState } from "@/components/common/EmptyState";
 import { StatCard } from "@/components/dashboard/StatCard";
@@ -34,14 +38,26 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { env } from "@/config/env";
-import { formatDate, timeAgo } from "@/lib/utils";
+import { formatDate, formatCurrency, timeAgo } from "@/lib/utils";
 
-const QUICK_ACTIONS = [
-  { label: "New Service", to: "/services", icon: Stethoscope },
-  { label: "Add Equipment", to: "/equipment", icon: Package },
-  { label: "Write Article", to: "/blogs", icon: Newspaper },
-  { label: "View Bookings", to: "/bookings", icon: CalendarCheck },
+const GENERAL_QUICK_ACTIONS = [
+  { label: "Staff Directory", to: "/employees", icon: Users },
+  { label: "Assignments / Shifts", to: "/assignments", icon: Activity },
+  { label: "Payments & Revenue", to: "/payments", icon: IndianRupee },
+  { label: "Bookings", to: "/bookings", icon: CalendarCheck },
+  { label: "Verification Queue", to: "/staff-verification", icon: ShieldCheck },
+  { label: "Medical Services", to: "/services", icon: Stethoscope },
+];
+
+const MANAGER_QUICK_ACTIONS = [
+  { label: "Assign Staff to Duty", to: "/assignments", icon: Activity },
+  { label: "Branch Staff Directory", to: "/employees", icon: Users },
+  { label: "Record Payment", to: "/payments", icon: IndianRupee },
+  { label: "Register New Staff", to: "/employees", icon: Plus },
+  { label: "Patients & Customers", to: "/customers", icon: HeartPulse },
+  { label: "Branch Reports", to: "/reports", icon: TrendingUp },
 ];
 
 export function DashboardPage() {
@@ -69,66 +85,317 @@ export function DashboardPage() {
   });
 
   const stats = statsQuery.data;
+  const isManagerScoped = Boolean(
+    stats?.is_scoped || (!user?.is_superuser && (user?.location_ids?.length ?? 0) > 0)
+  );
 
-  const cards = stats
+  // Cards for Branch Manager: focus on Staff, Working Staff, Revenue, Active Shifts
+  const managerCards = stats
     ? [
-        { label: "Total Bookings", value: stats.bookings.total, icon: <CalendarCheck />, tone: "primary" as const, hint: `${stats.bookings.pending} pending`, to: "/bookings" },
-        { label: "Pending Bookings", value: stats.bookings.pending, icon: <Clock />, tone: "warning" as const, hint: "Awaiting review", to: "/bookings" },
-        { label: "Completed", value: stats.bookings.completed, icon: <CheckCircle2 />, tone: "success" as const, hint: "Fulfilled bookings", to: "/bookings" },
-        { label: "Services", value: stats.services, icon: <Stethoscope />, tone: "accent" as const, to: "/services" },
-        { label: "Rental Requests", value: stats.rentals, icon: <ClipboardList />, tone: "primary" as const, to: "/rentals" },
-        { label: "Applications", value: stats.applications, icon: <FileUser />, tone: "accent" as const, to: "/applications" },
-        { label: "New Messages", value: stats.new_contacts, icon: <Mail />, tone: "warning" as const, to: "/contact" },
-        { label: "Blog Posts", value: stats.blogs, icon: <Newspaper />, tone: "success" as const, to: "/blogs" },
+        {
+          label: "Total Staff in Branch",
+          value: stats.staff?.total ?? 0,
+          icon: <Users className="h-5 w-5" />,
+          tone: "primary" as const,
+          hint: `${stats.staff?.verified ?? 0} verified · ${stats.staff?.pending ?? 0} pending review`,
+          to: "/employees",
+        },
+        {
+          label: "Staff Working / On Duty",
+          value: stats.staff?.working ?? 0,
+          icon: <Activity className="h-5 w-5" />,
+          tone: "success" as const,
+          hint: "Active on-duty patient shifts",
+          to: "/assignments",
+        },
+        {
+          label: "Available Staff",
+          value: stats.staff?.available ?? 0,
+          icon: <UserCheck className="h-5 w-5" />,
+          tone: "accent" as const,
+          hint: "Ready for immediate deployment",
+          to: "/employees",
+        },
+        {
+          label: "Total Branch Revenue",
+          value: formatCurrency(stats.revenue?.total ?? 0),
+          icon: <IndianRupee className="h-5 w-5" />,
+          tone: "success" as const,
+          hint: `${stats.revenue?.payment_count ?? 0} payments collected`,
+          to: "/payments",
+        },
+        {
+          label: "Active Shifts",
+          value: stats.assignments?.active ?? 0,
+          icon: <CalendarCheck className="h-5 w-5" />,
+          tone: "primary" as const,
+          hint: "Currently engaged patient shifts",
+          to: "/assignments",
+        },
+        {
+          label: "Active Patients",
+          value: stats.customers?.active ?? 0,
+          icon: <HeartPulse className="h-5 w-5" />,
+          tone: "accent" as const,
+          hint: "Patients receiving home care",
+          to: "/customers",
+        },
+        {
+          label: "Net Branch Profit",
+          value: formatCurrency(stats.revenue?.profit ?? 0),
+          icon: <TrendingUp className="h-5 w-5" />,
+          tone: "warning" as const,
+          hint: "Revenue minus local expenses",
+          to: "/reports",
+        },
+        {
+          label: "Staff Awaiting Review",
+          value: stats.staff?.pending ?? 0,
+          icon: <Clock className="h-5 w-5" />,
+          tone: "warning" as const,
+          hint: "Pending verification & ID card generation",
+          to: "/staff-verification",
+        },
       ]
     : [];
+
+  // Cards for Super Admin: global enterprise view
+  const adminCards = stats
+    ? [
+        {
+          label: "Total Staff (All Branches)",
+          value: stats.staff?.total ?? 0,
+          icon: <Users className="h-5 w-5" />,
+          tone: "primary" as const,
+          hint: `${stats.staff?.verified ?? 0} verified across all locations`,
+          to: "/employees",
+        },
+        {
+          label: "Staff On Duty / Working",
+          value: stats.staff?.working ?? 0,
+          icon: <Activity className="h-5 w-5" />,
+          tone: "success" as const,
+          hint: "Active live assignments",
+          to: "/assignments",
+        },
+        {
+          label: "Total Organisation Revenue",
+          value: formatCurrency(stats.revenue?.total ?? 0),
+          icon: <IndianRupee className="h-5 w-5" />,
+          tone: "success" as const,
+          hint: `${stats.revenue?.payment_count ?? 0} total payments collected`,
+          to: "/payments",
+        },
+        {
+          label: "Active Shifts",
+          value: stats.assignments?.active ?? 0,
+          icon: <CalendarCheck className="h-5 w-5" />,
+          tone: "accent" as const,
+          hint: "Ongoing patient engagements",
+          to: "/assignments",
+        },
+        {
+          label: "Total Bookings",
+          value: stats.bookings?.total ?? 0,
+          icon: <CalendarCheck className="h-5 w-5" />,
+          tone: "primary" as const,
+          hint: `${stats.bookings?.pending ?? 0} pending review`,
+          to: "/bookings",
+        },
+        {
+          label: "Pending Bookings",
+          value: stats.bookings?.pending ?? 0,
+          icon: <Clock className="h-5 w-5" />,
+          tone: "warning" as const,
+          hint: "Awaiting patient confirmation",
+          to: "/bookings",
+        },
+        {
+          label: "Job Applications",
+          value: stats.applications ?? 0,
+          icon: <FileUser className="h-5 w-5" />,
+          tone: "accent" as const,
+          hint: "Recruitment applicants",
+          to: "/applications",
+        },
+        {
+          label: "Active Services",
+          value: stats.services ?? 0,
+          icon: <Stethoscope className="h-5 w-5" />,
+          tone: "success" as const,
+          hint: "Catalogue services available",
+          to: "/services",
+        },
+      ]
+    : [];
+
+  const activeCards = isManagerScoped ? managerCards : adminCards;
+  const activeQuickActions = isManagerScoped ? MANAGER_QUICK_ACTIONS : GENERAL_QUICK_ACTIONS;
 
   return (
     <div className="space-y-6">
       <Helmet>
-        <title>Dashboard · {env.APP_NAME}</title>
+        <title>
+          {isManagerScoped ? "Branch Dashboard" : "Dashboard"} · {env.APP_NAME}
+        </title>
       </Helmet>
 
-      <PageHeader
-        title={`Welcome back, ${user?.name?.split(" ")[0] ?? "Admin"} 👋`}
-        description="Here's what's happening across your platform today."
-        actions={
-          <Button asChild>
-            <Link to="/bookings">
-              View bookings <ArrowRight />
-            </Link>
-          </Button>
-        }
-      />
+      {/* Hero / Page Header with Location Badge */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl border border-border bg-gradient-to-r from-card to-muted/30 p-6 shadow-sm">
+        <div>
+          <div className="flex items-center gap-2 mb-1.5">
+            {isManagerScoped ? (
+              <Badge className="bg-primary text-primary-foreground font-semibold px-2.5 py-0.5 flex items-center gap-1.5">
+                <MapPin className="h-3 w-3" />
+                {stats?.branch_names && stats.branch_names.length > 0
+                  ? stats.branch_names.join(", ")
+                  : "Assigned Location"}
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="border-primary/30 text-primary bg-primary/5 px-2.5 py-0.5">
+                Headquarters Console
+              </Badge>
+            )}
+            <span className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+              Live Tracking
+            </span>
+          </div>
 
-      {/* Stat cards */}
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            Welcome back, {user?.name?.split(" ")[0] ?? "Manager"} 👋
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {isManagerScoped
+              ? "Here is your branch live performance: registered staff, staff on duty, active shifts, and revenue."
+              : "Here's what's happening across all locations and operations today."}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {isManagerScoped ? (
+            <Button asChild className="gap-2 shadow-sm">
+              <Link to="/assignments">
+                <Activity className="h-4 w-4" /> Manage Duty Shifts
+              </Link>
+            </Button>
+          ) : (
+            <Button asChild className="gap-2 shadow-sm">
+              <Link to="/bookings">
+                View Bookings <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Stat Cards */}
       {statsQuery.isLoading ? (
         <CardsSkeleton count={8} />
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {cards.map((c, i) => (
+          {activeCards.map((c, i) => (
             <StatCard key={c.label} {...c} index={i} />
           ))}
         </div>
       )}
 
       {/* Quick actions */}
-      <Card>
-        <CardContent className="flex flex-wrap gap-3 p-4">
-          <span className="flex items-center px-1 text-sm font-medium text-muted-foreground">
-            Quick actions:
+      <Card className="border border-border">
+        <CardContent className="flex flex-wrap items-center gap-2.5 p-4">
+          <span className="flex items-center px-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Quick Actions:
           </span>
-          {QUICK_ACTIONS.map((action) => (
-            <Button key={action.label} variant="outline" size="sm" asChild>
+          {activeQuickActions.map((action) => (
+            <Button key={action.label} variant="outline" size="sm" asChild className="h-8 gap-1.5 text-xs">
               <Link to={action.to}>
-                <action.icon /> {action.label}
+                <action.icon className="h-3.5 w-3.5 text-primary" /> {action.label}
               </Link>
             </Button>
           ))}
         </CardContent>
       </Card>
 
-      {/* Charts */}
+      {/* For Super Admin: Branch Performance Matrix */}
+      {!isManagerScoped && stats?.branches_summary && stats.branches_summary.length > 0 && (
+        <Card className="border border-border shadow-sm overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between border-b border-border bg-card/60 pb-4">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Building2 className="h-5 w-5 text-primary" /> Branch Performance Matrix
+              </CardTitle>
+              <CardDescription>
+                Compare staff deployment, active staff on duty, and revenue collected across each branch.
+              </CardDescription>
+            </div>
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/staff-by-location">
+                View Full Breakdown <ArrowRight className="ml-1 h-3.5 w-3.5" />
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-border">
+              {stats.branches_summary.map((branch) => (
+                <div key={branch.id} className="p-5 space-y-4 hover:bg-muted/20 transition-colors">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-semibold text-base text-foreground flex items-center gap-1.5">
+                        <MapPin className="h-4 w-4 text-primary" /> {branch.name}
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {branch.city || "—"} · <span className="font-mono">{branch.code}</span>
+                      </p>
+                    </div>
+                    <Badge variant="secondary" className="text-xs font-mono">
+                      {branch.code}
+                    </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 rounded-xl bg-muted/40 p-3 text-center border border-border/60">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Total Staff</p>
+                      <p className="text-lg font-bold text-foreground mt-0.5">{branch.total_staff}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Working
+                      </p>
+                      <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                        {branch.working_staff}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Revenue</p>
+                      <p className="text-sm font-bold text-foreground mt-1 truncate">
+                        {formatCurrency(branch.revenue)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-xs text-muted-foreground">
+                      {branch.total_staff > 0
+                        ? `${Math.round((branch.working_staff / branch.total_staff) * 100)}% deployed`
+                        : "No staff assigned"}
+                    </span>
+                    <Button variant="ghost" size="sm" asChild className="h-7 text-xs text-primary gap-1">
+                      <Link to={`/employees?location_id=${branch.id}`}>
+                        Manage Branch <ArrowRight className="h-3 w-3" />
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Charts (Trend & Breakdown) */}
       {chartsQuery.isLoading ? (
         <div className="grid gap-4 xl:grid-cols-3">
           <Skeleton className="h-[360px] rounded-xl xl:col-span-2" />
@@ -154,7 +421,7 @@ export function DashboardPage() {
             </div>
             <Button variant="ghost" size="sm" asChild>
               <Link to="/bookings">
-                All <ArrowRight />
+                All <ArrowRight className="h-3.5 w-3.5 ml-1" />
               </Link>
             </Button>
           </CardHeader>
@@ -168,7 +435,7 @@ export function DashboardPage() {
                 {bookingsQuery.data.map((b) => (
                   <li key={b.id}>
                     <div className="flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-muted/60">
-                      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-secondary text-accent">
+                      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-secondary text-primary">
                         <CalendarCheck className="h-4 w-4" />
                       </div>
                       <div className="min-w-0 flex-1">
@@ -191,11 +458,11 @@ export function DashboardPage() {
           <CardHeader className="flex-row items-center justify-between space-y-0">
             <div>
               <CardTitle>Latest Messages</CardTitle>
-              <CardDescription>Contact form submissions</CardDescription>
+              <CardDescription>Contact form enquiries</CardDescription>
             </div>
             <Button variant="ghost" size="sm" asChild>
               <Link to="/contact">
-                All <ArrowRight />
+                All <ArrowRight className="h-3.5 w-3.5 ml-1" />
               </Link>
             </Button>
           </CardHeader>
@@ -233,12 +500,12 @@ export function DashboardPage() {
         <Card className="lg:col-span-2">
           <CardHeader className="flex-row items-center justify-between space-y-0">
             <div>
-              <CardTitle>Latest Applications</CardTitle>
-              <CardDescription>Recent job applicants</CardDescription>
+              <CardTitle>Latest Job Applications</CardTitle>
+              <CardDescription>Recent nurse and caregiver applicants</CardDescription>
             </div>
             <Button variant="ghost" size="sm" asChild>
               <Link to="/applications">
-                All <ArrowRight />
+                All <ArrowRight className="h-3.5 w-3.5 ml-1" />
               </Link>
             </Button>
           </CardHeader>

@@ -17,7 +17,7 @@ export interface UserCreatePayload {
 export const userService = {
   list: (params?: ListParams) => http.list<User>(endpoints.users.root, params),
   create: (data: UserCreatePayload) => http.post<User>(endpoints.users.root, data),
-  update: (id: string, data: Partial<User>) =>
+  update: (id: string, data: Partial<User> & { password?: string }) =>
     http.put<User>(`${endpoints.users.root}/${id}`, data),
   remove: (id: string) => http.del<null>(`${endpoints.users.root}/${id}`),
 

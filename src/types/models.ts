@@ -138,6 +138,9 @@ export interface LocationStaffStat {
   rejected: number;
   draft: number;
   active: number;
+  working?: number;
+  available?: number;
+  revenue?: number;
 }
 
 /** A branch as exposed to the (unauthenticated) staff signup form. */
@@ -725,6 +728,31 @@ export interface ActivityLog extends BaseDoc {
 }
 
 export interface DashboardStats {
+  is_scoped?: boolean;
+  branch_names?: string[];
+  branch_ids?: string[];
+  staff?: {
+    total: number;
+    working: number;
+    available: number;
+    on_leave: number;
+    verified: number;
+    pending: number;
+  };
+  revenue?: {
+    currency: string;
+    total: number;
+    expense?: number;
+    profit?: number;
+    payment_count?: number;
+    note?: string;
+  };
+  assignments?: {
+    active: number;
+  };
+  customers?: {
+    active: number;
+  };
   bookings: { total: number; pending: number; approved: number; completed: number };
   services: number;
   equipment: number;
@@ -732,7 +760,15 @@ export interface DashboardStats {
   applications: number;
   new_contacts: number;
   blogs: number;
-  revenue: { currency: string; total: number; note: string };
+  branches_summary?: Array<{
+    id: string;
+    name: string;
+    code: string;
+    city?: string | null;
+    total_staff: number;
+    working_staff: number;
+    revenue: number;
+  }>;
 }
 
 export interface DashboardCharts {
