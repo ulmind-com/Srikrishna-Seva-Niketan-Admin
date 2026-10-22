@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, useLocation, Navigate } from "react-router-dom";
+import { useNavigate, useLocation, Navigate, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { motion } from "framer-motion";
 import { Helmet } from "react-helmet-async";
@@ -76,8 +76,8 @@ export function LoginPage() {
               <HeartPulse className="h-6 w-6" />
             </div>
             <div>
-              <p className="text-lg font-bold">Nupun Health</p>
-              <p className="text-sm text-white/70">Home Health Care Services</p>
+              <p className="text-lg font-bold">{env.APP_NAME}</p>
+              <p className="text-sm text-white/70">Nursing · Aaya · Attendant Services</p>
             </div>
           </div>
 
@@ -113,7 +113,7 @@ export function LoginPage() {
           </div>
 
           <p className="text-sm text-white/60">
-            © {new Date().getFullYear()} Nupun Home Health Care Services.
+            © {new Date().getFullYear()} {env.APP_NAME}.
           </p>
         </div>
       </div>
@@ -131,7 +131,7 @@ export function LoginPage() {
               <HeartPulse className="h-6 w-6" />
             </div>
             <div>
-              <p className="text-base font-bold">Nupun Health</p>
+              <p className="text-base font-bold">{env.APP_NAME}</p>
               <p className="text-xs text-muted-foreground">Admin Panel</p>
             </div>
           </div>
@@ -152,7 +152,7 @@ export function LoginPage() {
                   id="email"
                   type="email"
                   autoComplete="off"
-                  placeholder="admin@nupunhealth.com"
+                  placeholder="admin@example.com"
                   className="pl-9"
                   {...register("email", { required: "Email is required" })}
                 />
@@ -205,7 +205,24 @@ export function LoginPage() {
             </Button>
           </form>
 
-          <p className="mt-8 text-center text-xs text-muted-foreground">
+          {/* Branch managers sign in here too — a manager is an admin user
+              scoped to one or more branches, not a separate login. */}
+          <div className="mt-6 rounded-xl border border-border bg-muted/40 p-4 text-center">
+            <p className="text-sm font-medium">Are you a nurse or staff member?</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Staff have their own portal to register and get their ID card.
+            </p>
+            <div className="mt-3 flex gap-2">
+              <Button asChild variant="outline" size="sm" className="flex-1">
+                <Link to="/staff/login">Staff sign in</Link>
+              </Button>
+              <Button asChild variant="outline" size="sm" className="flex-1">
+                <Link to="/staff/register">Register</Link>
+              </Button>
+            </div>
+          </div>
+
+          <p className="mt-6 text-center text-xs text-muted-foreground">
             Protected by role-based access control. Unauthorized access is
             prohibited.
           </p>
