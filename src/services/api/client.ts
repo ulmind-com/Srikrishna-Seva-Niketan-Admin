@@ -147,7 +147,10 @@ export function normalizeError(error: unknown): NormalizedError {
  */
 export function describeError(error: unknown): string {
   const normalized = normalizeError(error);
-  const fieldMessages = Object.values(normalized.fields ?? {});
+  const fieldMessages = Object.values(normalized.fields ?? {}).map((message) =>
+    // Pydantic prefixes custom validator failures with "Value error, ".
+    message.replace(/^Value error,\s*/i, ""),
+  );
   if (fieldMessages.length) {
     return fieldMessages.join(" · ");
   }
