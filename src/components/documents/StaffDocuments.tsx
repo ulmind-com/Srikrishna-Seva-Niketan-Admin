@@ -85,28 +85,56 @@ export function StaffDocuments({ staff }: { staff: Employee }) {
   }
 
   /**
-   * Print just the ID card on a page cut to the card's own size, so the PDF
-   * has no surrounding A4 background — only the card. The forms keep A4.
+   * Print just the ID card on a page cut to the card's exact size.
+   *
+   * The card is first rendered to a PNG, then printed from a throwaway iframe
+   * whose only content is that image at the card's size, with an @page sized to
+   * match. Nothing else is in that document, so there is no A4 background and
+   * no stray whitespace — only the card. The forms keep their own A4 printing.
    */
-  function printCard() {
+  async function printCard() {
     const node = cardRef.current?.querySelector<HTMLElement>(".id-card");
     if (!node) {
       window.print();
       return;
     }
-    // Convert the card's CSS-pixel box to millimetres for the @page size.
-    const wMm = (node.offsetWidth / 96) * 25.4;
-    const hMm = (node.offsetHeight / 96) * 25.4;
-    const style = document.createElement("style");
-    style.id = "id-card-page-size";
-    style.textContent = `@media print { @page { size: ${wMm.toFixed(1)}mm ${hMm.toFixed(1)}mm; margin: 0; } }`;
-    document.head.appendChild(style);
-    const cleanup = () => {
-      style.remove();
-      window.removeEventListener("afterprint", cleanup);
-    };
-    window.addEventListener("afterprint", cleanup);
-    window.print();
+    const wMm = ((node.offsetWidth / 96) * 25.4).toFixed(1);
+    const hMm = ((node.offsetHeight / 96) * 25.4).toFixed(1);
+    setDownloading(true);
+    try {
+      const dataUrl = await toPng(node, {
+        pixelRatio: 3,
+        cacheBust: true,
+        backgroundColor: "#ffffff",
+      });
+      const iframe = document.createElement("iframe");
+      iframe.style.cssText =
+        "position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
+      document.body.appendChild(iframe);
+      const doc = iframe.contentWindow!.document;
+      doc.open();
+      doc.write(
+        `<!doctype html><html><head><style>` +
+          `@page{size:${wMm}mm ${hMm}mm;margin:0}` +
+          `html,body{margin:0;padding:0}` +
+          `img{width:${wMm}mm;height:${hMm}mm;display:block}` +
+          `</style></head><body><img src="${dataUrl}"></body></html>`,
+      );
+      doc.close();
+      const img = doc.querySelector("img")!;
+      const run = () => {
+        iframe.contentWindow!.focus();
+        iframe.contentWindow!.print();
+        setTimeout(() => iframe.remove(), 1000);
+      };
+      if (img.complete) run();
+      else img.onload = run;
+    } catch (err) {
+      console.error("ID card print failed", err);
+      window.print();
+    } finally {
+      setDownloading(false);
+    }
   }
 
   return (
@@ -138,7 +166,10 @@ export function StaffDocuments({ staff }: { staff: Employee }) {
               {downloading ? "Preparing…" : "Download Card"}
             </Button>
           )}
-          <Button onClick={() => (active === "id-card" ? printCard() : window.print())}>
+          <Button
+            onClick={() => (active === "id-card" ? printCard() : window.print())}
+            disabled={active === "id-card" && downloading}
+          >
             <Printer className="mr-2 h-4 w-4" />
             Print {TABS.find((t) => t.key === active)?.label}
           </Button>
