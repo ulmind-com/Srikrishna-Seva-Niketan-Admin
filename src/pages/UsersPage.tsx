@@ -16,6 +16,7 @@ import {
   Sparkles,
   Copy,
   Check,
+  X,
   ShieldAlert,
   Building2,
   ShieldCheck,
@@ -25,7 +26,7 @@ import type { ListParams } from "@/types/api";
 import type { User } from "@/types/models";
 import { userService, type UserCreatePayload } from "@/services/user.service";
 import { resourceServices } from "@/services/resources";
-import { normalizeError } from "@/services/api/client";
+import { describeError } from "@/services/api/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { env } from "@/config/env";
 import { formatDate, humanize, initials } from "@/lib/utils";
@@ -235,7 +236,7 @@ export function UsersPage() {
       toast.success(editing ? "User updated" : "User created successfully");
       setDialogOpen(false);
     },
-    onError: (err) => toast.error(normalizeError(err).message),
+    onError: (err) => toast.error(describeError(err)),
   });
 
   const remove = useMutation({
@@ -245,7 +246,7 @@ export function UsersPage() {
       toast.success("User deleted");
       setDeleteTarget(null);
     },
-    onError: (err) => toast.error(normalizeError(err).message),
+    onError: (err) => toast.error(describeError(err)),
   });
 
   const copyCredsToClipboard = () => {
@@ -273,6 +274,20 @@ Please keep your credentials safe and do not share them.`;
   const selectedRole = form.watch("role");
   const isSuperuserChecked = form.watch("is_superuser");
   const selectedLocationIds = form.watch("location_ids") ?? [];
+
+  // Live password rules — the backend rejects anything missing one of these,
+  // so show them as they are met instead of failing on submit.
+  const passwordValue = form.watch("password") ?? "";
+  const passwordRules = [
+    { label: "8+ characters", ok: passwordValue.length >= 8 },
+    { label: "Uppercase letter", ok: /[A-Z]/.test(passwordValue) },
+    { label: "Lowercase letter", ok: /[a-z]/.test(passwordValue) },
+    { label: "Number", ok: /[0-9]/.test(passwordValue) },
+    { label: "Special character", ok: /[^A-Za-z0-9]/.test(passwordValue) },
+  ];
+  // When editing, an empty password means "unchanged" and is allowed.
+  const passwordOk = passwordRules.every((r) => r.ok);
+  const passwordValid = editing ? passwordValue === "" || passwordOk : passwordOk;
 
   return (
     <div className="space-y-6">
@@ -509,9 +524,25 @@ Please keep your credentials safe and do not share them.`;
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
-                <p className="text-[11px] text-muted-foreground">
-                  Must contain min 8 chars with uppercase, lowercase, number, and special character.
-                </p>
+                {(!editing || passwordValue !== "") && (
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 pt-0.5">
+                    {passwordRules.map((r) => (
+                      <span
+                        key={r.label}
+                        className={`inline-flex items-center gap-1 text-[11px] ${
+                          r.ok ? "text-success" : "text-muted-foreground"
+                        }`}
+                      >
+                        {r.ok ? (
+                          <Check className="h-3 w-3 stroke-[3]" />
+                        ) : (
+                          <X className="h-3 w-3" />
+                        )}
+                        {r.label}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -662,7 +693,7 @@ Please keep your credentials safe and do not share them.`;
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" loading={save.isPending}>
+              <Button type="submit" loading={save.isPending} disabled={!passwordValid}>
                 {editing ? "Save Changes" : "Create Account"}
               </Button>
             </DialogFooter>
