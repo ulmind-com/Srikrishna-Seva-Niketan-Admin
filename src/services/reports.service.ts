@@ -87,4 +87,6 @@ export const reportsService = {
     http.get<CustomerPaymentsReport>(endpoints.reports.customerPayments, params),
   dailySummary: (params?: ReportParams) =>
     http.get<DailySummaryReport>(endpoints.reports.dailySummary, params),
+  sendDailyEmail: () =>
+    http.post<{ success: boolean }>(endpoints.reports.dailyEmail),
 };

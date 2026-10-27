@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { BarChart3, TrendingUp, Users, Receipt, CalendarDays, Download } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { BarChart3, TrendingUp, Users, Receipt, CalendarDays, Download, Mail } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
 import { Button } from "@/components/ui/button";
 import { downloadReportPdf } from "@/lib/report-pdf";
@@ -132,6 +133,12 @@ export function ReportsPage() {
       ? "All branches"
       : locations?.items.find((b) => b.id === branch)?.name ?? "Branch";
 
+  const emailReport = useMutation({
+    mutationFn: () => reportsService.sendDailyEmail(),
+    onSuccess: () => toast.success("Daily report emailed to the super admins"),
+    onError: () => toast.error("Could not send the report email"),
+  });
+
   const exportPdf = () =>
     downloadReportPdf({
       periodLabel: PERIOD_LABEL[period],
@@ -164,6 +171,15 @@ export function ReportsPage() {
             </span>
             <Button variant="outline" size="sm" onClick={exportPdf} disabled={pnl.isLoading}>
               <Download className="mr-1.5 h-4 w-4" /> PDF
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => emailReport.mutate()}
+              disabled={emailReport.isPending}
+            >
+              <Mail className="mr-1.5 h-4 w-4" />
+              {emailReport.isPending ? "Sending…" : "Email"}
             </Button>
             <div className="w-56">
               <Select value={branch} onValueChange={setBranch}>

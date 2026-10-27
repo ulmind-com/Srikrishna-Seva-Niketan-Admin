@@ -96,6 +96,7 @@ export const endpoints = {
     distribution: "/reports/distribution",
     customerPayments: "/reports/customer-payments",
     dailySummary: "/reports/daily-summary",
+    dailyEmail: "/reports/daily-email",
   },
   contact: { root: "/contact" },
   settings: {
