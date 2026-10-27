@@ -66,6 +66,7 @@ export function DashboardPage() {
   const statsQuery = useQuery({
     queryKey: ["dashboard", "stats"],
     queryFn: () => dashboardService.stats(),
+    refetchInterval: 30_000,
   });
   const chartsQuery = useQuery({
     queryKey: ["dashboard", "charts"],
@@ -121,7 +122,7 @@ export function DashboardPage() {
           value: formatCurrency(stats.revenue?.total ?? 0),
           icon: <IndianRupee className="h-5 w-5" />,
           tone: "success" as const,
-          hint: `${stats.revenue?.payment_count ?? 0} payments collected`,
+          hint: `${stats.revenue?.payment_count ?? 0} engagements`,
           to: "/payments",
         },
         {
@@ -183,7 +184,7 @@ export function DashboardPage() {
           value: formatCurrency(stats.revenue?.total ?? 0),
           icon: <IndianRupee className="h-5 w-5" />,
           tone: "success" as const,
-          hint: `${stats.revenue?.payment_count ?? 0} total payments collected`,
+          hint: `${stats.revenue?.payment_count ?? 0} total engagements`,
           to: "/payments",
         },
         {
