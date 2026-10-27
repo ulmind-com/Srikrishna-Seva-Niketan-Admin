@@ -1,11 +1,12 @@
 import { useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toPng } from "html-to-image";
 import { IdCard, Printer, FileText, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ImageUpload } from "@/components/common/ImageUpload";
 import { resourceServices } from "@/services/resources";
 import { settingsService } from "@/services/settings.service";
-import type { Employee } from "@/types/models";
+import type { Employee, ImageAsset } from "@/types/models";
 import { StaffIdCard } from "./StaffIdCard";
 import { ApplicationFormI, ApplicationFormII } from "./StaffApplicationForms";
 
@@ -45,6 +46,16 @@ export function StaffDocuments({ staff }: { staff: Employee }) {
     staleTime: 300_000,
   });
   const authorizedSignatureUrl = settings?.authorized_signature?.url ?? null;
+
+  // Upload / replace the card holder's own signature (or a photo of their
+  // thumb impression) straight from the ID card view. Saved on the employee
+  // and reflected on the card immediately.
+  const qc = useQueryClient();
+  const signatureMutation = useMutation({
+    mutationFn: (signature: ImageAsset | null) =>
+      resourceServices.employees.update(staff.id, { signature }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["employees"] }),
+  });
 
   /**
    * Download only the ID card as a PNG — captured straight from the card node,
@@ -108,6 +119,29 @@ export function StaffDocuments({ staff }: { staff: Employee }) {
           </Button>
         </div>
       </div>
+
+      {/* Card holder signature uploader (ID card only) */}
+      {active === "id-card" && (
+        <div className="no-print rounded-2xl border border-border bg-card p-4">
+          <p className="text-sm font-medium">Signature of Card Holder</p>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Upload the staff member's signature. If they cannot sign, upload a
+            photo of their thumb impression — it prints just above "Signature of
+            Card Holder" on the card.
+          </p>
+          <div className="max-w-xs">
+            <ImageUpload
+              value={staff.signature}
+              onChange={(asset) => signatureMutation.mutate(asset)}
+              folder="ssn/employees/signatures"
+              aspect="wide"
+            />
+          </div>
+          {signatureMutation.isPending && (
+            <p className="mt-2 text-xs text-muted-foreground">Saving…</p>
+          )}
+        </div>
+      )}
 
       {/* Document stage */}
       <div className="overflow-x-auto rounded-2xl bg-muted/40 p-5">
