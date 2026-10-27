@@ -9,12 +9,16 @@ export interface Payslip {
 }
 
 export interface ProfitLossReport {
-  income: number;
-  expense: number;
+  income: number; // alias for revenue (kept for compatibility)
+  revenue: number;
+  staff_payout: number;
+  assignment_expense: number;
+  general_expense: number;
+  expense: number; // total expense
   profit: number;
-  income_by_mode: Record<string, number>;
+  margin_pct: number;
   expense_by_category: Record<string, number>;
-  payment_count: number;
+  assignment_count: number;
   expense_count: number;
   payslips: Payslip[];
 }

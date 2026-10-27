@@ -207,6 +207,7 @@ export interface Assignment extends BaseDoc {
   status: AssignmentStatus;
   customer_rate?: number | null;
   employee_payout?: number | null;
+  other_expense?: number | null;
   notes?: string | null;
   /** Server-computed progress. Null when the engagement is open-ended. */
   total_days?: number | null;

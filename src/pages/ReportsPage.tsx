@@ -260,9 +260,11 @@ export function ReportsPage() {
               />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Stat label="Income" value={rupee(pnl.data?.income)} tone="text-success" />
-            <Stat label="Expense" value={rupee(pnl.data?.expense)} tone="text-destructive" />
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+            <Stat label="Revenue" value={rupee(pnl.data?.revenue)} tone="text-success" />
+            <Stat label="Staff Payout" value={rupee(pnl.data?.staff_payout)} tone="text-destructive" />
+            <Stat label="Other Expense" value={rupee((pnl.data?.assignment_expense ?? 0) + (pnl.data?.general_expense ?? 0))} tone="text-destructive" />
+            <Stat label="Total Expense" value={rupee(pnl.data?.expense)} tone="text-destructive" />
             <Stat
               label="Profit / Loss"
               value={rupee(pnl.data?.profit)}
@@ -270,11 +272,7 @@ export function ReportsPage() {
             />
             <Stat
               label="Margin"
-              value={`${
-                (pnl.data?.income ?? 0) > 0
-                  ? Math.round(((pnl.data?.profit ?? 0) / (pnl.data!.income)) * 100)
-                  : 0
-              }%`}
+              value={`${pnl.data?.margin_pct ?? 0}%`}
               tone={(pnl.data?.profit ?? 0) >= 0 ? "text-success" : "text-destructive"}
             />
           </div>

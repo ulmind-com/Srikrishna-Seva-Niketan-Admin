@@ -190,8 +190,9 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
       section: "Schedule",
     },
     { name: "end_date", label: "End Date", type: "date", helper: "Optional — overrides duration.", section: "Schedule" },
-    { name: "customer_rate", label: "Customer Rate (₹)", type: "number", min: 0, helper: "Defaults to the customer's billing rate.", section: "Billing" },
-    { name: "employee_payout", label: "Staff Payout (₹)", type: "number", min: 0, helper: "Defaults to the staff member's daily rate.", section: "Billing" },
+    { name: "customer_rate", label: "Contract Amount (₹)", type: "number", min: 0, helper: "What the customer pays — counts as revenue.", section: "Billing" },
+    { name: "employee_payout", label: "Staff Payout (₹)", type: "number", min: 0, helper: "What the nurse is paid — an expense.", section: "Billing" },
+    { name: "other_expense", label: "Other Expense (₹)", type: "number", min: 0, helper: "Travel, kit, etc. for this engagement — an expense.", section: "Billing" },
     { name: "notes", label: "Notes", type: "textarea", section: "Billing", colSpan: 2 },
   ],
 };

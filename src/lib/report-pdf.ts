@@ -55,16 +55,16 @@ export function downloadReportPdf(input: ReportPdfInput) {
 
   // ---- P&L summary ----
   if (pnl) {
-    const margin =
-      pnl.income > 0 ? Math.round((pnl.profit / pnl.income) * 100) : 0;
     autoTable(doc, {
       startY: y,
       head: [["Profit & Loss", "Amount"]],
       body: [
-        ["Income (collected)", rupee(pnl.income)],
-        ["Expense", rupee(pnl.expense)],
+        ["Revenue (contracts)", rupee(pnl.revenue)],
+        ["Staff Payout", rupee(pnl.staff_payout)],
+        ["Other Expense", rupee(pnl.assignment_expense + pnl.general_expense)],
+        ["Total Expense", rupee(pnl.expense)],
         ["Profit / Loss", rupee(pnl.profit)],
-        ["Margin", `${margin}%`],
+        ["Margin", `${pnl.margin_pct}%`],
       ],
       theme: "grid",
       headStyles: { fillColor: [15, 118, 110] },
