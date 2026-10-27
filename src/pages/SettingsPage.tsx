@@ -130,7 +130,11 @@ function WebsiteForm({ canEdit }: { canEdit: boolean }) {
   if (isLoading) return <Skeleton className="h-[420px] rounded-xl" />;
 
   return (
-    <form onSubmit={handleSubmit((v) => mutation.mutate(v))}>
+    <form
+      onSubmit={handleSubmit(({ authorized_signature: _ignore, ...v }) =>
+        mutation.mutate(v),
+      )}
+    >
       <Card>
         <CardHeader>
           <CardTitle>Brand & contact</CardTitle>
@@ -228,25 +232,6 @@ function WebsiteForm({ canEdit }: { canEdit: boolean }) {
                   />
                 )}
               />
-            </Field>
-            <Field label="Authorized Signatory (ID card signature)">
-              <Controller
-                control={control}
-                name="authorized_signature"
-                render={({ field }) => (
-                  <ImageUpload
-                    value={field.value}
-                    onChange={field.onChange}
-                    folder="nupun/brand"
-                    aspect="wide"
-                  />
-                )}
-              />
-              <p className="mt-1 text-xs text-muted-foreground">
-                Upload the super-admin's signature once. It prints as the
-                "Authorized Signatory" on every staff ID card. Use a transparent
-                PNG or a photo of the signature on white paper.
-              </p>
             </Field>
           </div>
         </CardContent>

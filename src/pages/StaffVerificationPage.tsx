@@ -18,14 +18,16 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { describeError } from "@/services/api/client";
 import { staffAdminService } from "@/services/staff-portal.service";
+import { settingsService } from "@/services/settings.service";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { BranchName } from "@/components/common/BranchName";
+import { ImageUpload } from "@/components/common/ImageUpload";
 import { formatDate } from "@/components/documents/document-utils";
-import type { Employee } from "@/types/models";
+import type { Employee, ImageAsset } from "@/types/models";
 
 const STATUS_TABS = [
   { key: "pending", label: "Awaiting review" },
@@ -56,6 +58,24 @@ export function StaffVerificationPage() {
 
   const items = data?.items ?? [];
 
+  // Super-admin's signature — stored on website settings, printed as
+  // "Authorized Signatory" on every staff ID card.
+  const { data: websiteSettings } = useQuery({
+    queryKey: ["settings", "website"],
+    queryFn: () => settingsService.getWebsite(),
+    enabled: canDecide,
+    staleTime: 300_000,
+  });
+  const authSignatureMutation = useMutation({
+    mutationFn: (authorized_signature: ImageAsset | null) =>
+      settingsService.updateWebsite({ authorized_signature }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["settings", "website"] });
+      toast.success("Authorized signature updated");
+    },
+    onError: (err) => toast.error(describeError(err)),
+  });
+
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["staff-verification"] });
     queryClient.invalidateQueries({ queryKey: ["staff-location-stats"] });
@@ -76,6 +96,32 @@ export function StaffVerificationPage() {
             : "Submissions from your branch. Only a super admin can approve or reject."}
         </p>
       </div>
+
+      {/* Authorized signatory — super admin only */}
+      {canDecide && (
+        <div className="rounded-2xl border border-border bg-card p-4">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-primary" />
+            <p className="text-sm font-medium">Authorized Signatory</p>
+          </div>
+          <p className="mb-3 mt-1 text-xs text-muted-foreground">
+            Upload the super-admin's signature once. It prints as the
+            "Authorized Signatory" on every staff ID card. Use a transparent PNG
+            or a photo of the signature on white paper.
+          </p>
+          <div className="max-w-xs">
+            <ImageUpload
+              value={websiteSettings?.authorized_signature}
+              onChange={(asset) => authSignatureMutation.mutate(asset)}
+              folder="nupun/brand"
+              aspect="wide"
+            />
+          </div>
+          {authSignatureMutation.isPending && (
+            <p className="mt-2 text-xs text-muted-foreground">Saving…</p>
+          )}
+        </div>
+      )}
 
       {/* Status tabs */}
       <div className="flex flex-wrap gap-1.5 rounded-xl bg-muted p-1">
