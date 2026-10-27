@@ -18,6 +18,7 @@ import {
   VERIFICATION_VARIANT,
 } from "@/components/documents/document-utils";
 import { ORG_NAME } from "./StaffAuthShell";
+import { StaffNotifications } from "./StaffNotifications";
 
 /** The staff member's home screen after signing in. */
 export function StaffStatusPage() {
@@ -85,6 +86,9 @@ export function StaffStatusPage() {
             {VERIFICATION_LABEL[status] ?? status}
           </Badge>
         </section>
+
+        {/* Live notification feed */}
+        <StaffNotifications />
 
         {/* Status-specific panel */}
         {status === "draft" && (

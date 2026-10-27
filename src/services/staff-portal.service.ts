@@ -106,7 +106,39 @@ export const staffPortalService = {
       headers: { "Content-Type": "multipart/form-data" },
     });
   },
+
+  /** The staff member's own notification feed. */
+  notifications: () =>
+    staffRequest<{ items: StaffNotification[]; total: number }>({
+      method: "GET",
+      url: endpoints.staffPortal.notifications,
+    }),
+  unreadCount: () =>
+    staffRequest<{ unread: number }>({
+      method: "GET",
+      url: endpoints.staffPortal.notificationsUnread,
+    }),
+  markNotificationRead: (id: string) =>
+    staffRequest<StaffNotification>({
+      method: "POST",
+      url: endpoints.staffPortal.notificationRead(id),
+    }),
+  markAllNotificationsRead: () =>
+    staffRequest<{ updated: number }>({
+      method: "POST",
+      url: endpoints.staffPortal.notificationsReadAll,
+    }),
 };
+
+export interface StaffNotification {
+  id: string;
+  title: string;
+  message: string;
+  type: string;
+  is_read: boolean;
+  reference_id?: string | null;
+  created_at?: string | null;
+}
 
 /** Calls made *as an admin* against staff records. */
 export const staffAdminService = {
