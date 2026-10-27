@@ -1,11 +1,39 @@
 import { resourceServices } from "@/services/resources";
 import type { FieldConfig } from "@/components/resource/types";
+import { STORAGE_KEYS } from "@/config/env";
+
+/** The signed-in user's scoping, read from storage (no React context needed). */
+function currentScope(): { isSuper: boolean; locationIds: string[] } {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.user);
+    if (!raw) return { isSuper: false, locationIds: [] };
+    const u = JSON.parse(raw) as {
+      is_superuser?: boolean;
+      location_ids?: string[];
+    };
+    return {
+      isSuper: Boolean(u.is_superuser),
+      locationIds: u.location_ids ?? [],
+    };
+  } catch {
+    return { isSuper: false, locationIds: [] };
+  }
+}
 
 /** Shared loader for branch/location select options (used by employees,
- *  customers, assignments, expenses and payments forms). */
+ *  customers, assignments, expenses and payments forms).
+ *
+ *  A branch manager only ever sees their own branch(es), so they cannot even
+ *  pick another branch — matching the backend, which rejects cross-branch
+ *  writes outright. */
 export async function loadBranchOptions() {
   const res = await resourceServices.locations.list({ page_size: 100 });
-  return res.items.map((b) => ({ label: `${b.name} (${b.code})`, value: b.id }));
+  const { isSuper, locationIds } = currentScope();
+  const items =
+    isSuper || locationIds.length === 0
+      ? res.items
+      : res.items.filter((b) => locationIds.includes(b.id));
+  return items.map((b) => ({ label: `${b.name} (${b.code})`, value: b.id }));
 }
 
 /** Branch id → readable name, so pickers can show which branch a record is in. */
