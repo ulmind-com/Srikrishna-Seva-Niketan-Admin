@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { BarChart3, TrendingUp, Users, Receipt, CalendarDays } from "lucide-react";
+import { BarChart3, TrendingUp, Users, Receipt, CalendarDays, Download } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
+import { Button } from "@/components/ui/button";
+import { downloadReportPdf } from "@/lib/report-pdf";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -45,7 +47,15 @@ function toISO(d: Date): string {
   ).padStart(2, "0")}`;
 }
 
-type Period = "today" | "week" | "month" | "custom";
+type Period = "today" | "week" | "month" | "year" | "custom";
+
+const PERIOD_LABEL: Record<Period, string> = {
+  today: "Today",
+  week: "This Week",
+  month: "This Month",
+  year: "This Year",
+  custom: "Custom",
+};
 
 /** Start/end dates for a named period, anchored on today (local). */
 function periodRange(p: Period): { start: string; end: string } {
@@ -58,6 +68,9 @@ function periodRange(p: Period): { start: string; end: string } {
     const dow = (d.getDay() + 6) % 7; // 0 = Monday
     d.setDate(d.getDate() - dow);
     return { start: toISO(d), end };
+  }
+  if (p === "year") {
+    return { start: toISO(new Date(now.getFullYear(), 0, 1)), end };
   }
   // Month-to-date.
   return { start: toISO(new Date(now.getFullYear(), now.getMonth(), 1)), end };
@@ -114,6 +127,22 @@ export function ReportsPage() {
   const anyFetching =
     pnl.isFetching || dist.isFetching || pay.isFetching || daily.isFetching;
 
+  const branchName =
+    branch === "all"
+      ? "All branches"
+      : locations?.items.find((b) => b.id === branch)?.name ?? "Branch";
+
+  const exportPdf = () =>
+    downloadReportPdf({
+      periodLabel: PERIOD_LABEL[period],
+      start,
+      end,
+      branchName,
+      pnl: pnl.data,
+      payments: pay.data,
+      distribution: dist.data,
+    });
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -133,6 +162,9 @@ export function ReportsPage() {
               </span>
               Live
             </span>
+            <Button variant="outline" size="sm" onClick={exportPdf} disabled={pnl.isLoading}>
+              <Download className="mr-1.5 h-4 w-4" /> PDF
+            </Button>
             <div className="w-56">
               <Select value={branch} onValueChange={setBranch}>
                 <SelectTrigger>
@@ -158,6 +190,7 @@ export function ReportsPage() {
           ["today", "Today"],
           ["week", "This Week"],
           ["month", "This Month"],
+          ["year", "This Year"],
           ["custom", "Custom"],
         ] as [Period, string][]).map(([key, label]) => (
           <button
@@ -227,12 +260,21 @@ export function ReportsPage() {
               />
             </div>
           </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Stat label="Income" value={rupee(pnl.data?.income)} tone="text-success" />
             <Stat label="Expense" value={rupee(pnl.data?.expense)} tone="text-destructive" />
             <Stat
               label="Profit / Loss"
               value={rupee(pnl.data?.profit)}
+              tone={(pnl.data?.profit ?? 0) >= 0 ? "text-success" : "text-destructive"}
+            />
+            <Stat
+              label="Margin"
+              value={`${
+                (pnl.data?.income ?? 0) > 0
+                  ? Math.round(((pnl.data?.profit ?? 0) / (pnl.data!.income)) * 100)
+                  : 0
+              }%`}
               tone={(pnl.data?.profit ?? 0) >= 0 ? "text-success" : "text-destructive"}
             />
           </div>
