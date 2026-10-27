@@ -8,19 +8,47 @@ export async function loadBranchOptions() {
   return res.items.map((b) => ({ label: `${b.name} (${b.code})`, value: b.id }));
 }
 
+/** Branch id → readable name, so pickers can show which branch a record is in. */
+async function branchNames(): Promise<Record<string, string>> {
+  try {
+    const res = await resourceServices.locations.list({ page_size: 100 });
+    return Object.fromEntries(res.items.map((b) => [b.id, b.name]));
+  } catch {
+    // A missing branch name must never stop the picker from listing people.
+    return {};
+  }
+}
+
 /** Loader for customer select options (assignments, payments forms). */
 export async function loadCustomerOptions() {
-  const res = await resourceServices.customers.list({ page_size: 200 });
-  return res.items.map((c) => ({ label: `${c.name} (${c.code})`, value: c.id }));
+  const [res, names] = await Promise.all([
+    resourceServices.customers.list({ page_size: 200 }),
+    branchNames(),
+  ]);
+  return res.items
+    .map((c) => ({
+      label: [`${c.name} (${c.code})`, names[c.location_id]]
+        .filter(Boolean)
+        .join(" · "),
+      value: c.id,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label));
 }
 
 /** Loader for employee select options (assignments forms). */
 export async function loadEmployeeOptions() {
-  const res = await resourceServices.employees.list({ page_size: 200 });
-  return res.items.map((e) => ({
-    label: `${e.name} (${e.code}) · ${e.category}`,
-    value: e.id,
-  }));
+  const [res, names] = await Promise.all([
+    resourceServices.employees.list({ page_size: 200 }),
+    branchNames(),
+  ]);
+  return res.items
+    .map((e) => ({
+      label: [`${e.name} (${e.code})`, e.category, names[e.location_id]]
+        .filter(Boolean)
+        .join(" · "),
+      value: e.id,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label));
 }
 
 /** A ready-made `location_id` form field backed by the live branch list. */

@@ -31,6 +31,8 @@ export interface FieldConfig {
   /** For `select` fields whose options are loaded from the API at runtime
    *  (e.g. a branch/location picker). Takes precedence is given to static
    *  `options` when both are set. */
+  /** Shown inside an API-backed picker when the list comes back empty. */
+  emptyMessage?: string;
   dynamicOptions?: {
     queryKey: string;
     fetch: () => Promise<FieldOption[]>;

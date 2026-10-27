@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { AsyncSelect } from "@/components/common/AsyncSelect";
 import { ImageUpload } from "@/components/common/ImageUpload";
 import { VideoUpload } from "@/components/common/VideoUpload";
 import { TagsInput } from "@/components/common/TagsInput";
@@ -64,10 +65,19 @@ export function ResourceForm<T>({
       staleTime: 60_000,
     })),
   });
-  const dynamicOptionsMap = useMemo(() => {
-    const map: Record<string, { label: string; value: string }[]> = {};
+  // Carry the whole query state, not just the rows: a dynamic picker has to be
+  // able to say "loading", "failed" or "nothing here yet" instead of opening an
+  // empty list that looks broken.
+  const dynamicStateMap = useMemo(() => {
+    const map: Record<string, DynamicFieldState> = {};
     dynamicFields.forEach((f, i) => {
-      map[f.name] = dynamicQueries[i]?.data ?? [];
+      const q = dynamicQueries[i];
+      map[f.name] = {
+        options: q?.data ?? [],
+        isLoading: Boolean(q?.isLoading),
+        isError: Boolean(q?.isError),
+        refetch: () => void q?.refetch(),
+      };
     });
     return map;
   }, [dynamicFields, dynamicQueries]);
@@ -111,7 +121,7 @@ export function ResourceForm<T>({
                       </Label>
                     )}
 
-                    {renderControl(field, register, control, dynamicOptionsMap[field.name])}
+                    {renderControl(field, register, control, dynamicStateMap[field.name])}
 
                     {field.helper && !error && (
                       <p className="text-xs text-muted-foreground">
@@ -143,12 +153,20 @@ export function ResourceForm<T>({
   );
 }
 
+/** Live state of one API-backed option list. */
+interface DynamicFieldState {
+  options: { label: string; value: string }[];
+  isLoading: boolean;
+  isError: boolean;
+  refetch: () => void;
+}
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function renderControl(
   field: FieldConfig,
   register: any,
   control: any,
-  dynamicOptions?: { label: string; value: string }[]
+  dynamicState?: DynamicFieldState
 ) {
   switch (field.type) {
     case "textarea":
@@ -177,6 +195,32 @@ function renderControl(
       );
 
     case "select":
+      // API-backed lists get the searchable picker, which can also report
+      // loading / failure / emptiness. Static option lists stay a plain select.
+      if (!field.options && dynamicState) {
+        return (
+          <Controller
+            control={control}
+            name={field.name}
+            rules={{ required: field.required }}
+            render={({ field: f }) => (
+              <AsyncSelect
+                id={field.name}
+                value={f.value ? String(f.value) : undefined}
+                onChange={f.onChange}
+                options={dynamicState.options}
+                isLoading={dynamicState.isLoading}
+                isError={dynamicState.isError}
+                onRetry={dynamicState.refetch}
+                placeholder={field.placeholder ?? "Select…"}
+                emptyMessage={
+                  field.emptyMessage ?? "Nothing to choose from yet."
+                }
+              />
+            )}
+          />
+        );
+      }
       return (
         <Controller
           control={control}
@@ -191,7 +235,7 @@ function renderControl(
                 <SelectValue placeholder={field.placeholder ?? "Select…"} />
               </SelectTrigger>
               <SelectContent>
-                {(field.options ?? dynamicOptions ?? []).map((opt) => (
+                {(field.options ?? []).map((opt) => (
                   <SelectItem key={opt.value} value={opt.value}>
                     {opt.label}
                   </SelectItem>

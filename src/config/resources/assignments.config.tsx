@@ -118,6 +118,7 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
       section: "Assignment",
       placeholder: "Select staff…",
       helper: "Staff and customer must belong to the same branch.",
+      emptyMessage: "No staff registered yet. Add them in Staff Register first.",
       dynamicOptions: { queryKey: "employee-options", fetch: loadEmployeeOptions },
     },
     {
@@ -127,6 +128,7 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
       required: true,
       section: "Assignment",
       placeholder: "Select customer…",
+      emptyMessage: "No customers yet. Add one in Customers first.",
       dynamicOptions: { queryKey: "customer-options", fetch: loadCustomerOptions },
     },
     {
