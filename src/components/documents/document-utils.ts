@@ -2,6 +2,9 @@ export const ORG_NAME = "Srikrishna Seva Niketan";
 export const ORG_DEPARTMENT = "NURSING & HOME HEALTH CARE";
 export const ORG_TAGLINE = "Nursing · Aaya · Attendant Services";
 
+/** Printed brand logo for the ID card and application forms. */
+export const ORG_LOGO = "/brand/ssn-logo.webp";
+
 /** Format an ISO date (or null) as `DD/MM/YYYY` for printed documents. */
 export function formatDate(value?: string | null): string {
   if (!value) return "—";

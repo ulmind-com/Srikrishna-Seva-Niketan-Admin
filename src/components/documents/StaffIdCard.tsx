@@ -1,5 +1,5 @@
 import type { Employee } from "@/types/models";
-import { ORG_DEPARTMENT, ORG_NAME, formatDate } from "./document-utils";
+import { ORG_DEPARTMENT, ORG_LOGO, ORG_NAME, formatDate } from "./document-utils";
 
 /**
  * Printable staff identity card.
@@ -14,9 +14,12 @@ import { ORG_DEPARTMENT, ORG_NAME, formatDate } from "./document-utils";
 export function StaffIdCard({
   staff,
   branchName,
+  authorizedSignatureUrl,
 }: {
   staff: Employee;
   branchName?: string;
+  /** Super-admin's signature from website settings, printed as "Authorized Signatory". */
+  authorizedSignatureUrl?: string | null;
 }) {
   return (
     <div className="id-card relative overflow-hidden rounded-[14px] bg-white text-[#111]">
@@ -55,7 +58,12 @@ export function StaffIdCard({
       <div className="relative px-5 pb-5 pt-6">
         {/* ---- Crest + organisation ---- */}
         <div className="flex flex-col items-center text-center">
-          <Crest />
+          <img
+            src={ORG_LOGO}
+            alt={`${ORG_NAME} logo`}
+            crossOrigin="anonymous"
+            className="h-16 w-16 object-contain"
+          />
           <h1 className="mt-2 font-serif text-[15px] font-extrabold leading-tight tracking-tight text-[#0b0b0b]">
             {ORG_NAME.toUpperCase()}
           </h1>
@@ -83,6 +91,7 @@ export function StaffIdCard({
               <img
                 src={staff.photo.url}
                 alt={staff.name}
+                crossOrigin="anonymous"
                 className="h-full w-full object-cover"
               />
             ) : (
@@ -105,10 +114,19 @@ export function StaffIdCard({
         {/* ---- Signatures ---- */}
         <div className="mt-5 flex items-end justify-between gap-3">
           <div className="flex-1 text-center">
-            <div className="mx-auto mb-0.5 h-9">
-              <span className="font-signature text-[17px] leading-9 text-[#1c3d8f]">
-                Signature
-              </span>
+            <div className="mx-auto mb-0.5 flex h-9 items-end justify-center">
+              {authorizedSignatureUrl ? (
+                <img
+                  src={authorizedSignatureUrl}
+                  alt="Authorized signatory"
+                  crossOrigin="anonymous"
+                  className="max-h-9 object-contain mix-blend-multiply"
+                />
+              ) : (
+                <span className="font-signature text-[17px] leading-9 text-[#1c3d8f]">
+                  Signature
+                </span>
+              )}
             </div>
             <p className="border-t border-[#111]/20 pt-1 font-serif text-[8.5px] font-bold text-[#c0121f]">
               Authorized Signatory
@@ -121,6 +139,7 @@ export function StaffIdCard({
                 <img
                   src={staff.signature.url}
                   alt="Signature"
+                  crossOrigin="anonymous"
                   className="max-h-9 object-contain mix-blend-multiply"
                 />
               ) : (
@@ -163,28 +182,5 @@ function Row({
         {value || "—"}
       </dd>
     </div>
-  );
-}
-
-/** Simple medical crest standing in for the printed logo. */
-function Crest() {
-  return (
-    <svg viewBox="0 0 64 44" className="h-11 w-16" aria-hidden="true">
-      <defs>
-        <linearGradient id="crest-g" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#c0121f" />
-          <stop offset="100%" stopColor="#8a1538" />
-        </linearGradient>
-      </defs>
-      {/* caring figure */}
-      <circle cx="26" cy="9" r="5" fill="url(#crest-g)" />
-      <path
-        d="M14 36c0-8 5.4-14 12-14s12 6 12 14c0 1.2-1 2-2.2 2H16.2C15 38 14 37.2 14 36Z"
-        fill="url(#crest-g)"
-      />
-      {/* cross */}
-      <rect x="42" y="12" width="16" height="5.5" rx="1.2" fill="#1c3d8f" />
-      <rect x="47.2" y="6.8" width="5.6" height="16" rx="1.2" fill="#1c3d8f" />
-    </svg>
   );
 }

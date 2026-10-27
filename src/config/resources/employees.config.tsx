@@ -27,6 +27,10 @@ export const employeesConfig: ResourceConfig<Employee> = {
   defaultSort: "created_at",
   formWidth: "xl",
   getRowTitle: (row) => row.name,
+  // Staff Register shows verified staff only by default; those still under
+  // verification live in Staff Verification until approved. Admins can switch
+  // the Verification filter to see pending/all.
+  defaultFilters: { verification_status: "verified" },
   filters: [
     {
       key: "status",
@@ -146,7 +150,7 @@ export const employeesConfig: ResourceConfig<Employee> = {
     { name: "id_proof_number", label: "ID Proof Number", type: "text", section: "Documents" },
     { name: "id_proof", label: "ID Proof Document", type: "image", folder: "ssn/employees/id-proof", section: "Documents" },
     { name: "photo", label: "Photo (current)", type: "image", folder: "ssn/employees/photos", section: "Documents" },
-    { name: "signature", label: "Signature", type: "image", folder: "ssn/employees/signatures", section: "Documents" },
+    { name: "signature", label: "Signature / Thumb Impression", type: "image", folder: "ssn/employees/signatures", section: "Documents" },
     {
       name: "status",
       label: "Status",

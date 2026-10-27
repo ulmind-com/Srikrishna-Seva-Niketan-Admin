@@ -58,7 +58,9 @@ export function ResourceView<T extends { id: string }>({
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState<Record<string, string>>({});
+  const [filters, setFilters] = useState<Record<string, string>>(
+    config.defaultFilters ?? {},
+  );
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<T | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<T | null>(null);

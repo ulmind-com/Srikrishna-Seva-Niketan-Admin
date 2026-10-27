@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { IdCard, Printer, FileText } from "lucide-react";
+import { toPng } from "html-to-image";
+import { IdCard, Printer, FileText, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { resourceServices } from "@/services/resources";
+import { settingsService } from "@/services/settings.service";
 import type { Employee } from "@/types/models";
 import { StaffIdCard } from "./StaffIdCard";
 import { ApplicationFormI, ApplicationFormII } from "./StaffApplicationForms";
@@ -25,6 +27,8 @@ const TABS: { key: DocKey; label: string; icon: typeof IdCard }[] = [
  */
 export function StaffDocuments({ staff }: { staff: Employee }) {
   const [active, setActive] = useState<DocKey>("id-card");
+  const [downloading, setDownloading] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   // Resolve the branch name once; all three documents print it.
   const { data: locations } = useQuery({
@@ -33,6 +37,41 @@ export function StaffDocuments({ staff }: { staff: Employee }) {
     staleTime: 60_000,
   });
   const branchName = locations?.items.find((b) => b.id === staff.location_id)?.name;
+
+  // The super-admin's signature, printed as "Authorized Signatory" on the card.
+  const { data: settings } = useQuery({
+    queryKey: ["settings", "website"],
+    queryFn: () => settingsService.getWebsite(),
+    staleTime: 300_000,
+  });
+  const authorizedSignatureUrl = settings?.authorized_signature?.url ?? null;
+
+  /**
+   * Download only the ID card as a PNG — captured straight from the card node,
+   * so there is no page background, toolbar or A4 whitespace around it.
+   */
+  async function downloadCard() {
+    const node = cardRef.current?.querySelector<HTMLElement>(".id-card");
+    if (!node) return;
+    setDownloading(true);
+    try {
+      const dataUrl = await toPng(node, {
+        pixelRatio: 3,
+        cacheBust: true,
+        backgroundColor: "#ffffff",
+      });
+      const link = document.createElement("a");
+      link.download = `ID-Card-${staff.code}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error("ID card download failed", err);
+      // Fall back to the browser print dialog (Save as PDF still works there).
+      window.print();
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -56,18 +95,30 @@ export function StaffDocuments({ staff }: { staff: Employee }) {
           ))}
         </div>
 
-        <Button onClick={() => window.print()}>
-          <Printer className="mr-2 h-4 w-4" />
-          Print {TABS.find((t) => t.key === active)?.label}
-        </Button>
+        <div className="flex gap-2">
+          {active === "id-card" && (
+            <Button variant="outline" onClick={downloadCard} disabled={downloading}>
+              <Download className="mr-2 h-4 w-4" />
+              {downloading ? "Preparing…" : "Download Card"}
+            </Button>
+          )}
+          <Button onClick={() => window.print()}>
+            <Printer className="mr-2 h-4 w-4" />
+            Print {TABS.find((t) => t.key === active)?.label}
+          </Button>
+        </div>
       </div>
 
       {/* Document stage */}
       <div className="overflow-x-auto rounded-2xl bg-muted/40 p-5">
         <div className="flex justify-center">
           {active === "id-card" && (
-            <div className="print-target w-[300px] shadow-lg">
-              <StaffIdCard staff={staff} branchName={branchName} />
+            <div ref={cardRef} className="print-target w-[300px] shadow-lg">
+              <StaffIdCard
+                staff={staff}
+                branchName={branchName}
+                authorizedSignatureUrl={authorizedSignatureUrl}
+              />
             </div>
           )}
           {active === "form-1" && (

@@ -66,6 +66,8 @@ export interface ResourceConfig<T extends { id: string }> {
   columns: ColumnConfig<T>[];
   fields: FieldConfig[];
   filters?: FilterConfig[];
+  /** Filter values applied on first load (user can still change them). */
+  defaultFilters?: Record<string, string>;
   searchPlaceholder?: string;
   permission: string; // resource key for RBAC, e.g. "services"
   defaultSort?: string;

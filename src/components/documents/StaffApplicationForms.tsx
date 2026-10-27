@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { Employee } from "@/types/models";
-import { ORG_DEPARTMENT, ORG_NAME, ORG_TAGLINE, formatDate } from "./document-utils";
+import { ORG_DEPARTMENT, ORG_LOGO, ORG_NAME, ORG_TAGLINE, formatDate } from "./document-utils";
 
 /**
  * The two A4 forms generated for a verified staff member.
@@ -214,14 +214,21 @@ function Letterhead({
   return (
     <header className="border-b-2 border-[#8a1538] pb-3">
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="font-serif text-[19px] font-extrabold leading-tight tracking-tight">
-            {ORG_NAME.toUpperCase()}
-          </h1>
-          <p className="font-serif text-[10px] font-bold text-[#c0121f]">
-            {ORG_DEPARTMENT}
-          </p>
-          <p className="text-[9px] text-slate-500">{ORG_TAGLINE}</p>
+        <div className="flex items-center gap-3">
+          <img
+            src={ORG_LOGO}
+            alt={`${ORG_NAME} logo`}
+            className="h-14 w-14 shrink-0 object-contain"
+          />
+          <div>
+            <h1 className="font-serif text-[19px] font-extrabold leading-tight tracking-tight">
+              {ORG_NAME.toUpperCase()}
+            </h1>
+            <p className="font-serif text-[10px] font-bold text-[#c0121f]">
+              {ORG_DEPARTMENT}
+            </p>
+            <p className="text-[9px] text-slate-500">{ORG_TAGLINE}</p>
+          </div>
         </div>
         <div className="text-right">
           <p className="text-[8.5px] uppercase tracking-wide text-slate-500">Ref. No.</p>
