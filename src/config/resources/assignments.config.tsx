@@ -9,7 +9,7 @@ import {
   PLACE_LABEL,
 } from "@/components/common/AssignmentProgress";
 import { DateCell } from "./cells";
-import { loadCustomerOptions, loadEmployeeOptions } from "./branch-field";
+import { loadEmployeeOptions } from "./branch-field";
 
 const SHIFT_LABEL: Record<string, string> = {
   day: "Day",
@@ -124,12 +124,10 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
     {
       name: "customer_id",
       label: "Customer",
-      type: "select",
+      type: "customer",
       required: true,
       section: "Assignment",
-      placeholder: "Select customer…",
-      emptyMessage: "No customers yet. Add one in Customers first.",
-      dynamicOptions: { queryKey: "customer-options", fetch: loadCustomerOptions },
+      helper: "Pick an existing customer, or add a new one inline.",
     },
     {
       name: "shift",

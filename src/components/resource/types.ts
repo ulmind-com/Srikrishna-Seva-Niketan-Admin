@@ -8,6 +8,7 @@ export type FieldType =
   | "textarea"
   | "richtext"
   | "select"
+  | "customer"
   | "switch"
   | "image"
   | "video"

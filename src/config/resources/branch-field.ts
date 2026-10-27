@@ -22,7 +22,7 @@ async function branchNames(): Promise<Record<string, string>> {
 /** Loader for customer select options (assignments, payments forms). */
 export async function loadCustomerOptions() {
   const [res, names] = await Promise.all([
-    resourceServices.customers.list({ page_size: 200 }),
+    resourceServices.customers.list({ page_size: 100 }),
     branchNames(),
   ]);
   return res.items
@@ -38,7 +38,7 @@ export async function loadCustomerOptions() {
 /** Loader for employee select options (assignments forms). */
 export async function loadEmployeeOptions() {
   const [res, names] = await Promise.all([
-    resourceServices.employees.list({ page_size: 200 }),
+    resourceServices.employees.list({ page_size: 100 }),
     branchNames(),
   ]);
   return res.items

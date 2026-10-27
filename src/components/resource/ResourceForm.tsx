@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AsyncSelect } from "@/components/common/AsyncSelect";
+import { CustomerField } from "@/components/common/CustomerField";
 import { ImageUpload } from "@/components/common/ImageUpload";
 import { VideoUpload } from "@/components/common/VideoUpload";
 import { TagsInput } from "@/components/common/TagsInput";
@@ -190,6 +191,22 @@ function renderControl(
               <span className="text-sm font-medium">{field.label}</span>
               <Switch checked={Boolean(f.value)} onCheckedChange={f.onChange} />
             </label>
+          )}
+        />
+      );
+
+    case "customer":
+      return (
+        <Controller
+          control={control}
+          name={field.name}
+          rules={{ required: field.required }}
+          render={({ field: f }) => (
+            <CustomerField
+              id={field.name}
+              value={f.value ? String(f.value) : undefined}
+              onChange={f.onChange}
+            />
           )}
         />
       );
