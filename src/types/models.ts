@@ -235,6 +235,26 @@ export interface DeploymentBranch {
   }[];
 }
 
+/** One branch's shifts on a given day from `/assignments/daily`. */
+export interface DailyRosterBranch {
+  location_id: string;
+  location_name: string;
+  location_code: string;
+  city?: string | null;
+  count: number;
+  assignments: Assignment[];
+}
+
+export interface DailyRoster {
+  date: string;
+  totals: {
+    on_duty: number;
+    branches: number;
+    by_shift: Record<string, number>;
+  };
+  branches: DailyRosterBranch[];
+}
+
 export interface DeploymentOverview {
   totals: {
     total_staff: number;

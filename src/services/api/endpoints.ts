@@ -80,7 +80,11 @@ export const endpoints = {
     submit: "/staff-portal/me/submit",
   },
   customers: { root: "/customers" },
-  assignments: { root: "/assignments", deployment: "/assignments/deployment" },
+  assignments: {
+    root: "/assignments",
+    deployment: "/assignments/deployment",
+    daily: "/assignments/daily",
+  },
   expenses: { root: "/expenses" },
   payments: { root: "/payments" },
   reports: {
