@@ -38,12 +38,50 @@ function Stat({ label, value, tone }: { label: string; value: React.ReactNode; t
   );
 }
 
+/** `YYYY-MM-DD` for a Date in local time (not UTC, which can slip a day). */
+function toISO(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate(),
+  ).padStart(2, "0")}`;
+}
+
+type Period = "today" | "week" | "month" | "custom";
+
+/** Start/end dates for a named period, anchored on today (local). */
+function periodRange(p: Period): { start: string; end: string } {
+  const now = new Date();
+  const end = toISO(now);
+  if (p === "today") return { start: end, end };
+  if (p === "week") {
+    // Calendar week starting Monday.
+    const d = new Date(now);
+    const dow = (d.getDay() + 6) % 7; // 0 = Monday
+    d.setDate(d.getDate() - dow);
+    return { start: toISO(d), end };
+  }
+  // Month-to-date.
+  return { start: toISO(new Date(now.getFullYear(), now.getMonth(), 1)), end };
+}
+
+// Refresh cadence for the "live" feel.
+const LIVE_MS = 30_000;
+
 export function ReportsPage() {
-  const today = new Date().toISOString().slice(0, 10);
-  const monthStart = today.slice(0, 8) + "01";
-  const [start, setStart] = useState(monthStart);
+  const today = toISO(new Date());
+  const [period, setPeriodState] = useState<Period>("month");
+  const monthRange = periodRange("month");
+  const [start, setStart] = useState(monthRange.start);
   const [end, setEnd] = useState(today);
   const [branch, setBranch] = useState<string>("all");
+
+  const setPeriod = (p: Period) => {
+    setPeriodState(p);
+    if (p !== "custom") {
+      const r = periodRange(p);
+      setStart(r.start);
+      setEnd(r.end);
+    }
+  };
 
   const { data: locations } = useQuery({
     queryKey: ["locations", "all"],
@@ -55,19 +93,26 @@ export function ReportsPage() {
   const pnl = useQuery({
     queryKey: ["report", "pnl", start, end, loc],
     queryFn: () => reportsService.profitLoss({ start, end, location_id: loc }),
+    refetchInterval: LIVE_MS,
   });
   const dist = useQuery({
     queryKey: ["report", "dist", loc],
     queryFn: () => reportsService.distribution({ location_id: loc }),
+    refetchInterval: LIVE_MS,
   });
   const pay = useQuery({
     queryKey: ["report", "pay", loc],
     queryFn: () => reportsService.customerPayments({ location_id: loc }),
+    refetchInterval: LIVE_MS,
   });
   const daily = useQuery({
     queryKey: ["report", "daily", loc],
     queryFn: () => reportsService.dailySummary({ location_id: loc }),
+    refetchInterval: LIVE_MS,
   });
+
+  const anyFetching =
+    pnl.isFetching || dist.isFetching || pay.isFetching || daily.isFetching;
 
   return (
     <div className="space-y-6">
@@ -76,23 +121,62 @@ export function ReportsPage() {
         description="Profit & loss, staff distribution, customer payments and the daily summary."
         icon={<BarChart3 />}
         actions={
-          <div className="w-56">
-            <Select value={branch} onValueChange={setBranch}>
-              <SelectTrigger>
-                <SelectValue placeholder="All branches" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All branches</SelectItem>
-                {(locations?.items ?? []).map((b) => (
-                  <SelectItem key={b.id} value={b.id}>
-                    {b.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="relative flex h-2 w-2">
+                <span
+                  className={`absolute inline-flex h-full w-full rounded-full bg-success opacity-75 ${
+                    anyFetching ? "animate-ping" : ""
+                  }`}
+                />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
+              </span>
+              Live
+            </span>
+            <div className="w-56">
+              <Select value={branch} onValueChange={setBranch}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All branches" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All branches</SelectItem>
+                  {(locations?.items ?? []).map((b) => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         }
       />
+
+      {/* Period presets — drive the Profit & Loss date range. */}
+      <div className="flex flex-wrap items-center gap-2">
+        {([
+          ["today", "Today"],
+          ["week", "This Week"],
+          ["month", "This Month"],
+          ["custom", "Custom"],
+        ] as [Period, string][]).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setPeriod(key)}
+            className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition ${
+              period === key
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+        <span className="ml-1 text-xs text-muted-foreground">
+          {start} → {end}
+        </span>
+      </div>
 
       <Tabs defaultValue="daily">
         <TabsList>
@@ -120,11 +204,27 @@ export function ReportsPage() {
           <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-1.5">
               <Label>From</Label>
-              <Input type="date" value={start} onChange={(e) => setStart(e.target.value)} className="w-40" />
+              <Input
+                type="date"
+                value={start}
+                onChange={(e) => {
+                  setStart(e.target.value);
+                  setPeriodState("custom");
+                }}
+                className="w-40"
+              />
             </div>
             <div className="space-y-1.5">
               <Label>To</Label>
-              <Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className="w-40" />
+              <Input
+                type="date"
+                value={end}
+                onChange={(e) => {
+                  setEnd(e.target.value);
+                  setPeriodState("custom");
+                }}
+                className="w-40"
+              />
             </div>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -174,6 +274,37 @@ export function ReportsPage() {
 
         {/* Distribution */}
         <TabsContent value="dist" className="space-y-4">
+          {(() => {
+            const total = dist.data?.total_staff ?? 0;
+            const assigned = dist.data?.assigned_staff ?? 0;
+            const free = dist.data?.free_staff_count ?? Math.max(0, total - assigned);
+            const pct = total ? Math.round((assigned / total) * 100) : 0;
+            return (
+              <Card>
+                <CardContent className="p-5">
+                  <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+                    <p className="text-sm font-medium">Staff deployment</p>
+                    <p className="text-sm text-muted-foreground">
+                      <span className="font-semibold text-foreground">{assigned}</span>{" "}
+                      of <span className="font-semibold text-foreground">{total}</span>{" "}
+                      distributed ·{" "}
+                      <span className="font-semibold text-success">{free}</span> remaining
+                    </p>
+                  </div>
+                  <div className="h-3 w-full overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    {pct}% deployed · {dist.data?.customers?.length ?? 0} ongoing
+                    engagement{(dist.data?.customers?.length ?? 0) === 1 ? "" : "s"}
+                  </p>
+                </CardContent>
+              </Card>
+            );
+          })()}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Stat label="Total Staff" value={dist.data?.total_staff ?? "—"} />
             <Stat label="Assigned Staff" value={dist.data?.assigned_staff ?? "—"} />
