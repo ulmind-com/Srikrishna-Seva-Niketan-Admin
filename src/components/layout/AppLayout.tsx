@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { LiveNotificationListener } from "./LiveNotificationListener";
 
 export function AppLayout() {
   const [collapsed, setCollapsed] = useState(
@@ -25,7 +24,6 @@ export function AppLayout() {
 
   return (
     <div className="min-h-screen bg-background">
-      <LiveNotificationListener />
       {/* Desktop sidebar */}
       <aside
         className={cn(
