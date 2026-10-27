@@ -4,6 +4,10 @@ import { resourceServices } from "@/services/resources";
 import type { ResourceConfig } from "@/components/resource/types";
 import { Badge } from "@/components/ui/badge";
 import { BranchName } from "@/components/common/BranchName";
+import {
+  AssignmentProgress,
+  PLACE_LABEL,
+} from "@/components/common/AssignmentProgress";
 import { DateCell } from "./cells";
 import { loadCustomerOptions, loadEmployeeOptions } from "./branch-field";
 
@@ -60,6 +64,17 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
       cell: (r) => <Badge variant="outline">{SHIFT_LABEL[r.shift] ?? r.shift}</Badge>,
     },
     {
+      header: "Posted At",
+      cell: (r) => (
+        <div className="flex flex-col">
+          <span className="text-sm">{PLACE_LABEL[r.place_type] ?? "—"}</span>
+          {r.place_name && (
+            <span className="text-xs text-muted-foreground">{r.place_name}</span>
+          )}
+        </div>
+      ),
+    },
+    {
       header: "Period",
       cell: (r) => (
         <div className="text-xs text-muted-foreground">
@@ -67,6 +82,10 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
           {r.end_date ? <> → <DateCell value={r.end_date} /></> : " → ongoing"}
         </div>
       ),
+    },
+    {
+      header: "Progress",
+      cell: (r) => <AssignmentProgress row={r} />,
     },
     {
       header: "Rates (₹)",
@@ -137,8 +156,40 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
       ],
       section: "Assignment",
     },
+    {
+      name: "place_type",
+      label: "Posted At",
+      type: "select",
+      required: true,
+      defaultValue: "home",
+      options: [
+        { label: "Customer's Home", value: "home" },
+        { label: "Hospital", value: "hospital" },
+        { label: "Nursing Home", value: "nursing_home" },
+        { label: "Other", value: "other" },
+      ],
+      section: "Place",
+    },
+    {
+      name: "place_name",
+      label: "Hospital / Nursing Home Name",
+      type: "text",
+      placeholder: "e.g. Apollo Gleneagles",
+      helper: "Leave blank for a home posting.",
+      section: "Place",
+    },
+    { name: "address", label: "Address", type: "textarea", section: "Place", colSpan: 2 },
     { name: "start_date", label: "Start Date", type: "date", required: true, section: "Schedule" },
-    { name: "end_date", label: "End Date", type: "date", helper: "Leave blank for ongoing.", section: "Schedule" },
+    {
+      name: "duration_days",
+      label: "Duration (days)",
+      type: "number",
+      min: 1,
+      placeholder: "e.g. 10",
+      helper: "Sets the end date automatically. Leave blank for ongoing.",
+      section: "Schedule",
+    },
+    { name: "end_date", label: "End Date", type: "date", helper: "Optional — overrides duration.", section: "Schedule" },
     { name: "customer_rate", label: "Customer Rate (₹)", type: "number", min: 0, helper: "Defaults to the customer's billing rate.", section: "Billing" },
     { name: "employee_payout", label: "Staff Payout (₹)", type: "number", min: 0, helper: "Defaults to the staff member's daily rate.", section: "Billing" },
     { name: "notes", label: "Notes", type: "textarea", section: "Billing", colSpan: 2 },

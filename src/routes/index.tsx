@@ -23,6 +23,7 @@ import { EmployeeIdCardPage } from "@/pages/EmployeeIdCardPage";
 import { EmployeeDocumentsPage } from "@/pages/EmployeeDocumentsPage";
 import { StaffVerificationPage } from "@/pages/StaffVerificationPage";
 import { LocationStaffOverviewPage } from "@/pages/LocationStaffOverviewPage";
+import { StaffDeploymentPage } from "@/pages/StaffDeploymentPage";
 import { StaffLoginPage } from "@/pages/staff/StaffLoginPage";
 import { StaffRegisterPage } from "@/pages/staff/StaffRegisterPage";
 import { StaffOnboardingPage } from "@/pages/staff/StaffOnboardingPage";
@@ -83,6 +84,7 @@ export function AppRoutes() {
           <Route path="/staff-by-branch" element={<LocationStaffOverviewPage />} />
           <Route path="/customers" element={<CustomersPage />} />
           <Route path="/assignments" element={<AssignmentsPage />} />
+          <Route path="/staff-deployment" element={<StaffDeploymentPage />} />
           <Route path="/expenses" element={<ExpensesPage />} />
           <Route path="/payments" element={<PaymentsPage />} />
           <Route path="/reports" element={<ReportsPage />} />

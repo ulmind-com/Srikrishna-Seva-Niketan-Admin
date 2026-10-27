@@ -188,19 +188,61 @@ export interface Customer extends BaseDoc {
 export type ShiftType = "day" | "night" | "full_24h" | "custom";
 export type AssignmentStatus = "scheduled" | "active" | "completed" | "cancelled";
 
+export type AssignmentPlace = "home" | "hospital" | "nursing_home" | "other";
+
 export interface Assignment extends BaseDoc {
   customer_id: string;
   customer_name: string;
   employee_id: string;
   employee_name: string;
   location_id: string;
+  place_type: AssignmentPlace;
+  place_name?: string | null;
+  address?: string | null;
   shift: ShiftType;
   start_date: string;
   end_date?: string | null;
+  /** Write-only convenience input — the backend turns it into end_date. */
+  duration_days?: number | null;
   status: AssignmentStatus;
   customer_rate?: number | null;
   employee_payout?: number | null;
   notes?: string | null;
+  /** Server-computed progress. Null when the engagement is open-ended. */
+  total_days?: number | null;
+  days_elapsed?: number;
+  days_remaining?: number | null;
+  progress_pct?: number | null;
+}
+
+/** One branch's deployment picture from `/assignments/deployment`. */
+export interface DeploymentBranch {
+  location_id: string;
+  location_name: string;
+  location_code: string;
+  city?: string | null;
+  total_staff: number;
+  assigned_count: number;
+  available_count: number;
+  assignments: Assignment[];
+  available_staff: {
+    id: string;
+    name: string;
+    code: string;
+    category: string;
+    phone?: string | null;
+    photo?: ImageAsset | null;
+  }[];
+}
+
+export interface DeploymentOverview {
+  totals: {
+    total_staff: number;
+    assigned_count: number;
+    available_count: number;
+    branches: number;
+  };
+  branches: DeploymentBranch[];
 }
 
 export interface Expense extends BaseDoc {

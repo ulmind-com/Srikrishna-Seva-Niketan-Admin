@@ -2,6 +2,7 @@ import { endpoints } from "./api/endpoints";
 import { staffRequest } from "./api/staff-client";
 import { http } from "./api/http";
 import type {
+  DeploymentOverview,
   Employee,
   ImageAsset,
   LocationStaffStat,
@@ -111,6 +112,10 @@ export const staffAdminService = {
   /** Branch-wise counts — every branch for a super admin, own branches for a manager. */
   statsByLocation: () =>
     http.get<LocationStaffStat[]>(endpoints.employees.statsByLocation),
+
+  /** Who is deployed, who is free — per branch, scoped to the caller. */
+  deployment: () =>
+    http.get<DeploymentOverview>(endpoints.assignments.deployment),
 
   /** The review queue, optionally narrowed to one branch. */
   listByStatus: (verification_status: string, location_id?: string) =>
