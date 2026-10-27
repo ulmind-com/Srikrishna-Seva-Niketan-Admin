@@ -1,71 +1,112 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useWatch, type Control } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { resourceServices } from "@/services/resources";
 import { describeError } from "@/services/api/client";
-import {
-  loadBranchOptions,
-  loadCustomerOptions,
-} from "@/config/resources/branch-field";
+import { loadBranchOptions } from "@/config/resources/branch-field";
 import { AsyncSelect } from "@/components/common/AsyncSelect";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 /**
- * Customer picker for the assignment form.
+ * Customer picker for the assignment form — branch-aware, so the "staff and
+ * customer must belong to the same branch" rule is enforced by the UI instead
+ * of only surfacing as an error on save.
  *
- * Normally you pick an existing customer, but if the person is new you can type
- * their details right here instead of leaving to the Customers page first — a
- * customer still needs a name and phone to bill against, so the inline form
- * collects those plus the branch rather than taking a bare name.
+ * Once a staff member is chosen, the list is narrowed to that staff member's
+ * branch, a customer already picked from a different branch is cleared, and a
+ * new customer created inline inherits that same branch. If the person is new
+ * you can add them here (name + phone) without leaving the form.
  */
 export function CustomerField({
   value,
   onChange,
   id,
+  control,
 }: {
   value?: string;
   onChange: (value: string) => void;
   id?: string;
+  control?: Control<Record<string, unknown>>;
 }) {
   const qc = useQueryClient();
   const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ name: "", phone: "", location_id: "" });
+  const [form, setForm] = useState({ name: "", phone: "" });
 
-  const customers = useQuery({
-    queryKey: ["field-options", "customer-options"],
-    queryFn: loadCustomerOptions,
+  // The staff member chosen in the same form drives the branch constraint.
+  const staffId = useWatch({ control, name: "employee_id" }) as
+    | string
+    | undefined;
+
+  const employees = useQuery({
+    queryKey: ["assignment-employees-raw"],
+    queryFn: () => resourceServices.employees.list({ page_size: 100 }),
     staleTime: 60_000,
   });
-
+  const customersQ = useQuery({
+    queryKey: ["assignment-customers-raw"],
+    queryFn: () => resourceServices.customers.list({ page_size: 100 }),
+    staleTime: 60_000,
+  });
   const branches = useQuery({
     queryKey: ["field-options", "branches"],
     queryFn: loadBranchOptions,
     staleTime: 60_000,
-    enabled: adding,
   });
+
+  const branchName = (lid?: string | null) =>
+    branches.data?.find((b) => b.value === lid)?.label ?? "";
+
+  const staffBranch = employees.data?.items.find(
+    (e) => e.id === staffId,
+  )?.location_id;
+
+  const allCustomers = useMemo(
+    () => customersQ.data?.items ?? [],
+    [customersQ.data],
+  );
+
+  // Only customers in the staff member's branch are valid once staff is picked.
+  const options = useMemo(() => {
+    const visible = staffBranch
+      ? allCustomers.filter((c) => c.location_id === staffBranch)
+      : allCustomers;
+    return visible
+      .map((c) => ({
+        label: [`${c.name} (${c.code})`, branchName(c.location_id)]
+          .filter(Boolean)
+          .join(" · "),
+        value: c.id,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allCustomers, staffBranch, branches.data]);
+
+  // Drop a selection that no longer matches the staff member's branch.
+  useEffect(() => {
+    if (!value || !staffBranch) return;
+    const current = allCustomers.find((c) => c.id === value);
+    if (current && current.location_id !== staffBranch) onChange("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staffBranch]);
 
   const createMutation = useMutation({
     mutationFn: () =>
       resourceServices.customers.create({
         name: form.name.trim(),
         phone: form.phone.trim(),
-        location_id: form.location_id || undefined,
+        // New customer joins the staff member's branch so the pair always match.
+        location_id: staffBranch || undefined,
       } as never),
     onSuccess: (customer) => {
+      qc.invalidateQueries({ queryKey: ["assignment-customers-raw"] });
       qc.invalidateQueries({ queryKey: ["field-options", "customer-options"] });
       onChange(customer.id);
       setAdding(false);
-      setForm({ name: "", phone: "", location_id: "" });
+      setForm({ name: "", phone: "" });
       toast.success("Customer added");
     },
     onError: (err) => toast.error(describeError(err)),
@@ -107,26 +148,13 @@ export function CustomerField({
               placeholder="Mobile number"
             />
           </div>
-          <div>
-            <Label className="text-xs">Branch</Label>
-            <Select
-              value={form.location_id || undefined}
-              onValueChange={(v) => setForm((f) => ({ ...f, location_id: v }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select branch…" />
-              </SelectTrigger>
-              <SelectContent>
-                {(branches.data ?? []).map((b) => (
-                  <SelectItem key={b.value} value={b.value}>
-                    {b.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              Must match the staff member's branch.
-            </p>
+          <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs">
+            <span className="text-muted-foreground">Branch: </span>
+            {staffBranch ? (
+              <span className="font-medium">{branchName(staffBranch)}</span>
+            ) : (
+              <span className="text-warning">Select a staff member first</span>
+            )}
           </div>
 
           <div className="flex gap-2 pt-1">
@@ -134,7 +162,7 @@ export function CustomerField({
               type="button"
               size="sm"
               onClick={() => createMutation.mutate()}
-              disabled={!canCreate || createMutation.isPending}
+              disabled={!canCreate || !staffBranch || createMutation.isPending}
             >
               {createMutation.isPending ? "Adding…" : "Add customer"}
             </Button>
@@ -158,12 +186,16 @@ export function CustomerField({
         id={id}
         value={value}
         onChange={onChange}
-        options={customers.data ?? []}
-        isLoading={customers.isLoading}
-        isError={customers.isError}
-        onRetry={() => void customers.refetch()}
+        options={options}
+        isLoading={customersQ.isLoading}
+        isError={customersQ.isError}
+        onRetry={() => void customersQ.refetch()}
         placeholder="Select customer…"
-        emptyMessage="No customers yet — add one below."
+        emptyMessage={
+          staffBranch
+            ? "No customers in this branch yet — add one below."
+            : "No customers yet — add one below."
+        }
       />
       <button
         type="button"

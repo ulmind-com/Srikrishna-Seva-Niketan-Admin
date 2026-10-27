@@ -206,6 +206,7 @@ function renderControl(
               id={field.name}
               value={f.value ? String(f.value) : undefined}
               onChange={f.onChange}
+              control={control}
             />
           )}
         />
