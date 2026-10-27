@@ -84,6 +84,31 @@ export function StaffDocuments({ staff }: { staff: Employee }) {
     }
   }
 
+  /**
+   * Print just the ID card on a page cut to the card's own size, so the PDF
+   * has no surrounding A4 background — only the card. The forms keep A4.
+   */
+  function printCard() {
+    const node = cardRef.current?.querySelector<HTMLElement>(".id-card");
+    if (!node) {
+      window.print();
+      return;
+    }
+    // Convert the card's CSS-pixel box to millimetres for the @page size.
+    const wMm = (node.offsetWidth / 96) * 25.4;
+    const hMm = (node.offsetHeight / 96) * 25.4;
+    const style = document.createElement("style");
+    style.id = "id-card-page-size";
+    style.textContent = `@media print { @page { size: ${wMm.toFixed(1)}mm ${hMm.toFixed(1)}mm; margin: 0; } }`;
+    document.head.appendChild(style);
+    const cleanup = () => {
+      style.remove();
+      window.removeEventListener("afterprint", cleanup);
+    };
+    window.addEventListener("afterprint", cleanup);
+    window.print();
+  }
+
   return (
     <div className="space-y-5">
       {/* Toolbar */}
@@ -113,7 +138,7 @@ export function StaffDocuments({ staff }: { staff: Employee }) {
               {downloading ? "Preparing…" : "Download Card"}
             </Button>
           )}
-          <Button onClick={() => window.print()}>
+          <Button onClick={() => (active === "id-card" ? printCard() : window.print())}>
             <Printer className="mr-2 h-4 w-4" />
             Print {TABS.find((t) => t.key === active)?.label}
           </Button>
