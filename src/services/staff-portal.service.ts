@@ -128,7 +128,67 @@ export const staffPortalService = {
       method: "POST",
       url: endpoints.staffPortal.notificationsReadAll,
     }),
+
+  /** The nurse's own duty assignments — price-free. */
+  assignments: (pending?: boolean) =>
+    staffRequest<{ items: StaffAssignment[]; total: number }>({
+      method: "GET",
+      url: endpoints.staffPortal.assignments,
+      params: pending ? { pending: true } : undefined,
+    }),
+  acceptAssignment: (id: string) =>
+    staffRequest<StaffAssignment>({
+      method: "POST",
+      url: endpoints.staffPortal.assignmentAccept(id),
+    }),
+  declineAssignment: (id: string, reason?: string) =>
+    staffRequest<StaffAssignment>({
+      method: "POST",
+      url: endpoints.staffPortal.assignmentDecline(id),
+      data: { reason },
+    }),
+  /** Route from the nurse's current GPS to the duty location. */
+  route: (id: string, lat: number, lng: number) =>
+    staffRequest<RouteResult>({
+      method: "GET",
+      url: endpoints.staffPortal.assignmentRoute(id),
+      params: { lat, lng },
+    }),
+  pingLocation: (lat: number, lng: number) =>
+    staffRequest<{ ok: boolean }>({
+      method: "POST",
+      url: endpoints.staffPortal.location,
+      data: { lat, lng },
+    }),
 };
+
+/** An assignment as the nurse sees it — deliberately carries no money field. */
+export interface StaffAssignment {
+  id: string;
+  customer_name: string;
+  customer_phone?: string | null;
+  place_type: "home" | "hospital" | "nursing_home" | "other";
+  place_name?: string | null;
+  address?: string | null;
+  shift: string;
+  start_date: string;
+  end_date?: string | null;
+  acceptance_status: "pending" | "accepted" | "declined";
+  dest_lat?: number | null;
+  dest_lng?: number | null;
+  total_days?: number | null;
+  days_remaining?: number | null;
+}
+
+/** Shortest-path result from the staff route endpoint. */
+export interface RouteResult {
+  distance_m: number | null;
+  duration_s: number | null;
+  /** Polyline as [lng, lat] pairs, or null when routing was unavailable. */
+  geometry: number[][] | null;
+  dest_lat: number | null;
+  dest_lng: number | null;
+}
 
 export interface StaffNotification {
   id: string;

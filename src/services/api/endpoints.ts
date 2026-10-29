@@ -82,6 +82,11 @@ export const endpoints = {
     notificationsUnread: "/staff-portal/me/notifications/unread-count",
     notificationRead: (id: string) => `/staff-portal/me/notifications/${id}/read`,
     notificationsReadAll: "/staff-portal/me/notifications/read-all",
+    assignments: "/staff-portal/me/assignments",
+    assignmentAccept: (id: string) => `/staff-portal/me/assignments/${id}/accept`,
+    assignmentDecline: (id: string) => `/staff-portal/me/assignments/${id}/decline`,
+    assignmentRoute: (id: string) => `/staff-portal/me/assignments/${id}/route`,
+    location: "/staff-portal/me/location",
   },
   customers: { root: "/customers" },
   assignments: {

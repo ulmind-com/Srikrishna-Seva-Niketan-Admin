@@ -180,6 +180,9 @@ export interface Customer extends BaseDoc {
   duration_days?: number | null;
   one_to_one: boolean;
   location_id: string;
+  /** Map pin — admin-set or geocoded from the address. */
+  lat?: number | null;
+  lng?: number | null;
   billing_rate?: number | null;
   notes?: string | null;
   is_active: boolean;
@@ -189,6 +192,8 @@ export type ShiftType = "day" | "night" | "full_24h" | "custom";
 export type AssignmentStatus = "scheduled" | "active" | "completed" | "cancelled";
 
 export type AssignmentPlace = "home" | "hospital" | "nursing_home" | "other";
+
+export type AcceptanceStatus = "pending" | "accepted" | "declined";
 
 export interface Assignment extends BaseDoc {
   customer_id: string;
@@ -205,6 +210,13 @@ export interface Assignment extends BaseDoc {
   /** Write-only convenience input — the backend turns it into end_date. */
   duration_days?: number | null;
   status: AssignmentStatus;
+  /** Nurse's response to the posting. */
+  acceptance_status?: AcceptanceStatus;
+  accepted_at?: string | null;
+  declined_at?: string | null;
+  decline_reason?: string | null;
+  dest_lat?: number | null;
+  dest_lng?: number | null;
   customer_rate?: number | null;
   employee_payout?: number | null;
   other_expense?: number | null;
