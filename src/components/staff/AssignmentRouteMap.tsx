@@ -643,12 +643,14 @@ export function AssignmentRouteMap({ assignment }: { assignment: StaffAssignment
       ? `${durationMin} min`
       : null;
 
-  // Clock arrival time (e.g. "11:15 AM")
+  // Clock arrival time in IST (e.g. "11:15 AM")
   const etaClockTime =
     route?.duration_s != null
-      ? new Date(Date.now() + route.duration_s * 1000).toLocaleTimeString([], {
+      ? new Date(Date.now() + route.duration_s * 1000).toLocaleTimeString("en-IN", {
+          timeZone: "Asia/Kolkata",
           hour: "2-digit",
           minute: "2-digit",
+          hour12: true,
         })
       : null;
 

@@ -38,11 +38,14 @@ const SHIFT_LABEL: Record<string, string> = Object.fromEntries(
   SHIFTS.map((s) => [s.key, s.label]),
 );
 
-/** `YYYY-MM-DD` for a Date, in local time (not UTC, which can slip a day). */
+/** `YYYY-MM-DD` for a Date, formatted in IST (Asia/Kolkata). */
 function toISODate(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-    d.getDate(),
-  ).padStart(2, "0")}`;
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
 }
 
 function shiftDate(iso: string, days: number): string {
@@ -54,7 +57,8 @@ function shiftDate(iso: string, days: number): string {
 
 function prettyDate(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString("en-GB", {
+  return new Date(y, m - 1, d).toLocaleDateString("en-IN", {
+    timeZone: "Asia/Kolkata",
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -79,7 +83,8 @@ export function DailyShiftPage() {
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ["daily-roster", date],
     queryFn: () => staffAdminService.dailyRoster(date),
-    staleTime: 30_000,
+    staleTime: 5_000,
+    refetchInterval: 8_000,
   });
 
   const totals = data?.totals;

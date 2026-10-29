@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
@@ -64,10 +65,27 @@ export function ResourceView<T extends { id: string }>({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<T | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<T | null>(null);
+  const [searchParams] = useSearchParams();
 
   const canCreate = hasPermission(`${config.permission}:create`);
   const canUpdate = hasPermission(`${config.permission}:update`);
   const canDelete = hasPermission(`${config.permission}:delete`);
+
+  useEffect(() => {
+    if (searchParams.get("action") === "new" && canCreate) {
+      setEditing(null);
+      setSheetOpen(true);
+    }
+  }, [searchParams, canCreate]);
+
+  const prefillInitial = useMemo(() => {
+    if (editing) return editing;
+    const custId = searchParams.get("customer_id");
+    if (custId) {
+      return { customer_id: custId } as unknown as T;
+    }
+    return null;
+  }, [editing, searchParams]);
 
   const params: ListParams = useMemo(
     () => ({
@@ -84,6 +102,7 @@ export function ResourceView<T extends { id: string }>({
   const listQuery = useQuery({
     queryKey: [config.queryKey, "list", params],
     queryFn: () => config.service.list(params),
+    refetchInterval: 8_000,
   });
 
   const saveMutation = useMutation({
@@ -313,7 +332,7 @@ export function ResourceView<T extends { id: string }>({
           {sheetOpen && (
             <ResourceForm
               fields={config.fields}
-              initial={editing}
+              initial={prefillInitial}
               submitting={saveMutation.isPending}
               onCancel={() => setSheetOpen(false)}
               onSubmit={(values) => saveMutation.mutate(values)}

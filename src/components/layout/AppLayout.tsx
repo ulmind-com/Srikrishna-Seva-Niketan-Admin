@@ -5,6 +5,7 @@ import { STORAGE_KEYS } from "@/config/env";
 import { cn } from "@/lib/utils";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
+import { LiveNotificationListener } from "./LiveNotificationListener";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 
 export function AppLayout() {
@@ -56,6 +57,7 @@ export function AppLayout() {
         )}
       >
         <Header onMenuClick={() => setMobileOpen(true)} />
+        <LiveNotificationListener />
         <main className="flex-1 bg-grid">
           <div className="mx-auto w-full max-w-[1400px] p-4 sm:p-6 lg:p-8">
             <AnimatePresence mode="wait">

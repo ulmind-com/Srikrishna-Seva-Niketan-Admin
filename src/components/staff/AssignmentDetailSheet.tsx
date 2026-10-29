@@ -24,7 +24,8 @@ const SHIFT_LABEL: Record<string, string> = {
 function fmtDate(iso?: string | null) {
   if (!iso) return "Ongoing";
   try {
-    return new Date(iso).toLocaleDateString(undefined, {
+    return new Date(iso).toLocaleDateString("en-IN", {
+      timeZone: "Asia/Kolkata",
       day: "numeric",
       month: "short",
       year: "numeric",

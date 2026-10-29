@@ -16,7 +16,11 @@ const PLACE_LABEL: Record<string, string> = {
 function fmtDate(iso?: string | null) {
   if (!iso) return "Ongoing";
   try {
-    return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+    return new Date(iso).toLocaleDateString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      day: "numeric",
+      month: "short",
+    });
   } catch {
     return iso;
   }
@@ -34,7 +38,7 @@ export function StaffDuties() {
   const duties = useQuery({
     queryKey: ["staff-assignments"],
     queryFn: () => staffPortalService.assignments(),
-    refetchInterval: 30_000,
+    refetchInterval: 6_000,
   });
   const accepted = (duties.data?.items ?? []).filter((a) => a.acceptance_status === "accepted");
 

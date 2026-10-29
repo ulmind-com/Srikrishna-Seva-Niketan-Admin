@@ -16,7 +16,8 @@ const PLACE_LABEL: Record<string, string> = {
 
 function fmtDate(iso: string) {
   try {
-    return new Date(iso).toLocaleDateString(undefined, {
+    return new Date(iso).toLocaleDateString("en-IN", {
+      timeZone: "Asia/Kolkata",
       day: "numeric",
       month: "short",
       year: "numeric",

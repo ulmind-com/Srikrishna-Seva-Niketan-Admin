@@ -366,6 +366,7 @@ export interface Booking extends BaseDoc {
   emergency_contact_name?: string | null;
   emergency_contact_phone?: string | null;
   status: BookingStatus;
+  customer_id?: string | null;
   assigned_staff_id?: string | null;
   assigned_staff_name?: string | null;
   admin_notes?: string | null;

@@ -1,25 +1,66 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { format, formatDistanceToNow, parseISO } from "date-fns";
+import { formatDistanceToNow, parseISO } from "date-fns";
 
 /** Merge Tailwind class names, resolving conflicts. */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-/** Format an ISO date string as a readable date. */
-export function formatDate(value?: string | null, pattern = "dd MMM yyyy"): string {
+export const IST_TIMEZONE = "Asia/Kolkata";
+
+/** Format an ISO date string as a readable date in Indian Standard Time (IST). */
+export function formatDate(value?: string | Date | null, _pattern = "dd MMM yyyy"): string {
   if (!value) return "—";
   try {
-    return format(typeof value === "string" ? parseISO(value) : value, pattern);
+    const d = typeof value === "string" ? new Date(value) : value;
+    if (isNaN(d.getTime())) return "—";
+    return new Intl.DateTimeFormat("en-IN", {
+      timeZone: IST_TIMEZONE,
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }).format(d);
   } catch {
     return "—";
   }
 }
 
-/** Format an ISO date string as date + time. */
-export function formatDateTime(value?: string | null): string {
-  return formatDate(value, "dd MMM yyyy, HH:mm");
+/** Format an ISO date string as date + time in Indian Standard Time (IST). */
+export function formatDateTime(value?: string | Date | null): string {
+  if (!value) return "—";
+  try {
+    const d = typeof value === "string" ? new Date(value) : value;
+    if (isNaN(d.getTime())) return "—";
+    return new Intl.DateTimeFormat("en-IN", {
+      timeZone: IST_TIMEZONE,
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    }).format(d);
+  } catch {
+    return "—";
+  }
+}
+
+/** Format time only in Indian Standard Time (IST). */
+export function formatTime(value?: string | Date | null): string {
+  if (!value) return "—";
+  try {
+    const d = typeof value === "string" ? new Date(value) : value;
+    if (isNaN(d.getTime())) return "—";
+    return new Intl.DateTimeFormat("en-IN", {
+      timeZone: IST_TIMEZONE,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    }).format(d);
+  } catch {
+    return "—";
+  }
 }
 
 /** Relative time e.g. "3 hours ago". */

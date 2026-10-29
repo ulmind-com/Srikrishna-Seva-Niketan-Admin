@@ -20,6 +20,11 @@ export const bookingService = {
       assigned_staff_name,
     }),
   remove: (id: string) => http.del<null>(`${endpoints.bookings.root}/${id}`),
+  convertToCustomer: (id: string, location_id?: string) =>
+    http.post<{ customer: Record<string, any>; booking: Booking }>(
+      `${endpoints.bookings.root}/${id}/convert-to-customer`,
+      location_id ? { location_id } : {}
+    ),
   exportCsv: async (params?: Record<string, any>): Promise<Blob> => {
     const res = await rawClient.get(endpoints.bookings.export, {
       params,
