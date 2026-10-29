@@ -31,15 +31,15 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
           collapsed && "justify-center px-0"
         )}
       >
-        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl overflow-hidden bg-background/50 p-1 shadow-glow border border-sidebar-border">
+        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl overflow-hidden bg-background/50 p-1 shadow-glow border border-sidebar-border">
           <img src="/brand/ssn-logo.webp" alt="Srikrishna Seva Niketan" className="h-full w-full object-contain" />
         </div>
         {!collapsed && (
           <div className="min-w-0 leading-tight">
-            <p className="truncate text-sm font-bold text-sidebar-foreground">
+            <p className="truncate text-[15px] font-bold text-sidebar-foreground">
               Srikrishna Seva Niketan
             </p>
-            <p className="truncate text-[11px] text-muted-foreground">
+            <p className="truncate text-[11px] text-muted-foreground font-medium">
               Admin Panel
             </p>
           </div>
