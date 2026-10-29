@@ -394,11 +394,11 @@ export function AssignmentRouteMap({ assignment }: { assignment: StaffAssignment
       zoomControl: false, // Apple/Google Maps style: minimal clean interface without bulky controls
     }).setView(DEFAULT_CENTER, 14);
 
-    // Try CartoDB Voyager tiles (clean, soft buildings, Apple Maps vector aesthetic)
+    // Clean vector-style navigation tiles (high clarity, watermark-free)
     const baseTiles = L.tileLayer(NAVIGATION_TILE_URL, {
       attribution: NAVIGATION_ATTRIBUTION,
-      subdomains: "abcd",
-      maxZoom: 20,
+      subdomains: "abc",
+      maxZoom: 19,
     });
 
     // Fallback to OSM tile server if tile fails
