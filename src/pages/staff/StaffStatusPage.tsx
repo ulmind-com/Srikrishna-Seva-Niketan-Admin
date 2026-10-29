@@ -13,6 +13,7 @@ import { useStaffAuth } from "@/contexts/StaffAuthContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StaffDocuments } from "@/components/documents/StaffDocuments";
+import { StaffDuties } from "@/components/staff/StaffDuties";
 import {
   VERIFICATION_LABEL,
   VERIFICATION_VARIANT,
@@ -131,13 +132,14 @@ export function StaffStatusPage() {
 
         {status === "verified" && (
           <>
+            <StaffDuties />
             <StatusPanel
               tone="success"
               icon={BadgeCheck}
               title="You're verified"
               text="Your documents are ready. Print your ID card and keep it with you while on duty."
             />
-            <StaffDocuments staff={staff} />
+            <StaffDocuments staff={staff} mode="staff" />
           </>
         )}
       </main>
