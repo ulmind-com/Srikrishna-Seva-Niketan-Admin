@@ -87,6 +87,7 @@ export const endpoints = {
     assignmentDecline: (id: string) => `/staff-portal/me/assignments/${id}/decline`,
     assignmentRoute: (id: string) => `/staff-portal/me/assignments/${id}/route`,
     location: "/staff-portal/me/location",
+    verifyId: "/staff-portal/me/verify-id",
   },
   customers: { root: "/customers" },
   assignments: {

@@ -5,6 +5,7 @@ export interface VerificationResult {
   confidenceScore: number;
   idNumberMatched: boolean;
   nameMatched: boolean;
+  dobMatched?: boolean;
   photoMatched: boolean;
   fraudRisk: "low" | "medium" | "high";
   fraudFlags: string[];

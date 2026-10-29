@@ -36,10 +36,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ORG_NAME } from "./StaffAuthShell";
 import type { Employee } from "@/types/models";
-import {
-  verifyDocument,
-  type VerificationResult,
-} from "@/lib/documentVerification";
+import type { VerificationResult } from "@/lib/documentVerification";
 
 const STEPS = [
   { id: 0, label: "Your details", icon: UserRound },
@@ -188,6 +185,7 @@ function OnboardingForm({ staff }: { staff: Employee }) {
 
   const selectedIdType = watch("id_proof_type") || "Aadhaar";
   const selectedIdNumber = watch("id_proof_number") || "";
+  const selectedDob = watch("dob") || "";
 
   // Step 2 Verification State
   const isStep2Verified = Boolean(
@@ -208,44 +206,59 @@ function OnboardingForm({ staff }: { staff: Employee }) {
       return;
     }
 
+    if (!selectedDob) {
+      toast.error("Please enter your date of birth first — it is checked against the document.");
+      return;
+    }
+
     setIdDocUploading(true);
     setVerifyingDoc(true);
 
     try {
-      // 1. Run local image URL preview
-      const localPreviewUrl = URL.createObjectURL(file);
-      setIdDocPreview(localPreviewUrl);
-
-      // 2. Run OCR & Anti-fraud algorithm
-      toast.info("Scanning document & running anti-fraud checks…");
-      const result = await verifyDocument({
-        file,
-        idType: selectedIdType,
-        idNumber: selectedIdNumber.trim(),
-        applicantName: staff.name,
-        applicantPhotoUrl: photoPreview,
-      });
-
-      setDocVerification(result);
-
-      if (result.fraudRisk === "high") {
-        const primaryFlag =
-          result.fraudFlags[0] ||
-          "Fraud Alert: Uploaded document does not match your credentials or appears to be a downloaded sample.";
-        toast.error(`Verification Failed: ${primaryFlag}`);
-      } else if (!result.nameMatched) {
-        toast.error(`Name Mismatch: The name on this document does not match "${staff.name}".`);
-      } else if (!result.idNumberMatched) {
-        toast.error(`ID Mismatch: The ${selectedIdType} number does not match "${selectedIdNumber}".`);
-      } else {
-        toast.success(`Government ID verified successfully (${result.confidenceScore}% match)`);
-      }
-
-      // 3. Upload to cloud storage
+      // 1. Local preview, then upload so the server-side vision model can read it.
+      setIdDocPreview(URL.createObjectURL(file));
       const asset = await staffPortalService.upload(file, "id_proof");
       setIdDocPreview(asset.url);
 
-      // 4. Save profile with verification results
+      // 2. Server-side AI vision check: reads name + DOB + ID number off the image.
+      toast.info("Reading your document & verifying details…");
+      const v = await staffPortalService.verifyId({
+        image_url: asset.url,
+        id_type: selectedIdType,
+        id_number: selectedIdNumber.trim(),
+        dob: selectedDob || undefined,
+      });
+
+      const result: VerificationResult = {
+        isVerified: v.ok,
+        confidenceScore: v.confidence,
+        idNumberMatched: v.id_number_matched,
+        nameMatched: v.name_matched,
+        dobMatched: v.dob_matched,
+        photoMatched: true,
+        fraudRisk: v.fraud_risk,
+        fraudFlags: v.warnings,
+        extractedText: "",
+        summary: v.ok ? "Verified" : "Mismatch",
+        verifiedAt: new Date().toISOString(),
+      };
+      setDocVerification(result);
+
+      if (!v.readable) {
+        toast.error("Couldn't read the document — upload a clearer original scan.");
+      } else if (!v.is_government_id) {
+        toast.error("This does not look like a genuine government ID.");
+      } else if (!v.name_matched) {
+        toast.error(`Name mismatch: the document name does not match "${staff.name}".`);
+      } else if (!v.id_number_matched) {
+        toast.error(`ID mismatch: the ${selectedIdType} number does not match the document.`);
+      } else if (!v.dob_matched) {
+        toast.error("Date of birth does not match the document.");
+      } else {
+        toast.success(`Government ID verified (${v.confidence}% match)`);
+      }
+
+      // 3. Persist the verification result for the super-admin review.
       await staffPortalService.saveProfile({
         id_proof_type: selectedIdType,
         id_proof_number: selectedIdNumber.trim(),
@@ -292,19 +305,14 @@ function OnboardingForm({ staff }: { staff: Employee }) {
         toast.error("Please upload your Government ID document (Aadhaar / Voter ID / PAN)");
         return;
       }
-      // The automated OCR audit is advisory — it can misread genuine IDs
-      // (phone photos of Aadhaar etc.). We let the nurse proceed and leave the
-      // final call to the super-admin, who reviews the uploaded document. Just
-      // warn once so they can re-upload a clearer scan if they want to.
-      if (
-        docVerification &&
-        (docVerification.fraudRisk === "high" ||
-          !docVerification.nameMatched ||
-          !docVerification.idNumberMatched)
-      ) {
-        toast.warning(
-          "We couldn't auto-verify this document — the office will review it manually. You can re-upload a clearer scan, or continue.",
+      // Strict gate: the AI vision check must confirm name, date of birth AND
+      // ID number all match the uploaded document before continuing.
+      if (!docVerification || !docVerification.isVerified) {
+        toast.error(
+          docVerification?.fraudFlags?.[0] ||
+            "Your name, date of birth and ID number must all match the uploaded document. Re-upload a clear original.",
         );
+        return;
       }
     }
 
@@ -696,6 +704,18 @@ function OnboardingForm({ staff }: { staff: Employee }) {
                             {docVerification.nameMatched
                               ? "Confirmed Match"
                               : `Mismatch (Expected: "${staff.name}")`}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          {docVerification.dobMatched ? (
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                          ) : (
+                            <XCircle className="h-3.5 w-3.5 text-rose-500" />
+                          )}
+                          <span className={docVerification.dobMatched ? "text-emerald-700 dark:text-emerald-400 font-medium" : "text-rose-700 dark:text-rose-400 font-medium"}>
+                            Date of Birth:{" "}
+                            {docVerification.dobMatched ? "Confirmed Match" : "Mismatch / Not Found"}
                           </span>
                         </div>
 

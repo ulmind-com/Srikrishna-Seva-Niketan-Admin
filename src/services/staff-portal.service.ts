@@ -160,7 +160,38 @@ export const staffPortalService = {
       url: endpoints.staffPortal.location,
       data: { lat, lng },
     }),
+  /** Server-side AI verification of an uploaded government-ID image. */
+  verifyId: (payload: {
+    image_url: string;
+    id_type: string;
+    id_number: string;
+    dob?: string;
+  }) =>
+    staffRequest<IdVerifyResult>({
+      method: "POST",
+      url: endpoints.staffPortal.verifyId,
+      data: payload,
+    }),
 };
+
+/** Result of the backend vision ID check. */
+export interface IdVerifyResult {
+  ok: boolean;
+  readable: boolean;
+  is_government_id: boolean;
+  name_matched: boolean;
+  dob_matched: boolean;
+  id_number_matched: boolean;
+  fraud_risk: "low" | "high";
+  confidence: number;
+  extracted: {
+    name: string | null;
+    dob: string | null;
+    id_number: string | null;
+    document_type: string | null;
+  };
+  warnings: string[];
+}
 
 /** An assignment as the nurse sees it — deliberately carries no money field. */
 export interface StaffAssignment {
