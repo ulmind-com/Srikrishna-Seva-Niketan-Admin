@@ -15,11 +15,7 @@ import {
   UserRound,
   ShieldCheck,
   Briefcase,
-  AlertTriangle,
   FileText,
-  Sparkles,
-  CheckCircle2,
-  XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useStaffAuth } from "@/contexts/StaffAuthContext";
@@ -33,10 +29,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { ORG_NAME } from "./StaffAuthShell";
 import type { Employee } from "@/types/models";
-import type { VerificationResult } from "@/lib/documentVerification";
 
 const STEPS = [
   { id: 0, label: "Your details", icon: UserRound },
@@ -149,10 +143,6 @@ function OnboardingForm({ staff }: { staff: Employee }) {
     staff.id_proof?.url ?? null,
   );
   const [idDocUploading, setIdDocUploading] = useState(false);
-  const [verifyingDoc, setVerifyingDoc] = useState(false);
-  const [docVerification, setDocVerification] = useState<VerificationResult | null>(
-    (staff.document_verification as unknown as VerificationResult) ?? null,
-  );
 
   const [hasSignature, setHasSignature] = useState(Boolean(staff.signature?.url));
   const [submitting, setSubmitting] = useState(false);
@@ -185,90 +175,30 @@ function OnboardingForm({ staff }: { staff: Employee }) {
 
   const selectedIdType = watch("id_proof_type") || "Aadhaar";
   const selectedIdNumber = watch("id_proof_number") || "";
-  const selectedDob = watch("dob") || "";
 
-  // Step 2 Verification State
-  const isStep2Verified = Boolean(
-    idDocPreview &&
-    !verifyingDoc &&
-    !idDocUploading &&
-    docVerification &&
-    docVerification.isVerified &&
-    docVerification.nameMatched &&
-    docVerification.idNumberMatched &&
-    docVerification.fraudRisk !== "high"
-  );
+  // Step 2 is complete once a document is uploaded.
+  const isStep2Verified = Boolean(idDocPreview && !idDocUploading);
 
-  // Handle Document Upload + Real-Time Verification
+  // Handle Document Upload — any government ID, any format, no verification gate.
   const handleIdDocument = async (file: File) => {
-    if (!selectedIdNumber.trim()) {
-      toast.error(`Please enter your ${selectedIdType} number first before uploading.`);
-      return;
-    }
-
-    if (!selectedDob) {
-      toast.error("Please enter your date of birth first — it is checked against the document.");
-      return;
-    }
-
     setIdDocUploading(true);
-    setVerifyingDoc(true);
 
     try {
-      // 1. Local preview, then upload so the server-side vision model can read it.
+      // Local preview, then upload so it is attached to the profile.
       setIdDocPreview(URL.createObjectURL(file));
       const asset = await staffPortalService.upload(file, "id_proof");
       setIdDocPreview(asset.url);
 
-      // 2. Server-side AI vision check: reads name + DOB + ID number off the image.
-      toast.info("Reading your document & verifying details…");
-      const v = await staffPortalService.verifyId({
-        image_url: asset.url,
-        id_type: selectedIdType,
-        id_number: selectedIdNumber.trim(),
-        dob: selectedDob || undefined,
-      });
-
-      const result: VerificationResult = {
-        isVerified: v.ok,
-        confidenceScore: v.confidence,
-        idNumberMatched: v.id_number_matched,
-        nameMatched: v.name_matched,
-        dobMatched: v.dob_matched,
-        photoMatched: true,
-        fraudRisk: v.fraud_risk,
-        fraudFlags: v.warnings,
-        extractedText: "",
-        summary: v.ok ? "Verified" : "Mismatch",
-        verifiedAt: new Date().toISOString(),
-      };
-      setDocVerification(result);
-
-      if (!v.readable) {
-        toast.error("Couldn't read the document — upload a clearer original scan.");
-      } else if (!v.is_government_id) {
-        toast.error("This does not look like a genuine government ID.");
-      } else if (!v.name_matched) {
-        toast.error(`Name mismatch: the document name does not match "${staff.name}".`);
-      } else if (!v.id_number_matched) {
-        toast.error(`ID mismatch: the ${selectedIdType} number does not match the document.`);
-      } else if (!v.dob_matched) {
-        toast.error("Date of birth does not match the document.");
-      } else {
-        toast.success(`Government ID verified (${v.confidence}% match)`);
-      }
-
-      // 3. Persist the verification result for the super-admin review.
+      // Persist the ID details for the super-admin review.
       await staffPortalService.saveProfile({
         id_proof_type: selectedIdType,
         id_proof_number: selectedIdNumber.trim(),
-        document_verification: result as unknown as Record<string, unknown>,
       });
+      toast.success("Government ID uploaded");
     } catch (err) {
       toast.error(describeError(err));
     } finally {
       setIdDocUploading(false);
-      setVerifyingDoc(false);
     }
   };
 
@@ -305,15 +235,6 @@ function OnboardingForm({ staff }: { staff: Employee }) {
         toast.error("Please upload your Government ID document (Aadhaar / Voter ID / PAN)");
         return;
       }
-      // Strict gate: the AI vision check must confirm name, date of birth AND
-      // ID number all match the uploaded document before continuing.
-      if (!docVerification || !docVerification.isVerified) {
-        toast.error(
-          docVerification?.fraudFlags?.[0] ||
-            "Your name, date of birth and ID number must all match the uploaded document. Re-upload a clear original.",
-        );
-        return;
-      }
     }
 
     if (step === 3 && !photoPreview) {
@@ -331,18 +252,6 @@ function OnboardingForm({ staff }: { staff: Employee }) {
       setStep(2);
       return;
     }
-    if (
-      docVerification &&
-      (docVerification.fraudRisk === "high" ||
-        !docVerification.nameMatched ||
-        !docVerification.idNumberMatched)
-    ) {
-      toast.error(
-        "Government ID verification failed. Please upload your own authentic, original Government ID."
-      );
-      setStep(2);
-      return;
-    }
     if (!photoPreview) {
       toast.error("Please upload your photo first");
       setStep(3);
@@ -355,7 +264,6 @@ function OnboardingForm({ staff }: { staff: Employee }) {
         ...Object.fromEntries(
           Object.entries(values).filter(([, v]) => v !== "" && v != null),
         ),
-        document_verification: docVerification as unknown as Record<string, unknown>,
       } as StaffOnboardingPayload;
 
       await staffPortalService.saveProfile(payload);
@@ -532,11 +440,11 @@ function OnboardingForm({ staff }: { staff: Employee }) {
                 <div>
                   <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
                     <ShieldCheck className="h-5 w-5 text-primary" />
-                    Government ID Verification (Mandatory)
+                    Government ID (Mandatory)
                   </h3>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Upload an authentic original copy of your Government ID. Our system checks your
-                    ID number, applicant name, and runs automated anti-fraud checks to prevent duplicate or downloaded templates.
+                    Upload a copy of any Government ID (Aadhaar, PAN, Voter ID or Driving Licence).
+                    A super admin will review it after you submit.
                   </p>
                 </div>
 
@@ -591,12 +499,9 @@ function OnboardingForm({ staff }: { staff: Employee }) {
                           alt="Government ID"
                           className="h-full w-full object-contain max-h-52"
                         />
-                        {verifyingDoc && (
-                          <div className="absolute inset-0 bg-primary/20 backdrop-blur-[2px] flex flex-col items-center justify-center gap-2">
+                        {idDocUploading && (
+                          <div className="absolute inset-0 bg-primary/20 backdrop-blur-[2px] flex items-center justify-center">
                             <Loader2 className="h-7 w-7 animate-spin text-primary" />
-                            <span className="text-xs font-semibold bg-background/90 px-3 py-1 rounded-full shadow-sm text-primary flex items-center gap-1.5">
-                              <Sparkles className="h-3 w-3 animate-pulse" /> Running OCR & Anti-Fraud Scan…
-                            </span>
                           </div>
                         )}
                       </div>
@@ -632,7 +537,7 @@ function OnboardingForm({ staff }: { staff: Employee }) {
                         variant="outline"
                         size="sm"
                         onClick={() => idDocInputRef.current?.click()}
-                        loading={idDocUploading || verifyingDoc}
+                        loading={idDocUploading}
                       >
                         <Upload className="mr-2 h-4 w-4" />
                         {idDocPreview ? "Re-upload / Change Document" : "Select Document File"}
@@ -640,119 +545,10 @@ function OnboardingForm({ staff }: { staff: Employee }) {
                     </div>
                   </div>
 
-                  {/* Real-time Verification & Anti-Fraud Audit Results Card */}
-                  {docVerification && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className={`rounded-xl border p-4 text-xs ${
-                        docVerification.isVerified
-                          ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/40"
-                          : docVerification.fraudRisk === "high" || !docVerification.nameMatched || !docVerification.idNumberMatched
-                          ? "border-rose-300 bg-rose-50/70 dark:border-rose-900/60 dark:bg-rose-950/40"
-                          : "border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/40"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2 pb-2 border-b border-border/50">
-                        <span className="font-semibold flex items-center gap-1.5 text-foreground">
-                          {docVerification.isVerified ? (
-                            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                          ) : (
-                            <AlertTriangle className="h-4 w-4 text-rose-600" />
-                          )}
-                          AI Document Verification Audit
-                        </span>
-                        <Badge
-                          variant={
-                            docVerification.isVerified
-                              ? "success"
-                              : docVerification.fraudRisk === "high" || !docVerification.nameMatched
-                              ? "danger"
-                              : "warning"
-                          }
-                          className="font-mono text-[11px]"
-                        >
-                          {docVerification.isVerified
-                            ? `Match Score: ${docVerification.confidenceScore}% (Verified)`
-                            : `Match Score: ${docVerification.confidenceScore}% (Flagged / Mismatch)`}
-                        </Badge>
-                      </div>
-
-                      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
-                        <div className="flex items-center gap-1.5">
-                          {docVerification.idNumberMatched ? (
-                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                          ) : (
-                            <XCircle className="h-3.5 w-3.5 text-rose-500" />
-                          )}
-                          <span className={docVerification.idNumberMatched ? "text-emerald-700 dark:text-emerald-400 font-medium" : "text-rose-700 dark:text-rose-400 font-medium"}>
-                            ID Number Match:{" "}
-                            {docVerification.idNumberMatched
-                              ? "Confirmed Match"
-                              : `Mismatch / Not Found (${selectedIdNumber})`}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-1.5">
-                          {docVerification.nameMatched ? (
-                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                          ) : (
-                            <XCircle className="h-3.5 w-3.5 text-rose-500" />
-                          )}
-                          <span className={docVerification.nameMatched ? "text-emerald-700 dark:text-emerald-400 font-medium" : "text-rose-700 dark:text-rose-400 font-medium"}>
-                            Name Match:{" "}
-                            {docVerification.nameMatched
-                              ? "Confirmed Match"
-                              : `Mismatch (Expected: "${staff.name}")`}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-1.5">
-                          {docVerification.dobMatched ? (
-                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                          ) : (
-                            <XCircle className="h-3.5 w-3.5 text-rose-500" />
-                          )}
-                          <span className={docVerification.dobMatched ? "text-emerald-700 dark:text-emerald-400 font-medium" : "text-rose-700 dark:text-rose-400 font-medium"}>
-                            Date of Birth:{" "}
-                            {docVerification.dobMatched ? "Confirmed Match" : "Mismatch / Not Found"}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-1.5 sm:col-span-2">
-                          <ShieldCheck
-                            className={`h-3.5 w-3.5 ${
-                              docVerification.fraudRisk === "high" ? "text-rose-600" : "text-primary"
-                            }`}
-                          />
-                          <span
-                            className={
-                              docVerification.fraudRisk === "high"
-                                ? "text-rose-700 dark:text-rose-400 font-semibold"
-                                : ""
-                            }
-                          >
-                            Anti-Fraud Scan:{" "}
-                            {docVerification.fraudFlags.length === 0
-                              ? "Clean (Original Document)"
-                              : `Flagged (${docVerification.fraudRisk.toUpperCase()} FRAUD RISK)`}
-                          </span>
-                        </div>
-                      </div>
-
-                      {docVerification.fraudFlags.length > 0 && (
-                        <div className="mt-2.5 rounded-lg bg-rose-100/80 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-900 p-2.5 text-rose-800 dark:text-rose-200">
-                          <p className="font-semibold flex items-center gap-1 text-[11px]">
-                            <AlertTriangle className="h-3.5 w-3.5 text-rose-600" /> Fraud & Verification Warnings:
-                          </p>
-                          <ul className="list-disc list-inside mt-1 space-y-0.5 text-[11px]">
-                            {docVerification.fraudFlags.map((f, i) => (
-                              <li key={i}>{f}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </motion.div>
+                  {idDocPreview && !idDocUploading && (
+                    <p className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                      <Check className="h-4 w-4" /> Document uploaded. You can continue.
+                    </p>
                   )}
                 </div>
               </div>
@@ -859,25 +655,18 @@ function OnboardingForm({ staff }: { staff: Employee }) {
 
             {step < STEPS.length - 1 ? (
               step === 2 ? (
-                verifyingDoc || idDocUploading ? (
-                  <div className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3.5 py-2 text-xs font-semibold text-primary">
-                    <Loader2 className="h-4 w-4 animate-spin text-primary flex-shrink-0" />
-                    <span>Verifying Document Authenticity…</span>
-                  </div>
-                ) : (
-                  <Button
-                    type="button"
-                    onClick={next}
-                    disabled={!idDocPreview}
-                    className={
-                      isStep2Verified
-                        ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-md"
-                        : undefined
-                    }
-                  >
-                    Continue <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                )
+                <Button
+                  type="button"
+                  onClick={next}
+                  disabled={!idDocPreview || idDocUploading}
+                  className={
+                    isStep2Verified
+                      ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-md"
+                      : undefined
+                  }
+                >
+                  Continue <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
               ) : step === 3 ? (
                 <Button type="button" onClick={next} disabled={!photoPreview || photoUploading}>
                   Continue <ArrowRight className="ml-2 h-4 w-4" />
