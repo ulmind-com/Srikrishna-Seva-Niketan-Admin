@@ -79,6 +79,8 @@ export function BookingAssignmentDrawer({
       address: fullAddress,
       start_date: formattedStartDate,
       duration_days: 10,
+      payment_type: booking.payment_type || "prepaid",
+      payment_status: "pending",
       notes: `Booking #${booking.reference}. Patient: ${booking.patient_name} (${booking.contact_phone}). Requested: ${booking.service_name}${
         booking.care_required ? ` - ${booking.care_required}` : ""
       }${booking.message ? ` [Message: ${booking.message}]` : ""}`,

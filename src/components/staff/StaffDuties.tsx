@@ -76,8 +76,23 @@ export function StaffDuties() {
                     <CalendarClock className="h-4 w-4" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{a.customer_name}</p>
-                    <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="truncate text-sm font-semibold">{a.customer_name}</p>
+                      {a.status === "completed" ? (
+                        <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-500 border border-emerald-500/20">
+                          ✓ Completed
+                        </span>
+                      ) : a.payment_type === "postpaid" ? (
+                        <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-500 border border-amber-500/20">
+                          Postpaid · Cash: ₹{(a.collect_amount ?? 0).toLocaleString()}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold text-cyan-500 border border-cyan-500/20">
+                          Prepaid
+                        </span>
+                      )}
+                    </div>
+                    <p className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                       <MapPin className="h-3 w-3" />
                       {PLACE_LABEL[a.place_type] ?? a.place_type} · from {fmtDate(a.start_date)}
                     </p>

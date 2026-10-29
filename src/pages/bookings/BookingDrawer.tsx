@@ -17,6 +17,7 @@ import {
   UserCheck,
   MessageSquare,
   ClipboardList,
+  CreditCard,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Booking } from "@/types/models";
@@ -133,6 +134,7 @@ export function BookingDrawer({ booking, onClose, onAssignDuty }: Props) {
                 <InfoRow icon={Clock} label="Preferred time" value={booking.preferred_time} />
                 <InfoRow icon={User} label="Patient" value={`${booking.patient_name}${booking.patient_age ? `, ${booking.patient_age}` : ""}`} />
                 <InfoRow icon={Phone} label="Phone" value={booking.contact_phone} />
+                <InfoRow icon={CreditCard} label="Payment Method" value={booking.payment_type === "postpaid" ? "Postpaid (In-hand Cash)" : "Prepaid (Advance / Online)"} />
                 <InfoRow icon={MessageSquare} label="WhatsApp" value={booking.whatsapp_number} />
                 <InfoRow icon={Mail} label="Email" value={booking.contact_email} />
               </section>

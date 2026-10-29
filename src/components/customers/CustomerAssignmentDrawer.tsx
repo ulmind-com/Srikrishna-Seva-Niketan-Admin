@@ -65,6 +65,8 @@ export function CustomerAssignmentDrawer({
       start_date: getTodayIST(),
       duration_days: customer.duration_days ?? 10,
       customer_rate: customer.billing_rate ?? undefined,
+      payment_type: "prepaid",
+      payment_status: "pending",
       notes: customer.notes
         ? `Customer notes: ${customer.notes}`
         : customer.service_label

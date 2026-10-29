@@ -220,6 +220,11 @@ export interface Assignment extends BaseDoc {
   customer_rate?: number | null;
   employee_payout?: number | null;
   other_expense?: number | null;
+  payment_type?: "prepaid" | "postpaid";
+  payment_status?: string;
+  payment_received_at?: string | null;
+  payment_received_by?: string | null;
+  work_completed_at?: string | null;
   notes?: string | null;
   /** Server-computed progress. Null when the engagement is open-ended. */
   total_days?: number | null;
@@ -366,6 +371,7 @@ export interface Booking extends BaseDoc {
   emergency_contact_name?: string | null;
   emergency_contact_phone?: string | null;
   status: BookingStatus;
+  payment_type?: "prepaid" | "postpaid";
   customer_id?: string | null;
   location_id?: string | null;
   source?: string | null;

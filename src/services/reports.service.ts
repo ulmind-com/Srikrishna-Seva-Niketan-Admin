@@ -70,11 +70,64 @@ export interface DailySummaryReport {
   status_breakdown: Record<string, number>;
 }
 
+export interface DutyReportItem {
+  id: string;
+  start_date: string;
+  end_date?: string | null;
+  duration_days?: number | null;
+  customer_id: string;
+  customer_name: string;
+  customer_phone?: string | null;
+  employee_id: string;
+  employee_name: string;
+  employee_code?: string | null;
+  shift: string;
+  place_type: string;
+  place_name?: string | null;
+  address?: string | null;
+  payment_type: "prepaid" | "postpaid" | string;
+  payment_status: string;
+  customer_rate: number;
+  employee_payout: number;
+  other_expense: number;
+  profit: number;
+  margin_pct: number;
+  status: string;
+  acceptance_status: string;
+  work_completed_at?: string | null;
+  payment_received_at?: string | null;
+  payment_received_by?: string | null;
+  location_id: string;
+  location_name: string;
+}
+
+export interface DutyReportSummary {
+  total_duties: number;
+  total_billed: number;
+  total_staff_payout: number;
+  total_expenses: number;
+  total_profit: number;
+  overall_margin_pct: number;
+  prepaid_count: number;
+  prepaid_total: number;
+  postpaid_count: number;
+  postpaid_total: number;
+  postpaid_collected: number;
+  postpaid_pending: number;
+}
+
+export interface DutyReport {
+  summary: DutyReportSummary;
+  items: DutyReportItem[];
+}
+
 interface ReportParams {
   start?: string;
   end?: string;
   location_id?: string;
   on?: string;
+  payment_type?: string;
+  status?: string;
   [key: string]: string | undefined;
 }
 
@@ -87,6 +140,8 @@ export const reportsService = {
     http.get<CustomerPaymentsReport>(endpoints.reports.customerPayments, params),
   dailySummary: (params?: ReportParams) =>
     http.get<DailySummaryReport>(endpoints.reports.dailySummary, params),
+  duties: (params?: ReportParams) =>
+    http.get<DutyReport>(endpoints.reports.duties, params),
   sendDailyEmail: () =>
     http.post<{ success: boolean }>(endpoints.reports.dailyEmail),
 };

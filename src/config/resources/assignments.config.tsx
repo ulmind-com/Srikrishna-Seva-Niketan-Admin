@@ -94,13 +94,45 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
       cell: (r) => <AssignmentProgress row={r} />,
     },
     {
-      header: "Rates (₹)",
-      cell: (r) => (
-        <div className="text-xs text-muted-foreground">
-          {r.customer_rate != null && <div>Bill: ₹{r.customer_rate.toLocaleString()}</div>}
-          {r.employee_payout != null && <div>Pay: ₹{r.employee_payout.toLocaleString()}</div>}
-        </div>
-      ),
+      header: "Rates & Profit (₹)",
+      cell: (r) => {
+        const bill = r.customer_rate ?? 0;
+        const pay = r.employee_payout ?? 0;
+        const exp = r.other_expense ?? 0;
+        const profit = bill - pay - exp;
+        return (
+          <div className="text-xs text-muted-foreground flex flex-col gap-0.5">
+            {r.customer_rate != null && <div>Bill: <span className="font-semibold text-foreground">₹{r.customer_rate.toLocaleString()}</span></div>}
+            {r.employee_payout != null && <div>Pay: ₹{r.employee_payout.toLocaleString()}</div>}
+            {r.other_expense != null && r.other_expense > 0 && <div>Exp: ₹{r.other_expense.toLocaleString()}</div>}
+            {bill > 0 && (
+              <div className={`font-semibold ${profit >= 0 ? "text-success" : "text-destructive"}`}>
+                Profit: ₹{profit.toLocaleString()}
+              </div>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      header: "Payment",
+      cell: (r) => {
+        const isPostpaid = r.payment_type === "postpaid";
+        const isPaid = r.payment_status === "paid" || r.payment_status === "received";
+        return (
+          <div className="flex flex-col gap-1 items-start">
+            <Badge
+              variant={isPostpaid ? "secondary" : "default"}
+              className={isPostpaid ? "bg-amber-500/10 text-amber-400 border-amber-500/30 text-[10px]" : "bg-cyan-500/10 text-cyan-400 border-cyan-500/30 text-[10px]"}
+            >
+              {isPostpaid ? "Postpaid (Cash)" : "Prepaid"}
+            </Badge>
+            <span className={`text-[11px] font-medium capitalize ${isPaid ? "text-success" : "text-amber-400"}`}>
+              {isPaid ? "✓ Paid / Received" : "⏳ Pending"}
+            </span>
+          </div>
+        );
+      },
     },
     {
       header: "Status",
@@ -222,6 +254,31 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
       section: "Schedule",
     },
     { name: "end_date", label: "End Date", type: "date", helper: "Optional — overrides duration.", section: "Schedule" },
+    {
+      name: "payment_type",
+      label: "Payment Model",
+      type: "select",
+      required: true,
+      defaultValue: "prepaid",
+      options: [
+        { label: "Prepaid (অফিসে অগ্রিম পরিশোধিত)", value: "prepaid" },
+        { label: "Postpaid (সার্ভিসের পর স্টাফ ক্যাশ নেবে)", value: "postpaid" },
+      ],
+      section: "Billing",
+      helper: "Prepaid: office already collected. Postpaid: staff member collects cash in hand after service.",
+    },
+    {
+      name: "payment_status",
+      label: "Payment Status",
+      type: "select",
+      defaultValue: "pending",
+      options: [
+        { label: "Pending (বকেয়া)", value: "pending" },
+        { label: "Paid / Received (পরিশোধিত)", value: "paid" },
+        { label: "Collected by Staff (স্টাফ ক্যাশ বুঝে পেয়েছে)", value: "received" },
+      ],
+      section: "Billing",
+    },
     { name: "customer_rate", label: "Contract Amount (₹)", type: "number", min: 0, helper: "What the customer pays — counts as revenue.", section: "Billing" },
     { name: "employee_payout", label: "Staff Payout (₹)", type: "number", min: 0, helper: "What the nurse is paid — an expense.", section: "Billing" },
     { name: "other_expense", label: "Other Expense (₹)", type: "number", min: 0, helper: "Travel, kit, etc. for this engagement — an expense.", section: "Billing" },

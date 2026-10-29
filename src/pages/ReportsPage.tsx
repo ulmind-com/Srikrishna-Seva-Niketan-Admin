@@ -1,7 +1,19 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { BarChart3, TrendingUp, Users, Receipt, CalendarDays, Download, Mail } from "lucide-react";
+import {
+  BarChart3,
+  TrendingUp,
+  Users,
+  Receipt,
+  CalendarDays,
+  Download,
+  Mail,
+  ClipboardList,
+  Search,
+  FileSpreadsheet,
+  Clock,
+} from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
 import { Button } from "@/components/ui/button";
 import { downloadReportPdf } from "@/lib/report-pdf";
@@ -109,6 +121,10 @@ export function ReportsPage() {
     queryFn: () => reportsService.profitLoss({ start, end, location_id: loc }),
     refetchInterval: LIVE_MS,
   });
+  const [dutyPaymentType, setDutyPaymentType] = useState<string>("all");
+  const [dutyStatus, setDutyStatus] = useState<string>("all");
+  const [dutySearch, setDutySearch] = useState<string>("");
+
   const dist = useQuery({
     queryKey: ["report", "dist", loc],
     queryFn: () => reportsService.distribution({ location_id: loc }),
@@ -124,9 +140,84 @@ export function ReportsPage() {
     queryFn: () => reportsService.dailySummary({ location_id: loc }),
     refetchInterval: LIVE_MS,
   });
+  const duties = useQuery({
+    queryKey: ["report", "duties", start, end, loc, dutyPaymentType, dutyStatus],
+    queryFn: () =>
+      reportsService.duties({
+        start,
+        end,
+        location_id: loc,
+        payment_type: dutyPaymentType,
+        status: dutyStatus,
+      }),
+    refetchInterval: LIVE_MS,
+  });
 
   const anyFetching =
-    pnl.isFetching || dist.isFetching || pay.isFetching || daily.isFetching;
+    pnl.isFetching || dist.isFetching || pay.isFetching || daily.isFetching || duties.isFetching;
+
+  const exportDutiesCsv = () => {
+    const items = duties.data?.items ?? [];
+    if (!items.length) {
+      toast.error("No duties to export for this period");
+      return;
+    }
+    const headers = [
+      "Date Range",
+      "Shift",
+      "Duration (Days)",
+      "Customer Name",
+      "Customer Phone",
+      "Staff Member",
+      "Staff Code",
+      "Posted Location",
+      "Payment Model",
+      "Payment Status",
+      "Customer Fee (INR)",
+      "Staff Payout (INR)",
+      "Expenses (INR)",
+      "Company Profit (INR)",
+      "Margin %",
+      "Status",
+      "Completed At",
+      "Payment Received At",
+      "Payment Received By",
+      "Branch",
+    ];
+
+    const rows = items.map((r) => [
+      `"${r.start_date} ${r.end_date ? '→ ' + r.end_date : '(ongoing)'}"`,
+      `"${r.shift}"`,
+      r.duration_days ?? 1,
+      `"${r.customer_name}"`,
+      `"${r.customer_phone || ''}"`,
+      `"${r.employee_name}"`,
+      `"${r.employee_code || ''}"`,
+      `"${r.place_name || r.place_type}"`,
+      `"${r.payment_type}"`,
+      `"${r.payment_status}"`,
+      r.customer_rate,
+      r.employee_payout,
+      r.other_expense,
+      r.profit,
+      `${r.margin_pct}%`,
+      `"${r.status}"`,
+      `"${r.work_completed_at || ''}"`,
+      `"${r.payment_received_at || ''}"`,
+      `"${r.payment_received_by || ''}"`,
+      `"${r.location_name}"`,
+    ]);
+
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `duty_report_${start}_to_${end}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Duty report exported to CSV");
+  };
 
   const branchName =
     branch === "all"
@@ -227,13 +318,264 @@ export function ReportsPage() {
         </span>
       </div>
 
-      <Tabs defaultValue="daily">
+      <Tabs defaultValue="duties">
         <TabsList>
+          <TabsTrigger value="duties"><ClipboardList className="mr-1.5 h-4 w-4" /> Duty &amp; Payment Details</TabsTrigger>
           <TabsTrigger value="daily"><CalendarDays className="mr-1.5 h-4 w-4" /> Daily</TabsTrigger>
           <TabsTrigger value="pnl"><TrendingUp className="mr-1.5 h-4 w-4" /> Profit &amp; Loss</TabsTrigger>
           <TabsTrigger value="dist"><Users className="mr-1.5 h-4 w-4" /> Distribution</TabsTrigger>
           <TabsTrigger value="pay"><Receipt className="mr-1.5 h-4 w-4" /> Payments</TabsTrigger>
         </TabsList>
+
+        {/* Duties & Payment detailed ledger */}
+        <TabsContent value="duties" className="space-y-4">
+          {/* Summary KPIs */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+            <Stat label="Total Duties" value={duties.data?.summary.total_duties ?? "—"} />
+            <Stat label="Client Billed" value={rupee(duties.data?.summary.total_billed)} tone="text-success" />
+            <Stat label="Staff Payout" value={rupee(duties.data?.summary.total_staff_payout)} tone="text-destructive" />
+            <Stat label="Expenses" value={rupee(duties.data?.summary.total_expenses)} tone="text-destructive" />
+            <Stat
+              label="Net Profit"
+              value={rupee(duties.data?.summary.total_profit)}
+              tone={(duties.data?.summary.total_profit ?? 0) >= 0 ? "text-success" : "text-destructive"}
+            />
+            <Stat
+              label="Company Margin"
+              value={`${duties.data?.summary.overall_margin_pct ?? 0}%`}
+              tone={(duties.data?.summary.total_profit ?? 0) >= 0 ? "text-success" : "text-destructive"}
+            />
+          </div>
+
+          {/* Prepaid vs Postpaid sub-breakdown */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <Card className="border-cyan-500/20 bg-cyan-500/5">
+              <CardContent className="p-4">
+                <p className="text-xs uppercase tracking-wide text-cyan-400 font-semibold">Prepaid Engagements</p>
+                <p className="mt-1 text-xl font-bold text-foreground">
+                  {rupee(duties.data?.summary.prepaid_total)}{" "}
+                  <span className="text-xs font-normal text-muted-foreground">({duties.data?.summary.prepaid_count ?? 0} duties)</span>
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Office collected in advance</p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-emerald-500/20 bg-emerald-500/5">
+              <CardContent className="p-4">
+                <p className="text-xs uppercase tracking-wide text-emerald-400 font-semibold">Postpaid · Cash Collected</p>
+                <p className="mt-1 text-xl font-bold text-foreground">
+                  {rupee(duties.data?.summary.postpaid_collected)}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Received in-hand by staff member</p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-amber-500/20 bg-amber-500/5">
+              <CardContent className="p-4">
+                <p className="text-xs uppercase tracking-wide text-amber-400 font-semibold">Postpaid · Pending Cash</p>
+                <p className="mt-1 text-xl font-bold text-amber-400">
+                  {rupee(duties.data?.summary.postpaid_pending)}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Awaiting staff collection upon completion</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Filter and Export Bar */}
+          <Card>
+            <CardHeader className="py-3 px-4 border-b">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2 flex-1">
+                  <div className="relative w-64">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input
+                      placeholder="Search patient, phone, nurse..."
+                      value={dutySearch}
+                      onChange={(e) => setDutySearch(e.target.value)}
+                      className="pl-8 text-xs h-8"
+                    />
+                  </div>
+                  <Select value={dutyPaymentType} onValueChange={setDutyPaymentType}>
+                    <SelectTrigger className="w-36 h-8 text-xs">
+                      <SelectValue placeholder="All Models" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Models</SelectItem>
+                      <SelectItem value="prepaid">Prepaid</SelectItem>
+                      <SelectItem value="postpaid">Postpaid</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={dutyStatus} onValueChange={setDutyStatus}>
+                    <SelectTrigger className="w-36 h-8 text-xs">
+                      <SelectValue placeholder="All Statuses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="scheduled">Scheduled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button size="sm" variant="outline" onClick={exportDutiesCsv} className="h-8 text-xs">
+                  <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5 text-emerald-500" /> Export CSV
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date &amp; Shift</TableHead>
+                    <TableHead>Client (Patient)</TableHead>
+                    <TableHead>Service Staff</TableHead>
+                    <TableHead>Payment Model</TableHead>
+                    <TableHead className="text-right">Client Bill</TableHead>
+                    <TableHead className="text-right">Staff Pay</TableHead>
+                    <TableHead className="text-right">Expense</TableHead>
+                    <TableHead className="text-right">Net Profit</TableHead>
+                    <TableHead>Duty Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(() => {
+                    const rawItems = duties.data?.items ?? [];
+                    const q = dutySearch.toLowerCase().trim();
+                    const filtered = q
+                      ? rawItems.filter(
+                          (r) =>
+                            r.customer_name?.toLowerCase().includes(q) ||
+                            r.customer_phone?.toLowerCase().includes(q) ||
+                            r.employee_name?.toLowerCase().includes(q) ||
+                            r.employee_code?.toLowerCase().includes(q) ||
+                            r.address?.toLowerCase().includes(q)
+                        )
+                      : rawItems;
+
+                    if (!filtered.length) {
+                      return (
+                        <TableRow>
+                          <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                            No duty engagements found for the selected period.
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+
+                    return filtered.map((r) => {
+                      const isPostpaid = r.payment_type === "postpaid";
+                      const isPaid = r.payment_status === "paid" || r.payment_status === "received";
+                      return (
+                        <TableRow key={r.id}>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="font-semibold text-xs text-foreground">
+                                {r.start_date}
+                                {r.end_date ? ` → ${r.end_date}` : " (ongoing)"}
+                              </span>
+                              <span className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                                <Clock className="h-3 w-3" />
+                                {r.shift === "full_24h" ? "24 Hours" : r.shift === "day" ? "Day" : r.shift === "night" ? "Night" : r.shift}
+                                {r.duration_days ? ` · ${r.duration_days} day(s)` : ""}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="font-medium text-foreground">{r.customer_name}</span>
+                              {r.customer_phone && (
+                                <a href={`tel:${r.customer_phone}`} className="text-xs text-primary hover:underline">
+                                  {r.customer_phone}
+                                </a>
+                              )}
+                              <span className="text-[11px] text-muted-foreground truncate max-w-[180px]">
+                                {r.place_name || r.address || r.place_type}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="font-medium text-foreground">{r.employee_name}</span>
+                              <span className="text-[11px] text-muted-foreground">
+                                {r.employee_code || "Staff"} · {r.location_name}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col items-start gap-1">
+                              <Badge
+                                variant={isPostpaid ? "secondary" : "default"}
+                                className={
+                                  isPostpaid
+                                    ? "bg-amber-500/10 text-amber-400 border-amber-500/30 text-[10px]"
+                                    : "bg-cyan-500/10 text-cyan-400 border-cyan-500/30 text-[10px]"
+                                }
+                              >
+                                {isPostpaid ? "Postpaid (Cash)" : "Prepaid"}
+                              </Badge>
+                              <span
+                                className={`text-[10.5px] font-medium ${
+                                  isPaid ? "text-emerald-500" : "text-amber-400"
+                                }`}
+                              >
+                                {isPaid ? "✓ Cash Collected / Paid" : "⏳ Pending"}
+                              </span>
+                              {r.payment_received_by && (
+                                <span className="text-[10px] text-muted-foreground truncate max-w-[140px]">
+                                  by {r.payment_received_by}
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right font-semibold text-foreground">
+                            {rupee(r.customer_rate)}
+                          </TableCell>
+                          <TableCell className="text-right text-muted-foreground">
+                            {rupee(r.employee_payout)}
+                          </TableCell>
+                          <TableCell className="text-right text-muted-foreground">
+                            {rupee(r.other_expense)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <span
+                              className={`font-bold ${
+                                r.profit >= 0 ? "text-emerald-500" : "text-destructive"
+                              }`}
+                            >
+                              {rupee(r.profit)}
+                            </span>
+                            <div className="text-[10px] text-muted-foreground">({r.margin_pct}%)</div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-1 items-start">
+                              <Badge
+                                variant="outline"
+                                className={
+                                  r.status === "completed"
+                                    ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                                    : r.status === "active"
+                                    ? "bg-primary/10 text-primary border-primary/20"
+                                    : "bg-muted text-muted-foreground"
+                                }
+                              >
+                                {r.status === "completed" ? "✓ Completed" : r.status}
+                              </Badge>
+                              {r.work_completed_at && (
+                                <span className="text-[10px] text-muted-foreground">
+                                  Done: {new Date(r.work_completed_at).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short" })}
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    });
+                  })()}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         {/* Daily summary */}
         <TabsContent value="daily" className="space-y-4">

@@ -85,6 +85,7 @@ export const endpoints = {
     assignments: "/staff-portal/me/assignments",
     assignmentAccept: (id: string) => `/staff-portal/me/assignments/${id}/accept`,
     assignmentDecline: (id: string) => `/staff-portal/me/assignments/${id}/decline`,
+    assignmentComplete: (id: string) => `/staff-portal/me/assignments/${id}/complete`,
     assignmentRoute: (id: string) => `/staff-portal/me/assignments/${id}/route`,
     location: "/staff-portal/me/location",
     verifyId: "/staff-portal/me/verify-id",
@@ -111,6 +112,7 @@ export const endpoints = {
     customerPayments: "/reports/customer-payments",
     dailySummary: "/reports/daily-summary",
     dailyEmail: "/reports/daily-email",
+    duties: "/reports/duties",
   },
   contact: { root: "/contact" },
   settings: {

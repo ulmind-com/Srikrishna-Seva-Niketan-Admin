@@ -9,7 +9,7 @@ import type { Booking, BookingStatus } from "@/types/models";
 import { bookingService } from "@/services/booking.service";
 import { normalizeError } from "@/services/api/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { downloadBlob, formatDate } from "@/lib/utils";
+import { cn, downloadBlob, formatDate } from "@/lib/utils";
 import { env } from "@/config/env";
 import { PageHeader } from "@/components/common/PageHeader";
 import { SearchInput } from "@/components/common/SearchInput";
@@ -144,6 +144,7 @@ export function BookingsPage() {
               <TableHead>Reference</TableHead>
               <TableHead>Patient</TableHead>
               <TableHead>Service</TableHead>
+              <TableHead>Payment</TableHead>
               <TableHead>Preferred date</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -151,10 +152,10 @@ export function BookingsPage() {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableSkeleton rows={8} cols={6} />
+              <TableSkeleton rows={8} cols={7} />
             ) : items.length === 0 ? (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={6} className="p-0">
+                <TableCell colSpan={7} className="p-0">
                   <EmptyState
                     icon={<CalendarCheck />}
                     title="No bookings found"
@@ -181,6 +182,24 @@ export function BookingsPage() {
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {b.service_name}
+                  </TableCell>
+                  <TableCell>
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold border",
+                        b.payment_type === "postpaid"
+                          ? "border-amber-500/30 bg-amber-500/10 text-amber-400"
+                          : "border-sky-500/30 bg-sky-500/10 text-sky-400"
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "h-1.5 w-1.5 rounded-full",
+                          b.payment_type === "postpaid" ? "bg-amber-400" : "bg-sky-400"
+                        )}
+                      />
+                      {b.payment_type === "postpaid" ? "Postpaid" : "Prepaid"}
+                    </span>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {formatDate(b.preferred_date)}

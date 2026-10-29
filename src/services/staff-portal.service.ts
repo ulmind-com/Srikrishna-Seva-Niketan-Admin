@@ -147,6 +147,15 @@ export const staffPortalService = {
       url: endpoints.staffPortal.assignmentDecline(id),
       data: { reason },
     }),
+  completeAssignment: (
+    id: string,
+    payload?: { cash_collected?: boolean; notes?: string }
+  ) =>
+    staffRequest<StaffAssignment>({
+      method: "POST",
+      url: endpoints.staffPortal.assignmentComplete(id),
+      data: payload ?? {},
+    }),
   /** Route from the nurse's current GPS to the duty location. */
   route: (
     id: string,
@@ -210,6 +219,11 @@ export interface StaffAssignment {
   start_date: string;
   end_date?: string | null;
   acceptance_status: "pending" | "accepted" | "declined";
+  status?: string;
+  payment_type?: "prepaid" | "postpaid";
+  payment_status?: string;
+  collect_amount?: number | null;
+  work_completed_at?: string | null;
   dest_lat?: number | null;
   dest_lng?: number | null;
   total_days?: number | null;
