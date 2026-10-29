@@ -216,6 +216,12 @@ export interface StaffAssignment {
   days_remaining?: number | null;
 }
 
+export interface RouteStep {
+  instruction: string;
+  distance_m: number;
+  maneuver?: string;
+}
+
 /** Shortest/Fastest path result from the staff route endpoint. */
 export interface RouteResult {
   distance_m: number | null;
@@ -227,6 +233,7 @@ export interface RouteResult {
   dest_lat: number | null;
   dest_lng: number | null;
   preference?: "shortest" | "fastest";
+  steps?: RouteStep[];
 }
 
 export interface StaffNotification {

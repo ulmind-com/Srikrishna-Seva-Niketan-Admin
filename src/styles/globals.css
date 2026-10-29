@@ -217,33 +217,98 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* Zomato/Rapido style glowing neon 3-layer route & marker effects   */
+/* Apple Maps / Google Maps Clean Navigation Route & Moving Pulse     */
 /* ------------------------------------------------------------------ */
-.route-neon-outer-glow {
-  filter: url("#neon-glow-outer") blur(8px) drop-shadow(0 0 8px #00D9FF);
-  animation: neonOuterPulse 3s ease-in-out infinite alternate;
+.nav-route-casing {
   pointer-events: none;
 }
 
-@keyframes neonOuterPulse {
+.nav-route-line {
+  pointer-events: none;
+}
+
+/* Moving Luminous Pulse along the road route */
+.route-pulse-marker {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.route-pulse-halo {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.75) 0%, rgba(14, 165, 233, 0.4) 45%, rgba(2, 132, 199, 0) 75%);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.8), 0 0 18px rgba(14, 165, 233, 0.4);
+  animation: pulseBeacon 1.4s ease-in-out infinite alternate;
+}
+
+.route-pulse-core {
+  position: relative;
+  width: 9px;
+  height: 9px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 1.5px solid #0284c7;
+  box-shadow: 0 0 6px #38bdf8, 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes pulseBeacon {
   0% {
-    stroke-opacity: 0.16;
-    filter: url("#neon-glow-outer") blur(7px) drop-shadow(0 0 6px rgba(0, 217, 255, 0.6));
+    transform: scale(0.85);
+    opacity: 0.65;
   }
   100% {
-    stroke-opacity: 0.28;
-    filter: url("#neon-glow-outer") blur(9px) drop-shadow(0 0 14px rgba(0, 217, 255, 0.95));
+    transform: scale(1.2);
+    opacity: 1;
   }
 }
 
-.route-neon-middle-halo {
-  filter: url("#neon-glow-middle") blur(3px) drop-shadow(0 0 4px #00D9FF);
+/* Apple/Google Maps Walking Navigation Chevron Puck */
+.nav-puck-container {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-puck-accuracy {
+  position: absolute;
+  border-radius: 9999px;
+  background: rgba(37, 99, 235, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.3);
   pointer-events: none;
 }
 
-.route-neon-inner-line {
-  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.9));
-  pointer-events: none;
+.nav-puck-body {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  background: #2563eb;
+  border: 3px solid #ffffff;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  transition: transform 0.25s cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+.nav-puck-chevron {
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 12px solid #ffffff;
+  margin-top: -2px;
 }
 
 .nurse-radar-ping {

@@ -24,4 +24,9 @@ export const OSM_TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 export const OSM_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
+/** Apple/Google Maps-style clean navigation tiles (CartoDB Voyager) */
+export const NAVIGATION_TILE_URL = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+export const NAVIGATION_ATTRIBUTION =
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>';
+
 export { L };

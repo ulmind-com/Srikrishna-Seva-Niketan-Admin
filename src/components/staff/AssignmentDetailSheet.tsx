@@ -61,7 +61,7 @@ interface Props {
 export function AssignmentDetailSheet({ assignment, open, onOpenChange }: Props) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
+      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-xl lg:max-w-2xl">
         {assignment && (
           <>
             <SheetHeader className="text-left">
