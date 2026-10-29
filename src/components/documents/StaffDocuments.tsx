@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ImageUpload } from "@/components/common/ImageUpload";
 import { resourceServices } from "@/services/resources";
 import { settingsService } from "@/services/settings.service";
+import { staffPortalService } from "@/services/staff-portal.service";
 import type { Employee, ImageAsset } from "@/types/models";
 import { StaffIdCard } from "./StaffIdCard";
 import { ApplicationFormI, ApplicationFormII } from "./StaffApplicationForms";
@@ -26,18 +27,43 @@ const TABS: { key: DocKey; label: string; icon: typeof IdCard }[] = [
  * and the global print stylesheet hides everything else, so what the user
  * sees on screen is exactly what lands on paper (or in a Save-as-PDF).
  */
-export function StaffDocuments({ staff }: { staff: Employee }) {
+export function StaffDocuments({
+  staff,
+  mode = "admin",
+}: {
+  staff: Employee;
+  /**
+   * "admin" (default) runs inside the admin panel with an admin token.
+   * "staff" runs inside the self-service staff portal, where the admin-only
+   * `locations` and `employees` endpoints would 401 and bounce the nurse to
+   * the admin login — so it reads the branch from the public staff-portal
+   * endpoint and hides the admin signature uploader.
+   */
+  mode?: "admin" | "staff";
+}) {
   const [active, setActive] = useState<DocKey>("id-card");
   const [downloading, setDownloading] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+  const isStaffPortal = mode === "staff";
 
-  // Resolve the branch name once; all three documents print it.
+  // Resolve the branch name once; all three documents print it. The admin
+  // panel reads the full locations list; the staff portal uses the public
+  // branch list so it never hits an admin-only endpoint.
   const { data: locations } = useQuery({
     queryKey: ["locations", "all"],
     queryFn: () => resourceServices.locations.list({ page_size: 100 }),
     staleTime: 60_000,
+    enabled: !isStaffPortal,
   });
-  const branchName = locations?.items.find((b) => b.id === staff.location_id)?.name;
+  const { data: staffBranches } = useQuery({
+    queryKey: ["staff-portal", "branches"],
+    queryFn: () => staffPortalService.branches(),
+    staleTime: 60_000,
+    enabled: isStaffPortal,
+  });
+  const branchName = isStaffPortal
+    ? staffBranches?.find((b) => b.id === staff.location_id)?.name
+    : locations?.items.find((b) => b.id === staff.location_id)?.name;
 
   // The super-admin's signature, printed as "Authorized Signatory" on the card.
   const { data: settings } = useQuery({
@@ -176,8 +202,10 @@ export function StaffDocuments({ staff }: { staff: Employee }) {
         </div>
       </div>
 
-      {/* Card holder signature uploader (ID card only) */}
-      {active === "id-card" && (
+      {/* Card holder signature uploader (ID card only). Admin panel only —
+          in the staff portal the profile is already verified and locked, and
+          the update endpoint is admin-scoped. */}
+      {active === "id-card" && !isStaffPortal && (
         <div className="no-print rounded-2xl border border-border bg-card p-4">
           <p className="text-sm font-medium">Signature of Card Holder</p>
           <p className="mb-3 text-xs text-muted-foreground">
@@ -199,8 +227,9 @@ export function StaffDocuments({ staff }: { staff: Employee }) {
         </div>
       )}
 
-      {/* Document stage */}
-      <div className="overflow-x-auto rounded-2xl bg-muted/40 p-5">
+      {/* Document stage. The A4 forms keep their true width and scroll
+          horizontally on narrow screens rather than squishing. */}
+      <div className="overflow-x-auto rounded-2xl bg-muted/40 p-3 sm:p-5">
         <div className="flex justify-center">
           {active === "id-card" && (
             <div ref={cardRef} className="print-target w-[300px] shadow-lg">

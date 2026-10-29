@@ -94,9 +94,12 @@ export function StaffNotifications() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium">{n.title}</p>
+                    <p className="min-w-0 truncate text-sm font-medium">{n.title}</p>
                     {!n.is_read && (
-                      <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
+                      <Badge
+                        variant="secondary"
+                        className="h-4 shrink-0 px-1.5 text-[10px]"
+                      >
                         New
                       </Badge>
                     )}

@@ -196,7 +196,7 @@ export function ApplicationFormII({
 /** An A4 page surface. */
 function Sheet({ children }: { children: ReactNode }) {
   return (
-    <div className="doc-sheet mx-auto w-[210mm] max-w-full bg-white p-[14mm] text-[#111] shadow-soft">
+    <div className="doc-sheet mx-auto w-[210mm] bg-white p-[14mm] text-[#111] shadow-soft">
       {children}
     </div>
   );
