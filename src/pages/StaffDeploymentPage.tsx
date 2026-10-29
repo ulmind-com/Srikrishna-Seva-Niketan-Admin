@@ -22,6 +22,7 @@ import {
   AssignmentProgress,
   PLACE_LABEL,
 } from "@/components/common/AssignmentProgress";
+import { PushDispatchModal } from "@/components/notifications/PushDispatchModal";
 import type { Assignment, DeploymentBranch } from "@/types/models";
 
 const SHIFT_LABEL: Record<string, string> = {
@@ -79,14 +80,17 @@ export function StaffDeploymentPage() {
               : "Your branch — who is on duty, who is free, and how many days each engagement has left."}
           </p>
         </div>
-        <div className="relative w-full max-w-xs">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search staff, customer, place…"
-            className="pl-9"
-          />
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative w-full sm:w-64">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search staff, customer, place…"
+              className="pl-9"
+            />
+          </div>
+          <PushDispatchModal />
         </div>
       </div>
 

@@ -15,6 +15,7 @@ import { cn, timeAgo } from "@/lib/utils";
 import { PageHeader } from "@/components/common/PageHeader";
 import { EmptyState } from "@/components/common/EmptyState";
 import { Pagination } from "@/components/common/Pagination";
+import { PushDispatchModal } from "@/components/notifications/PushDispatchModal";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -61,11 +62,14 @@ export function NotificationsPage() {
         description="Stay on top of everything happening across your platform."
         icon={<Bell />}
         actions={
-          unread > 0 && (
-            <Button variant="outline" onClick={() => markAllRead.mutate()}>
-              <CheckCheck /> Mark all read
-            </Button>
-          )
+          <div className="flex flex-wrap items-center gap-2">
+            <PushDispatchModal />
+            {unread > 0 && (
+              <Button variant="outline" onClick={() => markAllRead.mutate()}>
+                <CheckCheck /> Mark all read
+              </Button>
+            )}
+          </div>
         }
       />
 

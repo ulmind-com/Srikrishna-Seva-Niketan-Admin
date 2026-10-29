@@ -20,6 +20,7 @@ import {
 } from "@/components/documents/document-utils";
 import { ORG_NAME } from "./StaffAuthShell";
 import { StaffNotifications } from "./StaffNotifications";
+import { StaffPushBanner } from "@/components/staff/StaffPushBanner";
 
 /** The staff member's home screen after signing in. */
 export function StaffStatusPage() {
@@ -87,6 +88,9 @@ export function StaffStatusPage() {
             {VERIFICATION_LABEL[status] ?? status}
           </Badge>
         </section>
+
+        {/* Duty Push Notification Control */}
+        <StaffPushBanner />
 
         {/* Live notification feed */}
         <StaffNotifications />

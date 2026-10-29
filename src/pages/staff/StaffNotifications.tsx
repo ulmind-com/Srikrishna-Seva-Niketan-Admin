@@ -1,7 +1,9 @@
+import { useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, CalendarClock, CheckCheck, Loader2 } from "lucide-react";
 import { staffPortalService } from "@/services/staff-portal.service";
 import { Badge } from "@/components/ui/badge";
+import { playDutyAlertSound } from "@/utils/audioAlert";
 
 /** Relative "2h ago" style time for a notification. */
 function timeAgo(iso?: string | null): string {
@@ -34,6 +36,23 @@ export function StaffNotifications() {
 
   const items = feed.data?.items ?? [];
   const unread = items.filter((n) => !n.is_read).length;
+  const initialLoadRef = useRef(true);
+  const prevUnreadRef = useRef(unread);
+
+  useEffect(() => {
+    if (initialLoadRef.current) {
+      if (!feed.isLoading) {
+        initialLoadRef.current = false;
+        prevUnreadRef.current = unread;
+      }
+      return;
+    }
+
+    if (unread > prevUnreadRef.current) {
+      playDutyAlertSound();
+    }
+    prevUnreadRef.current = unread;
+  }, [unread, feed.isLoading]);
 
   const markRead = useMutation({
     mutationFn: (id: string) => staffPortalService.markNotificationRead(id),

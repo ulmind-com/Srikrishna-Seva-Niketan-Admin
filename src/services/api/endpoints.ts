@@ -88,6 +88,11 @@ export const endpoints = {
     assignmentRoute: (id: string) => `/staff-portal/me/assignments/${id}/route`,
     location: "/staff-portal/me/location",
     verifyId: "/staff-portal/me/verify-id",
+    pushSubscription: "/staff-portal/me/push-subscription",
+    pushTest: "/staff-portal/me/push-test",
+  },
+  push: {
+    vapidPublicKey: "/push/vapid-public-key",
   },
   geo: {
     geocode: "/geo/geocode",
@@ -119,6 +124,8 @@ export const endpoints = {
     unread: "/notifications/unread-count",
     read: (id: string) => `/notifications/${id}/read`,
     readAll: "/notifications/read-all",
+    pushDispatch: "/notifications/push-dispatch",
+    pushStatus: "/notifications/push-status",
   },
   uploads: {
     image: "/uploads/image",
