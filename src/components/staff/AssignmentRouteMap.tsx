@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   Compass,
@@ -629,30 +629,58 @@ export function AssignmentRouteMap({ assignment }: { assignment: StaffAssignment
     window.open(url, "_blank", "noopener");
   };
 
-  // Distance & Duration metrics
-  const distanceDisplay = route?.readable_distance
-    ? route.readable_distance
-    : route?.distance_m != null
-      ? `${(route.distance_m / 1000).toFixed(1)} km`
-      : null;
+  // Distance & Duration metrics formatting
+  const formatDistance = (meters?: number | null, readable?: string | null): string => {
+    if (meters != null && !isNaN(meters)) {
+      if (meters < 1000) return `${Math.round(meters)} m`;
+      return `${(meters / 1000).toFixed(1)} km`;
+    }
+    if (readable) {
+      if (readable.includes("km") || readable.includes("m")) return readable;
+      const num = parseFloat(readable);
+      return isNaN(num) ? readable : `${num.toFixed(1)} km`;
+    }
+    return "--";
+  };
 
-  const durationMin = route?.duration_s != null ? Math.round(route.duration_s / 60) : null;
-  const durationDisplay = route?.readable_duration
-    ? route.readable_duration
-    : durationMin != null
-      ? `${durationMin} min`
-      : null;
+  const formatDurationCompact = (seconds?: number | null, readable?: string | null): string => {
+    if (seconds != null && !isNaN(seconds)) {
+      const totalMin = Math.round(seconds / 60);
+      if (totalMin < 60) return `${totalMin} min`;
+      const hours = Math.floor(totalMin / 60);
+      const mins = totalMin % 60;
+      if (mins === 0) return `${hours} hr`;
+      return `${hours} hr ${mins} min`;
+    }
+    if (readable) {
+      return readable
+        .replace(/hours?/gi, "hr")
+        .replace(/minutes?/gi, "min")
+        .replace(/seconds?/gi, "s")
+        .trim();
+    }
+    return "--";
+  };
 
-  // Clock arrival time in IST (e.g. "11:15 AM")
-  const etaClockTime =
-    route?.duration_s != null
-      ? new Date(Date.now() + route.duration_s * 1000).toLocaleTimeString("en-IN", {
-          timeZone: "Asia/Kolkata",
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: true,
-        })
-      : null;
+  const distanceDisplay = formatDistance(route?.distance_m, route?.readable_distance);
+  const durationDisplay = formatDurationCompact(route?.duration_s, route?.readable_duration);
+
+  // Clock arrival time in IST with separate AM/PM to prevent line breaks
+  const etaParts = useMemo(() => {
+    if (route?.duration_s == null) return { time: "--:--", period: "" };
+    const date = new Date(Date.now() + route.duration_s * 1000);
+    const str = date.toLocaleTimeString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+    const match = str.match(/^([\d:]+)\s*([a-zA-Z]+)?$/);
+    if (match) {
+      return { time: match[1], period: (match[2] || "").toUpperCase() };
+    }
+    return { time: str, period: "" };
+  }, [route?.duration_s]);
 
   // Turn-by-Turn Instruction banner calculation
   const nextStep = route?.steps && route.steps.length > 0 ? route.steps[0] : null;
@@ -664,52 +692,50 @@ export function AssignmentRouteMap({ assignment }: { assignment: StaffAssignment
 
   const instructionDist =
     nextStep?.distance_m != null
-      ? nextStep.distance_m > 1000
-        ? `${(nextStep.distance_m / 1000).toFixed(1)} km`
-        : `${nextStep.distance_m} m`
-      : distanceDisplay || "";
+      ? formatDistance(nextStep.distance_m)
+      : distanceDisplay;
 
   return (
     <div
       className={`relative flex flex-col overflow-hidden rounded-3xl border border-border/80 bg-neutral-950 font-sans shadow-2xl transition-all duration-300 ${
-        isFullscreen ? "fixed inset-0 z-[9999] rounded-none border-none h-screen w-screen" : "h-[480px] sm:h-[540px] w-full"
+        isFullscreen ? "fixed inset-0 z-[9999] rounded-none border-none h-screen w-screen" : "h-[500px] sm:h-[560px] w-full"
       }`}
     >
       {/* ------------------------------------------------------------- */}
       {/* 1. TOP NAVIGATION INSTRUCTION BANNER (APPLE MAPS STYLE)       */}
       {/* ------------------------------------------------------------- */}
-      <div className="absolute top-3 inset-x-3 sm:inset-x-6 z-[400] pointer-events-none">
-        <div className="pointer-events-auto flex items-center justify-between gap-3 rounded-2xl bg-neutral-900/95 backdrop-blur-md px-4 py-3.5 text-white border border-white/10 shadow-2xl">
-          <div className="flex items-center gap-3.5 min-w-0">
+      <div className="absolute top-2.5 sm:top-3 inset-x-2.5 sm:inset-x-5 z-[400] pointer-events-none">
+        <div className="pointer-events-auto flex items-center justify-between gap-2.5 rounded-2xl bg-neutral-900/95 backdrop-blur-md px-3.5 py-3 text-white border border-white/10 shadow-2xl">
+          <div className="flex items-center gap-3 min-w-0">
             {/* Maneuver Arrow Icon */}
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md">
               {route?.distance_m != null && route.distance_m < 80 ? (
-                <Flag className="h-6 w-6" />
+                <Flag className="h-5 w-5" />
               ) : nextStep?.maneuver?.includes("right") ? (
-                <CornerUpRight className="h-6 w-6" />
+                <CornerUpRight className="h-5 w-5" />
               ) : (
-                <Navigation2 className="h-6 w-6 rotate-45" />
+                <Navigation2 className="h-5 w-5 rotate-45" />
               )}
             </div>
 
             {/* Instruction Text & Distance */}
             <div className="min-w-0">
               <div className="flex items-baseline gap-2">
-                <span className="text-lg font-extrabold tracking-tight text-white leading-tight">
+                <span className="text-base sm:text-lg font-black tracking-tight text-white leading-tight whitespace-nowrap">
                   {instructionDist}
                 </span>
                 {geoState === "locating" && (
-                  <span className="text-xs text-blue-400 inline-flex items-center gap-1 font-medium">
+                  <span className="text-[11px] text-blue-400 inline-flex items-center gap-1 font-medium">
                     <Loader2 className="h-3 w-3 animate-spin" /> GPS Lock…
                   </span>
                 )}
                 {loadingRoute && (
-                  <span className="text-xs text-blue-400 inline-flex items-center gap-1 font-medium">
+                  <span className="text-[11px] text-blue-400 inline-flex items-center gap-1 font-medium">
                     <Loader2 className="h-3 w-3 animate-spin" /> Routing…
                   </span>
                 )}
               </div>
-              <p className="truncate text-xs text-neutral-300 font-medium">
+              <p className="truncate text-xs text-neutral-300 font-medium mt-0.5">
                 {instructionText}
               </p>
             </div>
@@ -744,7 +770,7 @@ export function AssignmentRouteMap({ assignment }: { assignment: StaffAssignment
                 setIsMuted(!isMuted);
                 if (isMuted) playSynthesizedChime();
               }}
-              className="flex h-9 w-9 items-center justify-center rounded-xl bg-neutral-800/80 text-neutral-300 hover:text-white hover:bg-neutral-800 border border-white/5 transition"
+              className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-neutral-800/80 text-neutral-300 hover:text-white hover:bg-neutral-800 border border-white/5 transition"
               title={isMuted ? "Unmute sound" : "Mute sound"}
             >
               {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4 text-blue-400" />}
@@ -761,29 +787,29 @@ export function AssignmentRouteMap({ assignment }: { assignment: StaffAssignment
       {/* ------------------------------------------------------------- */}
       {/* 3. FLOATING ACTION CONTROLS (APPLE MAPS RIGHT SIDE STACK)     */}
       {/* ------------------------------------------------------------- */}
-      <div className="absolute right-3 sm:right-5 top-24 z-[400] flex flex-col gap-2">
+      <div className="absolute right-2.5 sm:right-4 top-20 z-[400] flex flex-col gap-2">
         {/* Recenter / Navigation Lock Button */}
         <button
           type="button"
           onClick={handleRecenter}
-          className={`flex h-11 w-11 items-center justify-center rounded-2xl shadow-xl backdrop-blur-md border transition-all ${
+          className={`flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-2xl shadow-xl backdrop-blur-md border transition-all ${
             isNavLocked
               ? "bg-blue-600 text-white border-blue-500 shadow-blue-500/25 ring-2 ring-blue-400/40"
               : "bg-neutral-900/90 text-neutral-300 hover:text-white border-white/10 hover:bg-neutral-800"
           }`}
           title={isNavLocked ? "Locked to your walking position" : "Recenter navigation camera"}
         >
-          <LocateFixed className="h-5 w-5" />
+          <LocateFixed className="h-4 w-4 sm:h-5 sm:w-5" />
         </button>
 
         {/* Route Overview Fit Button */}
         <button
           type="button"
           onClick={fitRouteBounds}
-          className="flex h-11 w-11 items-center justify-center rounded-2xl bg-neutral-900/90 text-neutral-300 hover:text-white hover:bg-neutral-800 shadow-xl backdrop-blur-md border border-white/10 transition"
+          className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-2xl bg-neutral-900/90 text-neutral-300 hover:text-white hover:bg-neutral-800 shadow-xl backdrop-blur-md border border-white/10 transition"
           title="Fit whole route to screen"
         >
-          <RouteIcon className="h-5 w-5" />
+          <RouteIcon className="h-4 w-4 sm:h-5 sm:w-5" />
         </button>
 
         {/* Fullscreen Navigation Expand Toggle */}
@@ -793,77 +819,92 @@ export function AssignmentRouteMap({ assignment }: { assignment: StaffAssignment
             setIsFullscreen(!isFullscreen);
             setTimeout(() => mapRef.current?.invalidateSize(), 300);
           }}
-          className="flex h-11 w-11 items-center justify-center rounded-2xl bg-neutral-900/90 text-neutral-300 hover:text-white hover:bg-neutral-800 shadow-xl backdrop-blur-md border border-white/10 transition"
+          className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-2xl bg-neutral-900/90 text-neutral-300 hover:text-white hover:bg-neutral-800 shadow-xl backdrop-blur-md border border-white/10 transition"
           title={isFullscreen ? "Exit Fullscreen" : "Fullscreen Navigation"}
         >
-          {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
+          {isFullscreen ? <Minimize2 className="h-4 w-4 sm:h-5 sm:w-5" /> : <Maximize2 className="h-4 w-4 sm:h-5 sm:w-5" />}
         </button>
       </div>
 
-      {/* Recenter Pill Banner (When map is dragged away from nurse) */}
-      {!isNavLocked && (
-        <div className="absolute bottom-36 left-1/2 -translate-x-1/2 z-[400]">
+      {/* ------------------------------------------------------------- */}
+      {/* 4. APPLE MAPS STRIPPED-DOWN BOTTOM PANEL & RECENTER          */}
+      {/* ------------------------------------------------------------- */}
+      <div className="absolute bottom-2.5 sm:bottom-3 inset-x-2.5 sm:inset-x-5 z-[400] flex flex-col items-center gap-2 pointer-events-none">
+        {/* Resume Navigation Floating Pill — Natural Flex Stack Above Card */}
+        {!isNavLocked && (
           <button
             type="button"
             onClick={handleRecenter}
-            className="flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-xl hover:bg-blue-700 transition-all border border-blue-400/40 animate-bounce"
+            className="pointer-events-auto flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-xl hover:bg-blue-500 transition-all border border-blue-400/40 animate-pulse active:scale-95 cursor-pointer"
           >
-            <Navigation className="h-3.5 w-3.5" />
-            Resume Navigation
+            <Navigation className="h-3.5 w-3.5 fill-current" />
+            <span>Resume Navigation</span>
           </button>
-        </div>
-      )}
+        )}
 
-      {/* ------------------------------------------------------------- */}
-      {/* 4. APPLE MAPS STRIPPED-DOWN BOTTOM PANEL                      */}
-      {/* ------------------------------------------------------------- */}
-      <div className="absolute bottom-3 inset-x-3 sm:inset-x-6 z-[400] pointer-events-none">
-        <div className="pointer-events-auto rounded-3xl bg-neutral-900/95 backdrop-blur-xl border border-white/10 p-4 text-white shadow-2xl">
-          {/* Top Metric Row: Big Arrival, Duration, Distance */}
-          <div className="flex items-baseline justify-between border-b border-white/10 pb-3">
-            <div className="flex items-baseline gap-1">
-              <span className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-                {etaClockTime || "--:--"}
-              </span>
-              <span className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider ml-1">
-                arrival
-              </span>
-            </div>
-
-            <div className="flex items-baseline gap-1">
-              <span className="text-xl sm:text-2xl font-bold tracking-tight text-emerald-400">
-                {durationDisplay || "--"}
+        {/* Main Bottom Information Card */}
+        <div className="pointer-events-auto w-full rounded-2xl sm:rounded-3xl bg-neutral-900/95 backdrop-blur-xl border border-white/10 p-3 sm:p-4 text-white shadow-2xl">
+          {/* Top Metric Row: 3 Equal-Width Columns, Zero Overlap */}
+          <div className="grid grid-cols-3 divide-x divide-white/10 text-center pb-2.5 mb-2.5 border-b border-white/10">
+            {/* Col 1: Arrival Time */}
+            <div className="flex flex-col items-center justify-center px-1 min-w-0">
+              <div className="flex items-baseline gap-0.5 whitespace-nowrap">
+                <span className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                  {etaParts.time}
+                </span>
+                {etaParts.period && (
+                  <span className="text-[11px] font-bold text-neutral-400 uppercase">
+                    {etaParts.period}
+                  </span>
+                )}
+              </div>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 mt-0.5 whitespace-nowrap">
+                Arrival
               </span>
             </div>
 
-            <div className="flex items-baseline gap-1">
-              <span className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-200">
-                {distanceDisplay || "--"}
+            {/* Col 2: Duration */}
+            <div className="flex flex-col items-center justify-center px-1 min-w-0">
+              <span className="text-base sm:text-lg font-black text-emerald-400 tracking-tight whitespace-nowrap">
+                {durationDisplay}
+              </span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 mt-0.5 whitespace-nowrap">
+                Duration
+              </span>
+            </div>
+
+            {/* Col 3: Distance */}
+            <div className="flex flex-col items-center justify-center px-1 min-w-0">
+              <span className="text-base sm:text-lg font-black text-neutral-100 tracking-tight whitespace-nowrap">
+                {distanceDisplay}
+              </span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 mt-0.5 whitespace-nowrap">
+                Distance
               </span>
             </div>
           </div>
 
           {/* Bottom Destination Row & Actions */}
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-bold text-white">
+          <div className="flex items-center justify-between gap-2.5">
+            <div className="min-w-0 flex-1 text-left">
+              <p className="truncate text-xs sm:text-sm font-bold text-white">
                 {assignment.customer_name}
               </p>
-              <p className="truncate text-xs text-neutral-400">
-                {assignment.place_name || assignment.place_type} · {assignment.address || "Confirmed map pin"}
+              <p className="truncate text-[11px] text-neutral-400 mt-0.5">
+                {assignment.place_name || (assignment.place_type === "home" ? "Home" : assignment.place_type)} · {assignment.address || "Confirmed map pin"}
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 shrink-0">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={openInExternalMaps}
                 disabled={!dest}
-                className="h-9 rounded-xl border-white/15 bg-neutral-800 text-xs font-semibold text-white hover:bg-neutral-700 hover:text-white gap-1.5"
+                className="h-8 px-2.5 rounded-xl border-white/15 bg-neutral-800 text-xs font-semibold text-white hover:bg-neutral-700 hover:text-white gap-1.5"
               >
-                <Compass className="h-4 w-4 text-blue-400" />
-                Apple/Google Maps
+                <Compass className="h-3.5 w-3.5 text-blue-400" />
+                <span>Maps</span>
                 <ExternalLink className="h-3 w-3 opacity-60" />
               </Button>
 
@@ -872,7 +913,7 @@ export function AssignmentRouteMap({ assignment }: { assignment: StaffAssignment
                   variant="destructive"
                   size="sm"
                   onClick={() => setIsFullscreen(false)}
-                  className="h-9 rounded-xl text-xs font-bold px-3.5"
+                  className="h-8 rounded-xl text-xs font-bold px-3"
                 >
                   Exit
                 </Button>
