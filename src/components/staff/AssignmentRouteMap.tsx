@@ -74,7 +74,10 @@ export function AssignmentRouteMap({ assignment }: { assignment: StaffAssignment
     const map = L.map(containerRef.current).setView(DEFAULT_CENTER, 11);
     L.tileLayer(OSM_TILE_URL, { attribution: OSM_ATTRIBUTION, maxZoom: 19 }).addTo(map);
     mapRef.current = map;
+    // The sheet slides in after mount — recompute size so tiles aren't grey.
+    const t = setTimeout(() => map.invalidateSize(), 300);
     return () => {
+      clearTimeout(t);
       map.remove();
       mapRef.current = null;
     };

@@ -63,8 +63,11 @@ export function LocationPinField({ control, latName, lngName }: LocationPinField
     if (hasPin) place(Number(lat.field.value), Number(lng.field.value));
     map.on("click", (e: L.LeafletMouseEvent) => place(e.latlng.lat, e.latlng.lng));
     mapRef.current = map;
+    // The form may open in a dialog/sheet — recompute size so tiles render.
+    const t = setTimeout(() => map.invalidateSize(), 300);
 
     return () => {
+      clearTimeout(t);
       map.remove();
       mapRef.current = null;
       markerRef.current = null;
