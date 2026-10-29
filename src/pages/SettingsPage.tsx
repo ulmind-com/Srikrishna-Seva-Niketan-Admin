@@ -913,7 +913,7 @@ function HomeAboutForm({ canEdit }: { canEdit: boolean }) {
               <Textarea
                 {...register("home_about_description")}
                 rows={3}
-                placeholder="Nupun Home Health Care provides a qualified team of nursing staff..."
+                placeholder="Srikrishna Seva Niketan provides a qualified team of nursing staff..."
                 disabled={!canEdit}
               />
             </Field>
@@ -1153,7 +1153,7 @@ function ContentSectionsForm({ canEdit }: { canEdit: boolean }) {
         <CardContent className="space-y-6">
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label>Why Choose Nupun (Services Page)</Label>
+              <Label>Why Choose Srikrishna Seva Niketan (Services Page)</Label>
               {canEdit && (
                 <Button type="button" variant="outline" size="sm" onClick={() => whyChooseField.append({ title: "", detail: "" })}>
                   <Plus className="h-4 w-4" /> Add Reason
@@ -1215,7 +1215,7 @@ function ContentSectionsForm({ canEdit }: { canEdit: boolean }) {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Section Title</Label>
-                <Input {...register("why_choose_title")} placeholder="Why Choose Nupun Home Care?" disabled={!canEdit} />
+                <Input {...register("why_choose_title")} placeholder="Why Choose Srikrishna Seva Niketan?" disabled={!canEdit} />
               </div>
             </div>
             <div className="space-y-1.5">
@@ -1242,7 +1242,7 @@ function ContentSectionsForm({ canEdit }: { canEdit: boolean }) {
           <div className="space-y-3 pt-4 border-t border-border">
             <Label>Commitment Section — Team Image</Label>
             <p className="text-xs text-muted-foreground">
-              This image appears on the homepage &quot;Why Choose Nupun&quot; section (right side).
+              This image appears on the homepage &quot;Why Choose Srikrishna Seva Niketan&quot; section (right side).
             </p>
             <Controller
               control={control}
