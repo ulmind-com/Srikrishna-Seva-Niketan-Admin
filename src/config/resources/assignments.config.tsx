@@ -200,6 +200,17 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
       section: "Place",
     },
     { name: "address", label: "Address", type: "textarea", section: "Place", colSpan: 2 },
+    {
+      name: "dest_lat",
+      label: "Customer / Duty Location Pin",
+      type: "geopoint",
+      section: "Place",
+      colSpan: 2,
+      latField: "dest_lat",
+      lngField: "dest_lng",
+      addressField: "address",
+      helper: "Draggable pin for exact nurse navigation. Use 'Locate Address on Map' or drag the pin to set the exact customer location.",
+    },
     { name: "start_date", label: "Start Date", type: "date", required: true, section: "Schedule" },
     {
       name: "duration_days",

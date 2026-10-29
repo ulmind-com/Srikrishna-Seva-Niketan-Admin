@@ -48,6 +48,7 @@ export interface FieldConfig {
   /** For `geopoint` fields — the flat form keys the pin writes to. */
   latField?: string;
   lngField?: string;
+  addressField?: string;
 }
 
 export interface ColumnConfig<T> {

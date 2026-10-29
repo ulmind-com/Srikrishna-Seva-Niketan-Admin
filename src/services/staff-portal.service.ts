@@ -148,11 +148,16 @@ export const staffPortalService = {
       data: { reason },
     }),
   /** Route from the nurse's current GPS to the duty location. */
-  route: (id: string, lat: number, lng: number) =>
+  route: (
+    id: string,
+    lat: number,
+    lng: number,
+    preference: "shortest" | "fastest" = "shortest",
+  ) =>
     staffRequest<RouteResult>({
       method: "GET",
       url: endpoints.staffPortal.assignmentRoute(id),
-      params: { lat, lng },
+      params: { lat, lng, preference },
     }),
   pingLocation: (lat: number, lng: number) =>
     staffRequest<{ ok: boolean }>({
@@ -211,14 +216,17 @@ export interface StaffAssignment {
   days_remaining?: number | null;
 }
 
-/** Shortest-path result from the staff route endpoint. */
+/** Shortest/Fastest path result from the staff route endpoint. */
 export interface RouteResult {
   distance_m: number | null;
   duration_s: number | null;
+  readable_distance?: string | null;
+  readable_duration?: string | null;
   /** Polyline as [lng, lat] pairs, or null when routing was unavailable. */
-  geometry: number[][] | null;
+  geometry: [number, number][] | null;
   dest_lat: number | null;
   dest_lng: number | null;
+  preference?: "shortest" | "fastest";
 }
 
 export interface StaffNotification {

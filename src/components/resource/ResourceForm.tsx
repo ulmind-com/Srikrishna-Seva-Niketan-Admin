@@ -219,6 +219,7 @@ function renderControl(
           control={control}
           latName={field.latField ?? "lat"}
           lngName={field.lngField ?? "lng"}
+          addressName={field.addressField ?? "address"}
         />
       );
 

@@ -89,6 +89,9 @@ export const endpoints = {
     location: "/staff-portal/me/location",
     verifyId: "/staff-portal/me/verify-id",
   },
+  geo: {
+    geocode: "/geo/geocode",
+  },
   customers: { root: "/customers" },
   assignments: {
     root: "/assignments",
