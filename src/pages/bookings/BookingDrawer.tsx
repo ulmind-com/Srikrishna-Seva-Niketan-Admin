@@ -41,6 +41,7 @@ import { formatDate, humanize } from "@/lib/utils";
 interface Props {
   booking: Booking | null;
   onClose: () => void;
+  onAssignDuty?: (booking: Booking) => void;
 }
 
 function InfoRow({
@@ -65,7 +66,7 @@ function InfoRow({
   );
 }
 
-export function BookingDrawer({ booking, onClose }: Props) {
+export function BookingDrawer({ booking, onClose, onAssignDuty }: Props) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
@@ -78,24 +79,6 @@ export function BookingDrawer({ booking, onClose }: Props) {
     qc.invalidateQueries({ queryKey: ["customers"] });
     qc.invalidateQueries({ queryKey: ["dashboard"] });
   };
-
-  const convertMutation = useMutation({
-    mutationFn: () => bookingService.convertToCustomer(booking!.id),
-    onSuccess: (res) => {
-      invalidate();
-      toast.success(`Converted to Customer & Linked!`, {
-        description: `Customer ${res.customer.name} is ready for duty assignment.`,
-        action: {
-          label: "Assign Duty Now",
-          onClick: () => {
-            onClose();
-            navigate(`/assignments?action=new&customer_id=${res.customer.id}`);
-          },
-        },
-      });
-    },
-    onError: (err) => toast.error(normalizeError(err).message),
-  });
 
   const action = useMutation({
     mutationFn: async (kind: "approve" | "reject" | "cancel") => {
@@ -195,61 +178,44 @@ export function BookingDrawer({ booking, onClose }: Props) {
               {/* Customer Conversion & Duty Assignment Quick Action */}
               {canUpdate && (
                 <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-                  {booking.customer_id ? (
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                      <div className="flex items-start gap-2.5">
-                        <div className="mt-0.5 rounded-lg bg-emerald-500/15 p-1.5 text-emerald-400">
-                          <UserCheck className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-emerald-400">
-                            Customer Record Linked
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            Customer profile is ready in database for duty assignment.
-                          </p>
-                        </div>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex items-start gap-2.5">
+                      <div className="mt-0.5 rounded-lg bg-emerald-500/15 p-1.5 text-emerald-400">
+                        <UserCheck className="h-4 w-4" />
                       </div>
-                      <Button
-                        size="sm"
-                        className="bg-emerald-600 hover:bg-emerald-500 text-white gap-1.5 shrink-0"
-                        onClick={() => {
+                      <div>
+                        <p className="text-sm font-semibold text-emerald-400">
+                          {booking.customer_id
+                            ? "Customer Linked · Assign Duty"
+                            : "1-Click Direct Duty Assignment"}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {booking.customer_id
+                            ? "Assign nurse and schedule shift for this customer."
+                            : "Auto-registers patient with geocoded GPS pin and assigns nurse immediately."}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white gap-1.5 shrink-0"
+                      onClick={() => {
+                        if (onAssignDuty) {
+                          onAssignDuty(booking);
+                        } else {
                           onClose();
                           navigate(
-                            `/assignments?action=new&customer_id=${booking.customer_id}`
+                            booking.customer_id
+                              ? `/assignments?action=new&customer_id=${booking.customer_id}`
+                              : `/assignments?action=new`
                           );
-                        }}
-                      >
-                        <Calendar className="h-3.5 w-3.5" />
-                        Assign Duty
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                      <div className="flex items-start gap-2.5">
-                        <div className="mt-0.5 rounded-lg bg-primary/15 p-1.5 text-primary">
-                          <UserPlus className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">
-                            Add as Customer
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            Auto-geocode GPS location & create customer to assign nurse duties.
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        size="sm"
-                        className="bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5 shrink-0"
-                        onClick={() => convertMutation.mutate()}
-                        loading={convertMutation.isPending}
-                      >
-                        <UserPlus className="h-3.5 w-3.5" />
-                        + Add as Customer
-                      </Button>
-                    </div>
-                  )}
+                        }
+                      }}
+                    >
+                      <Calendar className="h-3.5 w-3.5" />
+                      Assign Duty
+                    </Button>
+                  </div>
                 </div>
               )}
 

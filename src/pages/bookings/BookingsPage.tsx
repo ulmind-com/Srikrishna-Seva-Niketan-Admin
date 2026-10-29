@@ -1,9 +1,8 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import { motion } from "framer-motion";
-import { CalendarCheck, Download, Eye, UserCheck, UserPlus } from "lucide-react";
+import { CalendarCheck, Download, Eye, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import type { ListParams } from "@/types/api";
 import type { Booking, BookingStatus } from "@/types/models";
@@ -36,6 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { BookingDrawer } from "./BookingDrawer";
+import { BookingAssignmentDrawer } from "@/components/bookings/BookingAssignmentDrawer";
 
 const STATUS_FILTERS: { label: string; value: string }[] = [
   { label: "Pending", value: "pending" },
@@ -48,38 +48,13 @@ const STATUS_FILTERS: { label: string; value: string }[] = [
 
 export function BookingsPage() {
   const { hasPermission } = useAuth();
-  const navigate = useNavigate();
-  const qc = useQueryClient();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>("");
   const [selected, setSelected] = useState<Booking | null>(null);
+  const [assigningBooking, setAssigningBooking] = useState<Booking | null>(null);
   const [exporting, setExporting] = useState(false);
-  const [convertingId, setConvertingId] = useState<string | null>(null);
-
-  const convertMutation = useMutation({
-    mutationFn: (bookingId: string) => bookingService.convertToCustomer(bookingId),
-    onSuccess: (res) => {
-      qc.invalidateQueries({ queryKey: ["bookings"] });
-      qc.invalidateQueries({ queryKey: ["customers"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
-      toast.success(`Customer created & linked for ${res.booking.patient_name}!`, {
-        description: "You can now assign a nurse or staff duty to this customer.",
-        action: {
-          label: "Assign Duty",
-          onClick: () =>
-            navigate(`/assignments?action=new&customer_id=${res.customer.id}`),
-        },
-      });
-    },
-    onError: (err) => {
-      toast.error(normalizeError(err).message);
-    },
-    onSettled: () => {
-      setConvertingId(null);
-    },
-  });
 
   const params: ListParams = useMemo(
     () => ({
@@ -218,35 +193,16 @@ export function BookingsPage() {
                       className="flex items-center justify-end gap-2"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      {b.customer_id ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 gap-1.5 border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300 text-xs font-medium"
-                          onClick={() =>
-                            navigate(`/assignments?action=new&customer_id=${b.customer_id}`)
-                          }
-                          title="Customer created. Click to assign duty"
-                        >
-                          <UserCheck className="h-3.5 w-3.5 text-emerald-400" />
-                          <span className="hidden sm:inline">Assign Duty</span>
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          className="h-8 gap-1.5 bg-primary/15 text-primary border border-primary/30 hover:bg-primary/25 hover:border-primary/50 text-xs font-medium"
-                          onClick={() => {
-                            setConvertingId(b.id);
-                            convertMutation.mutate(b.id);
-                          }}
-                          loading={convertingId === b.id && convertMutation.isPending}
-                          title="Add patient as Customer in system"
-                        >
-                          <UserPlus className="h-3.5 w-3.5" />
-                          <span>+ Add as Customer</span>
-                        </Button>
-                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1.5 border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300 text-xs font-semibold shadow-xs"
+                        onClick={() => setAssigningBooking(b)}
+                        title="Assign Nurse or Duty"
+                      >
+                        <UserCheck className="h-3.5 w-3.5 text-emerald-400" />
+                        <span>Assign Duty</span>
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon-sm"
@@ -277,7 +233,19 @@ export function BookingsPage() {
         )}
       </Card>
 
-      <BookingDrawer booking={selected} onClose={() => setSelected(null)} />
+      <BookingDrawer
+        booking={selected}
+        onClose={() => setSelected(null)}
+        onAssignDuty={(b) => {
+          setSelected(null);
+          setAssigningBooking(b);
+        }}
+      />
+
+      <BookingAssignmentDrawer
+        booking={assigningBooking}
+        onClose={() => setAssigningBooking(null)}
+      />
     </div>
   );
 }

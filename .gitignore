@@ -41,3 +41,4 @@ pnpm-debug.log*
 secrets.json
 service-account*.json
 .claude/
+*.tsbuildinfo

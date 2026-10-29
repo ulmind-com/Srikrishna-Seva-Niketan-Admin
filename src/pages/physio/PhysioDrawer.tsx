@@ -13,6 +13,7 @@ import {
   X,
   Ban,
   UserPlus,
+  UserCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Booking } from "@/types/models";
@@ -37,6 +38,7 @@ import { formatDate, humanize } from "@/lib/utils";
 interface Props {
   booking: Booking | null;
   onClose: () => void;
+  onAssignDuty?: (booking: Booking) => void;
 }
 
 function InfoRow({
@@ -61,7 +63,7 @@ function InfoRow({
   );
 }
 
-export function PhysioDrawer({ booking, onClose }: Props) {
+export function PhysioDrawer({ booking, onClose, onAssignDuty }: Props) {
   const qc = useQueryClient();
   const { hasPermission } = useAuth();
   const canUpdate = hasPermission("bookings:update");
@@ -157,6 +159,39 @@ export function PhysioDrawer({ booking, onClose }: Props) {
                   </div>
                 )}
               </section>
+
+              {/* 1-Click Duty & Physiotherapist Assignment */}
+              {canUpdate && (
+                <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex items-start gap-2.5">
+                      <div className="mt-0.5 rounded-lg bg-emerald-500/15 p-1.5 text-emerald-400">
+                        <UserCheck className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-emerald-400">
+                          {booking.customer_id
+                            ? "Customer Linked · Assign Physiotherapist"
+                            : "1-Click Assign Physiotherapist"}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Directly assign staff member & schedule physiotherapy session with route tracking.
+                        </p>
+                      </div>
+                    </div>
+                    {onAssignDuty && (
+                      <Button
+                        size="sm"
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white gap-1.5 shrink-0"
+                        onClick={() => onAssignDuty(booking)}
+                      >
+                        <Calendar className="h-3.5 w-3.5" />
+                        Assign Duty
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {canUpdate && (
                 <>

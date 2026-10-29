@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import { motion } from "framer-motion";
-import { CalendarCheck, Download, Eye, Sparkles } from "lucide-react";
+import { CalendarCheck, Download, Eye, Sparkles, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import type { ListParams } from "@/types/api";
 import type { Booking, BookingStatus } from "@/types/models";
@@ -35,6 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { BookingDrawer } from "./BookingDrawer";
+import { BookingAssignmentDrawer } from "@/components/bookings/BookingAssignmentDrawer";
 
 const STATUS_FILTERS: { label: string; value: string }[] = [
   { label: "Pending", value: "pending" },
@@ -52,6 +53,7 @@ export function ComprehensiveBookingsPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>("");
   const [selected, setSelected] = useState<Booking | null>(null);
+  const [assigningBooking, setAssigningBooking] = useState<Booking | null>(null);
   const [exporting, setExporting] = useState(false);
 
   const params: ListParams = useMemo(
@@ -194,16 +196,29 @@ export function ComprehensiveBookingsPage() {
                     <StatusBadge status={b.status} />
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelected(b);
-                      }}
+                    <div
+                      className="flex items-center justify-end gap-2"
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      <Eye className="h-4 w-4" />
-                    </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1.5 border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300 text-xs font-semibold shadow-xs"
+                        onClick={() => setAssigningBooking(b)}
+                        title="Assign Nurse or Duty"
+                      >
+                        <UserCheck className="h-3.5 w-3.5 text-emerald-400" />
+                        <span>Assign Duty</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => setSelected(b)}
+                        title="View details"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </motion.tr>
               ))
@@ -225,7 +240,19 @@ export function ComprehensiveBookingsPage() {
         )}
       </Card>
 
-      <BookingDrawer booking={selected} onClose={() => setSelected(null)} />
+      <BookingDrawer
+        booking={selected}
+        onClose={() => setSelected(null)}
+        onAssignDuty={(b) => {
+          setSelected(null);
+          setAssigningBooking(b);
+        }}
+      />
+
+      <BookingAssignmentDrawer
+        booking={assigningBooking}
+        onClose={() => setAssigningBooking(null)}
+      />
     </div>
   );
 }
