@@ -48,11 +48,19 @@ import {
 import { ResourceForm } from "./ResourceForm";
 import type { ResourceConfig } from "./types";
 
+export interface ResourceViewProps<T extends { id: string }> {
+  config: ResourceConfig<T>;
+  extraRowAction?: (row: T) => React.ReactNode;
+  extraDropdownItems?: (row: T) => React.ReactNode;
+  children?: React.ReactNode;
+}
+
 export function ResourceView<T extends { id: string }>({
   config,
-}: {
-  config: ResourceConfig<T>;
-}) {
+  extraRowAction,
+  extraDropdownItems,
+  children,
+}: ResourceViewProps<T>) {
   const qc = useQueryClient();
   const { hasPermission } = useAuth();
 
@@ -269,30 +277,39 @@ export function ResourceView<T extends { id: string }>({
                       {col.cell(row)}
                     </TableCell>
                   ))}
-                  {(canUpdate || canDelete) && (
+                  {(canUpdate || canDelete || extraRowAction || extraDropdownItems) && (
                     <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon-sm">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {canUpdate && (
-                            <DropdownMenuItem onClick={() => openEdit(row)}>
-                              <Pencil /> Edit
-                            </DropdownMenuItem>
-                          )}
-                          {canDelete && (
-                            <DropdownMenuItem
-                              destructive
-                              onClick={() => setDeleteTarget(row)}
-                            >
-                              <Trash2 /> Delete
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <div
+                        className="flex items-center justify-end gap-1.5"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {extraRowAction?.(row)}
+                        {(canUpdate || canDelete || extraDropdownItems) && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon-sm">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {extraDropdownItems?.(row)}
+                              {canUpdate && (
+                                <DropdownMenuItem onClick={() => openEdit(row)}>
+                                  <Pencil /> Edit
+                                </DropdownMenuItem>
+                              )}
+                              {canDelete && (
+                                <DropdownMenuItem
+                                  destructive
+                                  onClick={() => setDeleteTarget(row)}
+                                >
+                                  <Trash2 /> Delete
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </div>
                     </TableCell>
                   )}
                 </motion.tr>
@@ -358,6 +375,9 @@ export function ResourceView<T extends { id: string }>({
         loading={deleteMutation.isPending}
         onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
       />
+
+      {/* Additional custom sheets/dialogs passed by caller */}
+      {children}
     </div>
   );
 }
