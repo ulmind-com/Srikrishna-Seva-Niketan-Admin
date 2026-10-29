@@ -201,13 +201,6 @@ function OnboardingForm({ staff }: { staff: Employee }) {
     docVerification.fraudRisk !== "high"
   );
 
-  const isStep2Failed = Boolean(
-    docVerification &&
-    (!docVerification.nameMatched ||
-     !docVerification.idNumberMatched ||
-     docVerification.fraudRisk === "high")
-  );
-
   // Handle Document Upload + Real-Time Verification
   const handleIdDocument = async (file: File) => {
     if (!selectedIdNumber.trim()) {
@@ -299,27 +292,19 @@ function OnboardingForm({ staff }: { staff: Employee }) {
         toast.error("Please upload your Government ID document (Aadhaar / Voter ID / PAN)");
         return;
       }
+      // The automated OCR audit is advisory — it can misread genuine IDs
+      // (phone photos of Aadhaar etc.). We let the nurse proceed and leave the
+      // final call to the super-admin, who reviews the uploaded document. Just
+      // warn once so they can re-upload a clearer scan if they want to.
       if (
         docVerification &&
         (docVerification.fraudRisk === "high" ||
           !docVerification.nameMatched ||
           !docVerification.idNumberMatched)
       ) {
-        if (!docVerification.nameMatched) {
-          toast.error(
-            `Verification Blocked: The name on the document does not match your registered name "${staff.name}". Upload your own authentic ID.`
-          );
-        } else if (!docVerification.idNumberMatched) {
-          toast.error(
-            `Verification Blocked: The ${selectedIdType} number on the document does not match "${selectedIdNumber}".`
-          );
-        } else {
-          toast.error(
-            docVerification.fraudFlags[0] ||
-              "Please upload an authentic, original Government ID document without watermarks or alterations."
-          );
-        }
-        return;
+        toast.warning(
+          "We couldn't auto-verify this document — the office will review it manually. You can re-upload a clearer scan, or continue.",
+        );
       }
     }
 
@@ -854,26 +839,22 @@ function OnboardingForm({ staff }: { staff: Employee }) {
 
             {step < STEPS.length - 1 ? (
               step === 2 ? (
-                isStep2Failed ? (
-                  <div className="flex items-center gap-2 rounded-xl border border-rose-300 bg-rose-50 px-3.5 py-2 text-xs font-semibold text-rose-700 shadow-sm dark:border-rose-900 dark:bg-rose-950/70 dark:text-rose-300">
-                    <XCircle className="h-4 w-4 text-rose-600 animate-pulse flex-shrink-0" />
-                    <span>Verification Failed — Upload your own authentic ID to continue</span>
-                  </div>
-                ) : verifyingDoc || idDocUploading ? (
+                verifyingDoc || idDocUploading ? (
                   <div className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3.5 py-2 text-xs font-semibold text-primary">
                     <Loader2 className="h-4 w-4 animate-spin text-primary flex-shrink-0" />
                     <span>Verifying Document Authenticity…</span>
                   </div>
-                ) : isStep2Verified ? (
+                ) : (
                   <Button
                     type="button"
                     onClick={next}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-md"
+                    disabled={!idDocPreview}
+                    className={
+                      isStep2Verified
+                        ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-md"
+                        : undefined
+                    }
                   >
-                    Continue <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                ) : (
-                  <Button type="button" onClick={next} disabled={!idDocPreview}>
                     Continue <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 )
