@@ -34,6 +34,9 @@ export function useAssignmentAlerts(enabled: boolean): AssignmentAlerts {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const unlockedRef = useRef(false);
+  // Keep the latest pending count readable from the one-off gesture listener.
+  const pendingCountRef = useRef(pendingCount);
+  pendingCountRef.current = pendingCount;
   const [needsGesture, setNeedsGesture] = useState(false);
 
   useEffect(() => {
@@ -44,6 +47,44 @@ export function useAssignmentAlerts(enabled: boolean): AssignmentAlerts {
     return () => {
       a.pause();
       audioRef.current = null;
+    };
+  }, []);
+
+  // Browsers block autoplay until the user interacts with the page. Prime the
+  // audio on the FIRST interaction anywhere so a later ring just works without
+  // the nurse having to find the "Tap to enable" button.
+  useEffect(() => {
+    const prime = () => {
+      const a = audioRef.current;
+      if (!a || unlockedRef.current) return;
+      // Unlock silently: mute, play to satisfy the autoplay gesture, then either
+      // keep ringing (if a duty is already pending) or reset — never a blip.
+      const pendingNow = pendingCountRef.current > 0;
+      a.muted = !pendingNow;
+      a.play()
+        .then(() => {
+          unlockedRef.current = true;
+          setNeedsGesture(false);
+          if (pendingNow) {
+            a.muted = false;
+          } else {
+            a.pause();
+            a.currentTime = 0;
+            a.muted = false;
+          }
+        })
+        .catch(() => {
+          a.muted = false;
+        });
+    };
+    const opts = { capture: true } as const;
+    window.addEventListener("pointerdown", prime, opts);
+    window.addEventListener("keydown", prime, opts);
+    window.addEventListener("touchstart", prime, opts);
+    return () => {
+      window.removeEventListener("pointerdown", prime, opts);
+      window.removeEventListener("keydown", prime, opts);
+      window.removeEventListener("touchstart", prime, opts);
     };
   }, []);
 
