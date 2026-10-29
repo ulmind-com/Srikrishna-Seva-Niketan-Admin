@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { AsyncSelect } from "@/components/common/AsyncSelect";
 import { CustomerField } from "@/components/common/CustomerField";
+import { LocationPinField } from "@/components/resource/fields/LocationPinField";
 import { ImageUpload } from "@/components/common/ImageUpload";
 import { VideoUpload } from "@/components/common/VideoUpload";
 import { TagsInput } from "@/components/common/TagsInput";
@@ -209,6 +210,15 @@ function renderControl(
               control={control}
             />
           )}
+        />
+      );
+
+    case "geopoint":
+      return (
+        <LocationPinField
+          control={control}
+          latName={field.latField ?? "lat"}
+          lngName={field.lngField ?? "lng"}
         />
       );
 

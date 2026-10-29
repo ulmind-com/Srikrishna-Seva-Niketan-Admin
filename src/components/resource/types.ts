@@ -14,6 +14,7 @@ export type FieldType =
   | "video"
   | "tags"
   | "date"
+  | "geopoint"
   | "divider";
 
 export interface FieldOption {
@@ -44,6 +45,9 @@ export interface FieldConfig {
   defaultValue?: unknown;
   min?: number;
   max?: number;
+  /** For `geopoint` fields — the flat form keys the pin writes to. */
+  latField?: string;
+  lngField?: string;
 }
 
 export interface ColumnConfig<T> {

@@ -98,6 +98,14 @@ export const customersConfig: ResourceConfig<Customer> = {
     { name: "city", label: "City", type: "text", section: "Address" },
     { name: "pincode", label: "Pincode", type: "text", section: "Address" },
     {
+      name: "lat",
+      label: "Map Location",
+      type: "geopoint",
+      section: "Address",
+      colSpan: 2,
+      helper: "Optional — drop a pin for exact routing, or leave it and we geocode the address.",
+    },
+    {
       name: "id_proof_type",
       label: "ID Proof Type",
       type: "select",
