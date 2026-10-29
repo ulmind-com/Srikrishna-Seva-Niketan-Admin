@@ -84,13 +84,48 @@ function createDestIcon(name: string) {
   });
 }
 
+function ensureSvgGlowFilter(map: L.Map) {
+  try {
+    const overlay = map.getPanes().overlayPane;
+    let svg = overlay.querySelector("svg");
+    if (!svg) {
+      const dummy = L.polyline([[0, 0]], { opacity: 0 }).addTo(map);
+      map.removeLayer(dummy);
+      svg = overlay.querySelector("svg");
+    }
+    if (svg && !svg.querySelector("#neon-glow-outer")) {
+      const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+      defs.innerHTML = `
+        <filter id="neon-glow-outer" x="-40%" y="-40%" width="180%" height="180%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur8" />
+          <feMerge>
+            <feMergeNode in="blur8" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+        <filter id="neon-glow-middle" x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur3" />
+          <feMerge>
+            <feMergeNode in="blur3" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      `;
+      svg.insertBefore(defs, svg.firstChild);
+    }
+  } catch {
+    // Graceful fallback to CSS filter
+  }
+}
+
 /**
  * Production-quality Zomato/Rapido style live nurse-to-customer route tracking.
  *
  * Features:
  * - Real-time continuous GPS tracking via navigator.geolocation.watchPosition
  * - Real road-following routing via server-side Ola Maps Directions API
- * - Two overlapping polyline layers: wider semi-transparent cyan glow + narrower bright blue inner line
+ * - 3-layer neon stacked line layers: 20px outer glow (#00D9FF, blur 8px, op 0.20),
+ *   12px middle halo (#00D9FF, blur 3px, op 0.40), and 4px crisp luminous inner core (#38E8FF, op 1.0)
  * - Animated pulsating live nurse marker & custom destination pin
  * - Dynamic route recalculation when nurse moves > 40 meters (throttled)
  * - Configurable route preference (shortest vs fastest)
@@ -344,32 +379,49 @@ export function AssignmentRouteMap({ assignment }: { assignment: StaffAssignment
       layersRef.current.push(dm);
     }
 
-    // Draw Real Road Geometry — Overlapping Glow + Inner Crisp Line
+    // Draw Real Road Geometry — 3 Stacked Line Layers sharing the route source
     if (route?.geometry && route.geometry.length > 1) {
-      // route.geometry is [[lng, lat], ...] in GeoJSON convention
+      ensureSvgGlowFilter(map);
+
+      // route.geometry is [[lng, lat], ...] from Ola Maps Directions API
       // Convert to Leaflet [[lat, lng], ...]
       const latlngs = route.geometry.map(([lng, lat]) => [lat, lng]) as [number, number][];
 
-      // Layer 1: Wider semi-transparent outer glow
+      // Layer 1 (Bottom): Outer glow — #00D9FF, width 20px, blur ~8px, low opacity ~0.20
       const outerGlow = L.polyline(latlngs, {
-        color: "#06b6d4",
-        weight: 12,
-        opacity: 0.38,
+        color: "#00D9FF",
+        weight: 20,
+        opacity: 0.20,
         lineCap: "round",
         lineJoin: "round",
-        className: "route-outer-glow",
+        className: "route-neon-outer-glow",
+        interactive: false,
       }).addTo(map);
       layersRef.current.push(outerGlow);
 
-      // Layer 2: Narrower bright inner road line
-      const innerLine = L.polyline(latlngs, {
-        color: "#0284c7",
-        weight: 5,
-        opacity: 0.95,
+      // Layer 2 (Middle): Middle halo — #00D9FF, width 12px, blur ~3px, opacity ~0.40
+      const middleHalo = L.polyline(latlngs, {
+        color: "#00D9FF",
+        weight: 12,
+        opacity: 0.40,
         lineCap: "round",
         lineJoin: "round",
+        className: "route-neon-middle-halo",
+        interactive: false,
       }).addTo(map);
-      layersRef.current.push(innerLine);
+      layersRef.current.push(middleHalo);
+
+      // Layer 3 (Top): Inner route — #38E8FF, width 4px, opacity 1.0 (crisp luminous core)
+      const innerRoute = L.polyline(latlngs, {
+        color: "#38E8FF",
+        weight: 4,
+        opacity: 1.0,
+        lineCap: "round",
+        lineJoin: "round",
+        className: "route-neon-inner-line",
+        interactive: false,
+      }).addTo(map);
+      layersRef.current.push(innerRoute);
 
       fit();
     } else if (origin || dest) {

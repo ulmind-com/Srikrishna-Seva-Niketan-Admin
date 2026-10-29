@@ -217,20 +217,33 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* Zomato/Rapido style live route tracking & marker effects           */
+/* Zomato/Rapido style glowing neon 3-layer route & marker effects   */
 /* ------------------------------------------------------------------ */
-.route-outer-glow {
-  filter: drop-shadow(0 0 6px rgba(6, 182, 212, 0.75));
-  animation: routeGlowPulse 2.8s ease-in-out infinite alternate;
+.route-neon-outer-glow {
+  filter: url("#neon-glow-outer") blur(8px) drop-shadow(0 0 8px #00D9FF);
+  animation: neonOuterPulse 3s ease-in-out infinite alternate;
+  pointer-events: none;
 }
 
-@keyframes routeGlowPulse {
+@keyframes neonOuterPulse {
   0% {
-    stroke-opacity: 0.32;
+    stroke-opacity: 0.16;
+    filter: url("#neon-glow-outer") blur(7px) drop-shadow(0 0 6px rgba(0, 217, 255, 0.6));
   }
   100% {
-    stroke-opacity: 0.58;
+    stroke-opacity: 0.28;
+    filter: url("#neon-glow-outer") blur(9px) drop-shadow(0 0 14px rgba(0, 217, 255, 0.95));
   }
+}
+
+.route-neon-middle-halo {
+  filter: url("#neon-glow-middle") blur(3px) drop-shadow(0 0 4px #00D9FF);
+  pointer-events: none;
+}
+
+.route-neon-inner-line {
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.9));
+  pointer-events: none;
 }
 
 .nurse-radar-ping {
