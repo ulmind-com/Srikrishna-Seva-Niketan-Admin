@@ -25,6 +25,12 @@ const STATUS_VARIANT: Record<string, "success" | "secondary" | "warning" | "dang
   cancelled: "danger",
 };
 
+const ACCEPTANCE: Record<string, { label: string; variant: "success" | "warning" | "danger" }> = {
+  pending: { label: "Pending", variant: "warning" },
+  accepted: { label: "Accepted", variant: "success" },
+  declined: { label: "Declined", variant: "danger" },
+};
+
 export const assignmentsConfig: ResourceConfig<Assignment> = {
   name: "Assignment",
   titlePlural: "Assignments / Shifts",
@@ -103,6 +109,21 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
           {r.status}
         </Badge>
       ),
+    },
+    {
+      header: "Response",
+      cell: (r) => {
+        const a = ACCEPTANCE[r.acceptance_status ?? "pending"];
+        if (!a) return <span className="text-xs text-muted-foreground">—</span>;
+        return (
+          <Badge
+            variant={a.variant}
+            className={a.variant === "warning" ? "animate-pulse" : undefined}
+          >
+            {a.label}
+          </Badge>
+        );
+      },
     },
     {
       header: "Branch",
