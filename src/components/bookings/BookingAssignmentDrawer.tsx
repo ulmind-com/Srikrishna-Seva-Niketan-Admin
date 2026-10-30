@@ -33,6 +33,17 @@ interface BookingAssignmentDrawerProps {
   onClose: () => void;
 }
 
+function toISODate(d: unknown): string | undefined {
+  if (!d) return undefined;
+  const s = String(d).trim();
+  if (!s) return undefined;
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) {
+    const [day, mon, yr] = s.split("/");
+    return `${yr}-${mon}-${day}`;
+  }
+  return s.slice(0, 10);
+}
+
 function getTodayIST(): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Kolkata",
@@ -115,10 +126,14 @@ export function BookingAssignmentDrawer({
         ...values,
         customer_id: customerId,
         location_id: values.location_id || customerLocationId,
+        start_date: toISODate(values.start_date) || getTodayIST(),
       };
 
-      // Strip empty strings and NaNs that fail backend validation
-      if (!assignmentPayload.end_date) delete assignmentPayload.end_date;
+      if (values.end_date) {
+        assignmentPayload.end_date = toISODate(values.end_date);
+      } else {
+        delete assignmentPayload.end_date;
+      }
       if (
         assignmentPayload.dest_lat === "" ||
         assignmentPayload.dest_lat == null ||

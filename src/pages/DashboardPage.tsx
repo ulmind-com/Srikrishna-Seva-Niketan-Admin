@@ -66,23 +66,29 @@ export function DashboardPage() {
   const statsQuery = useQuery({
     queryKey: ["dashboard", "stats"],
     queryFn: () => dashboardService.stats(),
-    refetchInterval: 30_000,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
   });
   const chartsQuery = useQuery({
     queryKey: ["dashboard", "charts"],
     queryFn: () => dashboardService.charts(30),
+    staleTime: 60_000,
   });
   const bookingsQuery = useQuery({
     queryKey: ["dashboard", "recent-bookings"],
     queryFn: () => dashboardService.recentBookings(6),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
   });
   const contactsQuery = useQuery({
     queryKey: ["dashboard", "recent-contacts"],
     queryFn: () => dashboardService.recentContacts(5),
+    staleTime: 60_000,
   });
   const applicationsQuery = useQuery({
     queryKey: ["dashboard", "recent-applications"],
     queryFn: () => dashboardService.recentApplications(5),
+    staleTime: 60_000,
   });
 
   const stats = statsQuery.data;

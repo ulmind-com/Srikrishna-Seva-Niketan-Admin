@@ -170,7 +170,12 @@ export function normalizeError(error: unknown): NormalizedError {
     const fields: Record<string, string> = {};
     if (envelope && Array.isArray(envelope.errors)) {
       for (const e of envelope.errors) {
-        if (e.field) fields[e.field] = e.message;
+        const raw = e as any;
+        const fieldName =
+          raw.field ||
+          (Array.isArray(raw.loc) ? raw.loc.filter((p: any) => p !== "body").join(".") : undefined);
+        const msg = raw.message || raw.msg;
+        if (fieldName && msg) fields[fieldName] = msg;
       }
     }
     const fieldMsg = Object.entries(fields)
