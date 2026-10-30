@@ -118,7 +118,15 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
       header: "Payment",
       cell: (r) => {
         const isPostpaid = r.payment_type === "postpaid";
-        const isPaid = r.payment_status === "paid" || r.payment_status === "received";
+        const collected = r.payment_status === "paid" || r.payment_status === "received";
+        // Prepaid is collected in advance by the office — always settled; only
+        // postpaid can be pending collection by the staff member.
+        const settled = !isPostpaid || collected;
+        const payLabel = !isPostpaid
+          ? "✓ Advance Paid"
+          : collected
+          ? "✓ Cash Collected"
+          : "⏳ Pending Collection";
         return (
           <div className="flex flex-col gap-1 items-start">
             <Badge
@@ -127,8 +135,8 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
             >
               {isPostpaid ? "Postpaid (Cash)" : "Prepaid"}
             </Badge>
-            <span className={`text-[11px] font-medium capitalize ${isPaid ? "text-success" : "text-amber-400"}`}>
-              {isPaid ? "✓ Paid / Received" : "⏳ Pending"}
+            <span className={`text-[11px] font-medium ${settled ? "text-success" : "text-amber-400"}`}>
+              {payLabel}
             </span>
           </div>
         );
@@ -148,12 +156,22 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
         const a = ACCEPTANCE[r.acceptance_status ?? "pending"];
         if (!a) return <span className="text-xs text-muted-foreground">—</span>;
         return (
-          <Badge
-            variant={a.variant}
-            className={a.variant === "warning" ? "animate-pulse" : undefined}
-          >
-            {a.label}
-          </Badge>
+          <div className="space-y-0.5">
+            <Badge
+              variant={a.variant}
+              className={a.variant === "warning" ? "animate-pulse" : undefined}
+            >
+              {a.label}
+            </Badge>
+            {r.acceptance_status === "declined" && r.decline_reason && (
+              <p
+                className="max-w-[200px] truncate text-xs text-muted-foreground"
+                title={r.decline_reason}
+              >
+                “{r.decline_reason}”
+              </p>
+            )}
+          </div>
         );
       },
     },

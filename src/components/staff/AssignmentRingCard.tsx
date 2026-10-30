@@ -202,7 +202,7 @@ export function AssignmentRingCard({
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 rows={2}
-                placeholder="Reason (optional) — e.g. unwell, distance"
+                placeholder="Reason (required) — e.g. unwell, distance"
               />
               <div className="flex gap-2">
                 <Button
@@ -216,7 +216,7 @@ export function AssignmentRingCard({
                 <Button
                   variant="destructive"
                   className="flex-1"
-                  disabled={busy}
+                  disabled={busy || !reason.trim()}
                   onClick={() => declineMut.mutate()}
                 >
                   {declineMut.isPending ? (

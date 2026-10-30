@@ -17,6 +17,7 @@ import {
 import { PageHeader } from "@/components/common/PageHeader";
 import { Button } from "@/components/ui/button";
 import { downloadReportPdf } from "@/lib/report-pdf";
+import { downloadDutyReportPdf, downloadDutyReportXlsx } from "@/lib/duty-report-export";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -241,6 +242,30 @@ export function ReportsPage() {
       distribution: dist.data,
     });
 
+  const dutyExportInput = () => ({
+    items: duties.data?.items ?? [],
+    summary: duties.data?.summary,
+    start,
+    end,
+    branchName,
+  });
+  const exportDutyPdf = () => {
+    if (!(duties.data?.items ?? []).length) {
+      toast.error("No duties to export for this period");
+      return;
+    }
+    downloadDutyReportPdf(dutyExportInput());
+    toast.success("Duty report PDF downloaded");
+  };
+  const exportDutyExcel = () => {
+    if (!(duties.data?.items ?? []).length) {
+      toast.error("No duties to export for this period");
+      return;
+    }
+    downloadDutyReportXlsx(dutyExportInput());
+    toast.success("Duty report Excel downloaded");
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -416,10 +441,40 @@ export function ReportsPage() {
                       <SelectItem value="scheduled">Scheduled</SelectItem>
                     </SelectContent>
                   </Select>
+                  <div className="flex items-center gap-1.5">
+                    <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
+                    <Input
+                      type="date"
+                      value={start}
+                      onChange={(e) => {
+                        setStart(e.target.value);
+                        setPeriodState("custom");
+                      }}
+                      className="h-8 w-[130px] text-xs"
+                    />
+                    <span className="text-xs text-muted-foreground">→</span>
+                    <Input
+                      type="date"
+                      value={end}
+                      onChange={(e) => {
+                        setEnd(e.target.value);
+                        setPeriodState("custom");
+                      }}
+                      className="h-8 w-[130px] text-xs"
+                    />
+                  </div>
                 </div>
-                <Button size="sm" variant="outline" onClick={exportDutiesCsv} className="h-8 text-xs">
-                  <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5 text-emerald-500" /> Export CSV
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" onClick={exportDutyExcel} className="h-8 text-xs">
+                    <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5 text-emerald-500" /> Excel
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={exportDutyPdf} className="h-8 text-xs">
+                    <Download className="mr-1.5 h-3.5 w-3.5 text-rose-500" /> PDF
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={exportDutiesCsv} className="h-8 text-xs">
+                    <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" /> CSV
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -464,7 +519,16 @@ export function ReportsPage() {
 
                     return filtered.map((r) => {
                       const isPostpaid = r.payment_type === "postpaid";
-                      const isPaid = r.payment_status === "paid" || r.payment_status === "received";
+                      const collected =
+                        r.payment_status === "paid" || r.payment_status === "received";
+                      // Prepaid is collected by the office in advance, so it is
+                      // always settled — only postpaid can be pending collection.
+                      const settled = !isPostpaid || collected;
+                      const payLabel = !isPostpaid
+                        ? "✓ Advance Paid"
+                        : collected
+                        ? "✓ Cash Collected"
+                        : "⏳ Pending Collection";
                       return (
                         <TableRow key={r.id}>
                           <TableCell>
@@ -515,10 +579,10 @@ export function ReportsPage() {
                               </Badge>
                               <span
                                 className={`text-[10.5px] font-medium ${
-                                  isPaid ? "text-emerald-500" : "text-amber-400"
+                                  settled ? "text-emerald-500" : "text-amber-400"
                                 }`}
                               >
-                                {isPaid ? "✓ Cash Collected / Paid" : "⏳ Pending"}
+                                {payLabel}
                               </span>
                               {r.payment_received_by && (
                                 <span className="text-[10px] text-muted-foreground truncate max-w-[140px]">
