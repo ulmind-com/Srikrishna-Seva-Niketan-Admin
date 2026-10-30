@@ -13,6 +13,7 @@ const STATUS_VARIANT: Record<string, BadgeVariant> = {
   // bookings / rentals
   pending: "warning",
   approved: "success",
+  assigned: "success",
   in_progress: "default",
   completed: "success",
   returned: "success",

@@ -18,6 +18,7 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { Button } from "@/components/ui/button";
 import { downloadReportPdf } from "@/lib/report-pdf";
 import { downloadDutyReportPdf, downloadDutyReportXlsx } from "@/lib/duty-report-export";
+import { ReportDatePicker } from "@/components/reports/ReportDatePicker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -273,8 +274,8 @@ export function ReportsPage() {
         description="Profit & loss, staff distribution, customer payments and the daily summary."
         icon={<BarChart3 />}
         actions={
-          <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground mr-1">
               <span className="relative flex h-2 w-2">
                 <span
                   className={`absolute inline-flex h-full w-full rounded-full bg-success opacity-75 ${
@@ -285,21 +286,41 @@ export function ReportsPage() {
               </span>
               Live
             </span>
-            <Button variant="outline" size="sm" onClick={exportPdf} disabled={pnl.isLoading}>
-              <Download className="mr-1.5 h-4 w-4" /> PDF
+            <ReportDatePicker
+              start={start}
+              end={end}
+              activePreset={period}
+              onChange={(s, e, p) => {
+                setStart(s);
+                setEnd(e);
+                setPeriodState((p || "custom") as Period);
+              }}
+            />
+            <Button
+              variant="default"
+              size="sm"
+              onClick={exportDutyPdf}
+              disabled={duties.isLoading}
+              className="h-9 gap-1.5 text-xs font-semibold shadow-xs"
+              title="Download Detailed PDF Report"
+            >
+              <Download className="h-3.5 w-3.5" />
+              <span>Download PDF</span>
             </Button>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => emailReport.mutate()}
-              disabled={emailReport.isPending}
+              onClick={exportDutyExcel}
+              disabled={duties.isLoading}
+              className="h-9 gap-1.5 text-xs font-semibold border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 shadow-xs"
+              title="Download Detailed Excel (.xlsx) Report"
             >
-              <Mail className="mr-1.5 h-4 w-4" />
-              {emailReport.isPending ? "Sending…" : "Email"}
+              <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-400" />
+              <span>Download Excel</span>
             </Button>
-            <div className="w-56">
+            <div className="w-44">
               <Select value={branch} onValueChange={setBranch}>
-                <SelectTrigger>
+                <SelectTrigger className="h-9 text-xs">
                   <SelectValue placeholder="All branches" />
                 </SelectTrigger>
                 <SelectContent>
@@ -312,35 +333,76 @@ export function ReportsPage() {
                 </SelectContent>
               </Select>
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 text-xs"
+              onClick={() => emailReport.mutate()}
+              disabled={emailReport.isPending}
+            >
+              <Mail className="mr-1.5 h-3.5 w-3.5" />
+              {emailReport.isPending ? "Sending…" : "Email"}
+            </Button>
           </div>
         }
       />
 
-      {/* Period presets — drive the Profit & Loss date range. */}
-      <div className="flex flex-wrap items-center gap-2">
-        {([
-          ["today", "Today"],
-          ["week", "This Week"],
-          ["month", "This Month"],
-          ["year", "This Year"],
-          ["custom", "Custom"],
-        ] as [Period, string][]).map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setPeriod(key)}
-            className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition ${
-              period === key
-                ? "border-primary bg-primary/10 text-primary"
-                : "border-border text-muted-foreground hover:text-foreground"
-            }`}
+      {/* Period presets bar with calendar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/60 bg-muted/20 p-2.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs font-medium text-muted-foreground mr-1 flex items-center gap-1">
+            <CalendarDays className="h-3.5 w-3.5 text-primary" /> Period:
+          </span>
+          {([
+            ["today", "Today"],
+            ["week", "This Week"],
+            ["month", "This Month"],
+            ["year", "This Year"],
+            ["custom", "Custom"],
+          ] as [Period, string][]).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setPeriod(key)}
+              className={`rounded-lg border px-3 py-1 text-xs font-medium transition ${
+                period === key
+                  ? "border-primary bg-primary/15 text-primary font-semibold shadow-xs"
+                  : "border-border/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+          <ReportDatePicker
+            start={start}
+            end={end}
+            activePreset={period}
+            onChange={(s, e, p) => {
+              setStart(s);
+              setEnd(e);
+              setPeriodState((p || "custom") as Period);
+            }}
+            className="h-7 text-xs ml-1"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={exportDutyExcel}
+            className="h-7 text-xs border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 gap-1.5"
           >
-            {label}
-          </button>
-        ))}
-        <span className="ml-1 text-xs text-muted-foreground">
-          {start} → {end}
-        </span>
+            <FileSpreadsheet className="h-3 w-3" /> Excel
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={exportDutyPdf}
+            className="h-7 text-xs border-primary/30 text-primary hover:bg-primary/10 gap-1.5"
+          >
+            <Download className="h-3 w-3" /> PDF
+          </Button>
+        </div>
       </div>
 
       <Tabs defaultValue="duties">
@@ -372,36 +434,68 @@ export function ReportsPage() {
             />
           </div>
 
-          {/* Prepaid vs Postpaid sub-breakdown */}
+          {/* Prepaid vs Postpaid sub-breakdown with crystal-clear settlement explanations */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <Card className="border-cyan-500/20 bg-cyan-500/5">
+            <Card className="border-cyan-500/30 bg-cyan-500/5">
               <CardContent className="p-4">
-                <p className="text-xs uppercase tracking-wide text-cyan-400 font-semibold">Prepaid Engagements</p>
-                <p className="mt-1 text-xl font-bold text-foreground">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs uppercase tracking-wide text-cyan-400 font-semibold">
+                    Prepaid (অফিস অগ্রিম পরিশোধিত)
+                  </p>
+                  <Badge variant="outline" className="border-cyan-500/30 text-cyan-400 text-[10px]">
+                    ✓ Settled
+                  </Badge>
+                </div>
+                <p className="mt-1.5 text-2xl font-bold text-foreground">
                   {rupee(duties.data?.summary.prepaid_total)}{" "}
-                  <span className="text-xs font-normal text-muted-foreground">({duties.data?.summary.prepaid_count ?? 0} duties)</span>
+                  <span className="text-xs font-normal text-muted-foreground">
+                    ({duties.data?.summary.prepaid_count ?? 0} duties)
+                  </span>
                 </p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">Office collected in advance</p>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Office collected money upfront online or at desk. Fully paid.
+                </p>
               </CardContent>
             </Card>
 
-            <Card className="border-emerald-500/20 bg-emerald-500/5">
+            <Card className="border-emerald-500/30 bg-emerald-500/5">
               <CardContent className="p-4">
-                <p className="text-xs uppercase tracking-wide text-emerald-400 font-semibold">Postpaid · Cash Collected</p>
-                <p className="mt-1 text-xl font-bold text-foreground">
-                  {rupee(duties.data?.summary.postpaid_collected)}
+                <div className="flex items-center justify-between">
+                  <p className="text-xs uppercase tracking-wide text-emerald-400 font-semibold">
+                    Postpaid · Cash Collected (আদায়কৃত ক্যাশ)
+                  </p>
+                  <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 text-[10px]">
+                    ✓ Collected
+                  </Badge>
+                </div>
+                <p className="mt-1.5 text-2xl font-bold text-foreground">
+                  {rupee(duties.data?.summary.postpaid_collected)}{" "}
+                  <span className="text-xs font-normal text-muted-foreground">
+                    ({(duties.data?.summary.postpaid_count ?? 0) - (duties.data?.summary.postpaid_pending ? 1 : 0)} settled)
+                  </span>
                 </p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">Received in-hand by staff member</p>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Staff member collected physical cash in-hand from patient.
+                </p>
               </CardContent>
             </Card>
 
-            <Card className="border-amber-500/20 bg-amber-500/5">
+            <Card className="border-amber-500/30 bg-amber-500/5">
               <CardContent className="p-4">
-                <p className="text-xs uppercase tracking-wide text-amber-400 font-semibold">Postpaid · Pending Cash</p>
-                <p className="mt-1 text-xl font-bold text-amber-400">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs uppercase tracking-wide text-amber-400 font-semibold">
+                    Postpaid · Pending Cash (বকেয়া ক্যাশ)
+                  </p>
+                  <Badge variant="outline" className="border-amber-500/30 text-amber-400 text-[10px]">
+                    ⏳ Awaiting Cash
+                  </Badge>
+                </div>
+                <p className="mt-1.5 text-2xl font-bold text-amber-400">
                   {rupee(duties.data?.summary.postpaid_pending)}
                 </p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">Awaiting staff collection upon completion</p>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Pending cash collection from patient upon completion.
+                </p>
               </CardContent>
             </Card>
           </div>
@@ -441,38 +535,42 @@ export function ReportsPage() {
                       <SelectItem value="scheduled">Scheduled</SelectItem>
                     </SelectContent>
                   </Select>
-                  <div className="flex items-center gap-1.5">
-                    <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
-                    <Input
-                      type="date"
-                      value={start}
-                      onChange={(e) => {
-                        setStart(e.target.value);
-                        setPeriodState("custom");
-                      }}
-                      className="h-8 w-[130px] text-xs"
-                    />
-                    <span className="text-xs text-muted-foreground">→</span>
-                    <Input
-                      type="date"
-                      value={end}
-                      onChange={(e) => {
-                        setEnd(e.target.value);
-                        setPeriodState("custom");
-                      }}
-                      className="h-8 w-[130px] text-xs"
-                    />
-                  </div>
+                  <ReportDatePicker
+                    start={start}
+                    end={end}
+                    activePreset={period}
+                    onChange={(s, e, p) => {
+                      setStart(s);
+                      setEnd(e);
+                      setPeriodState((p || "custom") as Period);
+                    }}
+                    className="h-8 text-xs"
+                  />
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button size="sm" variant="outline" onClick={exportDutyExcel} className="h-8 text-xs">
-                    <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5 text-emerald-500" /> Excel
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={exportDutyExcel}
+                    className="h-8 text-xs border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/15"
+                  >
+                    <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5 text-emerald-400" /> Excel (.xlsx)
                   </Button>
-                  <Button size="sm" variant="outline" onClick={exportDutyPdf} className="h-8 text-xs">
-                    <Download className="mr-1.5 h-3.5 w-3.5 text-rose-500" /> PDF
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={exportDutyPdf}
+                    className="h-8 text-xs shadow-xs"
+                  >
+                    <Download className="mr-1.5 h-3.5 w-3.5" /> PDF
                   </Button>
-                  <Button size="sm" variant="outline" onClick={exportDutiesCsv} className="h-8 text-xs">
-                    <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" /> CSV
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={exportDutiesCsv}
+                    className="h-8 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" /> CSV
                   </Button>
                 </div>
               </div>
@@ -681,6 +779,15 @@ export function ReportsPage() {
                 className="w-40"
               />
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportPdf}
+              disabled={pnl.isLoading}
+              className="h-9 text-xs"
+            >
+              <Download className="mr-1.5 h-3.5 w-3.5 text-rose-500" /> Export P&amp;L PDF
+            </Button>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
             <Stat label="Revenue" value={rupee(pnl.data?.revenue)} tone="text-success" />

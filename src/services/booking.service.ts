@@ -2,7 +2,7 @@ import { endpoints } from "./api/endpoints";
 import { http } from "./api/http";
 import { rawClient } from "./api/client";
 import type { ListParams } from "@/types/api";
-import type { Booking } from "@/types/models";
+import type { Booking, BookingStatus } from "@/types/models";
 
 export const bookingService = {
   list: (params?: ListParams) => http.list<Booking>(endpoints.bookings.root, params),
@@ -14,6 +14,8 @@ export const bookingService = {
     http.post<Booking>(endpoints.bookings.reject(id), { reason }),
   cancel: (id: string, reason?: string) =>
     http.post<Booking>(endpoints.bookings.cancel(id), { reason }),
+  changeStatus: (id: string, status: BookingStatus, reason?: string) =>
+    http.post<Booking>(`${endpoints.bookings.root}/${id}/status`, { status, reason }),
   assign: (id: string, assigned_staff_id: string, assigned_staff_name: string) =>
     http.post<Booking>(endpoints.bookings.assign(id), {
       assigned_staff_id,

@@ -20,7 +20,7 @@ import {
   CreditCard,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Booking } from "@/types/models";
+import type { Booking, BookingStatus } from "@/types/models";
 import { bookingService } from "@/services/booking.service";
 import { normalizeError } from "@/services/api/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -31,6 +31,13 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -107,6 +114,16 @@ export function BookingDrawer({ booking, onClose, onAssignDuty }: Props) {
     onError: (err) => toast.error(normalizeError(err).message),
   });
 
+  const changeStatus = useMutation({
+    mutationFn: (newStatus: BookingStatus) =>
+      bookingService.changeStatus(booking!.id, newStatus),
+    onSuccess: (_, newStatus) => {
+      invalidate();
+      toast.success(`Booking status changed to ${humanize(newStatus)}`);
+    },
+    onError: (err) => toast.error(normalizeError(err).message),
+  });
+
   const isTerminal =
     booking && ["completed", "cancelled", "rejected"].includes(booking.status);
 
@@ -128,6 +145,59 @@ export function BookingDrawer({ booking, onClose, onAssignDuty }: Props) {
             </SheetHeader>
 
             <div className="flex-1 space-y-6 overflow-y-auto p-6">
+              {booking.assigned_staff_name && (
+                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="grid h-10 w-10 place-items-center rounded-lg bg-emerald-500/20 text-emerald-400">
+                      <UserCheck className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider">
+                        Assigned Nurse / Staff
+                      </p>
+                      <p className="text-sm font-bold text-foreground">
+                        {booking.assigned_staff_name}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-medium bg-emerald-500/20 text-emerald-300 px-2.5 py-1 rounded-full border border-emerald-500/40">
+                    Already Assigned
+                  </span>
+                </div>
+              )}
+
+              {canUpdate && (
+                <div className="rounded-xl border border-border bg-card p-3.5 space-y-2 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Booking Status
+                    </Label>
+                    <span className="text-[11px] text-muted-foreground">
+                      Syncs live with Super Admin &amp; Branch
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Select
+                      value={booking.status}
+                      onValueChange={(val) => changeStatus.mutate(val as BookingStatus)}
+                      disabled={changeStatus.isPending}
+                    >
+                      <SelectTrigger className="h-9 flex-1 text-xs font-medium">
+                        <SelectValue placeholder="Update status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending">Pending (অপেক্ষারত)</SelectItem>
+                        <SelectItem value="approved">Approved (অনুমোদিত)</SelectItem>
+                        <SelectItem value="assigned">Assigned (নার্স নিযুক্ত)</SelectItem>
+                        <SelectItem value="in_progress">In Progress (চলমান)</SelectItem>
+                        <SelectItem value="completed">Completed (সম্পন্ন)</SelectItem>
+                        <SelectItem value="cancelled">Cancelled (বাতিল)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+
               <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <InfoRow icon={Stethoscope} label="Service" value={booking.service_name} />
                 <InfoRow icon={Calendar} label="Preferred date" value={formatDate(booking.preferred_date)} />

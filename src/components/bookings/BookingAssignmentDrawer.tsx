@@ -80,7 +80,7 @@ export function BookingAssignmentDrawer({
       start_date: formattedStartDate,
       duration_days: 10,
       payment_type: booking.payment_type || "prepaid",
-      payment_status: "pending",
+      payment_status: booking.payment_type === "postpaid" ? "pending" : "paid",
       notes: `Booking #${booking.reference}. Patient: ${booking.patient_name} (${booking.contact_phone}). Requested: ${booking.service_name}${
         booking.care_required ? ` - ${booking.care_required}` : ""
       }${booking.message ? ` [Message: ${booking.message}]` : ""}`,
@@ -163,6 +163,18 @@ export function BookingAssignmentDrawer({
       }
 
       const created = await resourceServices.assignments.create(assignmentPayload);
+
+      // Automatically update the booking: link assigned staff and update status to "assigned"
+      if (booking?.id) {
+        try {
+          const empId = created.employee_id || (values.employee_id as string) || "staff";
+          const empName = created.employee_name || (values.employee_name as string) || "Staff";
+          await bookingService.assign(booking.id, empId, empName);
+        } catch (e) {
+          console.warn("Could not sync booking status with assigned staff:", e);
+        }
+      }
+
       return { created, customerId };
     },
     onSuccess: ({ created }) => {

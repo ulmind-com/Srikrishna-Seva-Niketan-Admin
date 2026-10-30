@@ -40,6 +40,7 @@ import { BookingAssignmentDrawer } from "@/components/bookings/BookingAssignment
 const STATUS_FILTERS: { label: string; value: string }[] = [
   { label: "Pending", value: "pending" },
   { label: "Approved", value: "approved" },
+  { label: "Assigned", value: "assigned" },
   { label: "In Progress", value: "in_progress" },
   { label: "Completed", value: "completed" },
   { label: "Rejected", value: "rejected" },
@@ -205,7 +206,18 @@ export function BookingsPage() {
                     {formatDate(b.preferred_date)}
                   </TableCell>
                   <TableCell>
-                    <StatusBadge status={b.status} />
+                    <div className="flex flex-col gap-1 items-start">
+                      <StatusBadge status={b.status} />
+                      {b.assigned_staff_name && (
+                        <span
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/25"
+                          title={`Assigned to ${b.assigned_staff_name}`}
+                        >
+                          <UserCheck className="h-3 w-3 shrink-0" />
+                          <span className="truncate max-w-[120px]">{b.assigned_staff_name}</span>
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right">
                     <div

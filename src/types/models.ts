@@ -37,6 +37,7 @@ export type ContentStatus = "draft" | "published" | "archived";
 export type BookingStatus =
   | "pending"
   | "approved"
+  | "assigned"
   | "rejected"
   | "in_progress"
   | "completed"
