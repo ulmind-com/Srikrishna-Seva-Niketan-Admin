@@ -146,7 +146,7 @@ export function StaffAuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<StaffAuthValue>(
     () => ({
       staff,
-      isAuthenticated: Boolean(staff),
+      isAuthenticated: Boolean(staff && staffTokenStore.getAccess()),
       isLoading,
       login,
       register,

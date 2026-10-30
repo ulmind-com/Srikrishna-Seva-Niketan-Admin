@@ -8,7 +8,12 @@ import {
   type ReactNode,
 } from "react";
 import { authService } from "@/services/auth.service";
-import { setStoredRefresh, tokenStore } from "@/services/api/tokens";
+import {
+  getStoredAccess,
+  getStoredRefresh,
+  setStoredRefresh,
+  tokenStore,
+} from "@/services/api/tokens";
 import {
   refreshAccessToken,
   registerAuthFailureHandler,
@@ -39,9 +44,13 @@ function readStoredUser(): User | null {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUserState] = useState<User | null>(readStoredUser);
-  // Start loading: on mount we attempt a cookie-based session restore.
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const initialUser = readStoredUser();
+  const [user, setUserState] = useState<User | null>(initialUser);
+  const hasStoredSession = Boolean(
+    initialUser && (getStoredAccess() || getStoredRefresh())
+  );
+  // If user and tokens already exist in localStorage, never block UI on refresh
+  const [isLoading, setIsLoading] = useState<boolean>(!hasStoredSession);
 
   const setUser = useCallback((next: User) => {
     setUserState(next);
@@ -55,10 +64,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string) => {
-      const res = await authService.login(email, password);
+      const res = await authService.login(email.trim(), password);
       tokenStore.setAccess(res.access_token);
-      // Cross-site fallback: keep the refresh token for reloads where the
-      // HttpOnly cookie is blocked by the browser.
       if (res.refresh_token) setStoredRefresh(res.refresh_token);
       setUser(res.user);
     },
@@ -97,24 +104,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user]
   );
 
-  // On mount, restore the session from the HttpOnly refresh cookie: mint a new
-  // access token, then hydrate the user. A reload keeps the user signed in as
-  // long as the refresh session is still valid; otherwise it falls through to
-  // login cleanly.
+  // Persistent session restore (like Facebook / Instagram / Google):
+  // 1. Immediately hydrate from localStorage on reload.
+  // 2. Silently verify or refresh session in the background.
+  // 3. User stays logged in permanently across page refreshes.
   useEffect(() => {
     registerAuthFailureHandler(clearSession);
     let active = true;
-    (async () => {
+
+    async function restoreSession() {
+      const hasAuth = getStoredAccess() || getStoredRefresh();
+      if (!hasAuth) {
+        if (active) {
+          clearSession();
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      // 1. If we already have a valid access token in storage, verify silently with me()
+      if (tokenStore.getAccess()) {
+        try {
+          const me = await authService.me();
+          if (active) setUser(me);
+          if (active) setIsLoading(false);
+          return;
+        } catch {
+          // Token might have expired, try refresh below
+        }
+      }
+
+      // 2. Try transparent refresh using refresh token
       try {
         await refreshAccessToken();
         const me = await authService.me();
         if (active) setUser(me);
       } catch {
+        // Both access token and refresh token failed -> session truly expired
         if (active) clearSession();
       } finally {
         if (active) setIsLoading(false);
       }
-    })();
+    }
+
+    restoreSession();
     return () => {
       active = false;
     };
@@ -123,7 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
-      isAuthenticated: Boolean(user),
+      isAuthenticated: Boolean(user && tokenStore.getAccess()),
       isLoading,
       login,
       logout,
@@ -137,9 +170,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
+  if (!ctx) throw new Error("useAuth must be used within <AuthProvider>");
   return ctx;
 }

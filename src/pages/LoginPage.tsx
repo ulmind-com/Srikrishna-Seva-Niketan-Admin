@@ -49,7 +49,7 @@ export function LoginPage() {
 
   const onSubmit = async (values: LoginForm) => {
     try {
-      await login(values.email, values.password);
+      await login(values.email.trim(), values.password);
       toast.success("Welcome back!");
       const to = (location.state as { from?: Location })?.from?.pathname ?? "/";
       navigate(to, { replace: true });

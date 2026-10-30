@@ -1,22 +1,27 @@
 import { STORAGE_KEYS } from "@/config/env";
 
-/**
- * Access-token store — **in memory only**.
- *
- * The access token is short-lived and kept in a module variable so it never
- * touches localStorage (XSS-reachable). The refresh token is not stored here at
- * all: it lives solely in a Secure, HttpOnly cookie the browser manages and
- * JavaScript cannot read. A page reload therefore starts with no access token
- * and the app silently calls `/auth/refresh` (cookie) to restore the session.
- */
+/** In-memory access token cache for the active admin session. */
 let accessToken: string | null = null;
 
-// Cross-site fallback: when the HttpOnly refresh cookie is blocked (Vercel admin
-// + Render API are different sites, and Brave/modern Chrome block the resulting
-// third-party cookie), the refresh token is kept here in localStorage and sent
-// via the X-Refresh-Token header instead. Where the cookie works, this stays
-// null and the cookie is used.
+const ACCESS_KEY = "ssn_admin_access";
 const REFRESH_KEY = "ssn_admin_refresh";
+
+export function getStoredAccess(): string | null {
+  try {
+    return localStorage.getItem(ACCESS_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredAccess(token: string | null): void {
+  try {
+    if (token) localStorage.setItem(ACCESS_KEY, token);
+    else localStorage.removeItem(ACCESS_KEY);
+  } catch {
+    /* ignore storage errors */
+  }
+}
 
 export function getStoredRefresh(): string | null {
   try {
@@ -37,13 +42,15 @@ export function setStoredRefresh(token: string | null): void {
 
 export const tokenStore = {
   getAccess(): string | null {
-    return accessToken;
+    return accessToken || getStoredAccess();
   },
   setAccess(access: string): void {
     accessToken = access;
+    setStoredAccess(access);
   },
   clear(): void {
     accessToken = null;
+    setStoredAccess(null);
     setStoredRefresh(null);
     try {
       localStorage.removeItem(STORAGE_KEYS.user);
@@ -54,10 +61,14 @@ export const tokenStore = {
 };
 
 /**
- * Read the double-submit CSRF token from its (non-HttpOnly) cookie so it can be
+ * Read the double-submit CSRF token from its cookie so it can be
  * echoed in the `X-CSRF-Token` header on refresh/logout.
  */
 export function getCsrfToken(): string | null {
-  const match = document.cookie.match(/(?:^|;\s*)ssn_csrf=([^;]+)/);
-  return match ? decodeURIComponent(match[1]) : null;
+  try {
+    const match = document.cookie.match(/(?:^|;\s*)ssn_csrf=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : null;
+  } catch {
+    return null;
+  }
 }
