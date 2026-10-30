@@ -29,7 +29,7 @@ export function StaffLoginPage() {
 
   const onSubmit = async (values: LoginForm) => {
     try {
-      await login(values.email, values.password);
+      await login(values.email.trim(), values.password);
       toast.success("Welcome back!");
       navigate("/staff-portal", { replace: true });
     } catch (err) {

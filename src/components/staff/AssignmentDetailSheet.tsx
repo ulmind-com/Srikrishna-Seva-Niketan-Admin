@@ -30,6 +30,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { staffPortalService, type StaffAssignment } from "@/services/staff-portal.service";
+import { stopDutyAlert } from "@/hooks/useAssignmentAlerts";
 import { AssignmentRouteMap } from "./AssignmentRouteMap";
 
 const PLACE_LABEL: Record<string, string> = {
@@ -98,11 +99,24 @@ export function AssignmentDetailSheet({ assignment, open, onOpenChange }: Props)
         cash_collected: isPostpaid,
       });
     },
+    onMutate: () => {
+      // 1. Instantly silence any ringing alarm
+      stopDutyAlert();
+      // 2. Close confirmation modal right away
+      setConfirmOpen(false);
+      // 3. Optimistic local update
+      if (assignment) {
+        assignment.status = "completed";
+        if (isPostpaid) assignment.payment_status = "paid";
+      }
+    },
     onSuccess: () => {
+      stopDutyAlert();
       qc.invalidateQueries({ queryKey: ["staff-assignments"] });
+      qc.invalidateQueries({ queryKey: ["staff-pending-assignments"] });
       qc.invalidateQueries({ queryKey: ["report"] });
       qc.invalidateQueries({ queryKey: ["assignments"] });
-      setConfirmOpen(false);
+      qc.invalidateQueries({ queryKey: ["bookings"] });
       toast.success(
         isPostpaid
           ? `✓ ₹${collectAmount.toLocaleString()} ক্যাশ গ্রহণ ও কাজ সম্পন্ন সফল হয়েছে!`
@@ -111,13 +125,10 @@ export function AssignmentDetailSheet({ assignment, open, onOpenChange }: Props)
           description: `Customer: ${assignment?.customer_name}. ধন্যবাদ!`,
         }
       );
-      if (assignment) {
-        assignment.status = "completed";
-        if (isPostpaid) assignment.payment_status = "paid";
-      }
     },
     onError: (err: any) => {
       toast.error(err?.message || "Could not complete assignment. Please try again.");
+      qc.invalidateQueries({ queryKey: ["staff-assignments"] });
     },
   });
 

@@ -1,127 +1,221 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { staffPortalService, type StaffAssignment } from "@/services/staff-portal.service";
 
 /** The ring tone lives in public/. The filename has spaces — encode them. */
 const SOUND_URL = "/new%20assignments%20comming.mp3";
 
+let sharedAudio: HTMLAudioElement | null = null;
+let sharedAudioCtx: AudioContext | null = null;
+let synthInterval: any = null;
+let isAlertActive = false;
+
+/** Initialize or get the shared HTMLAudioElement. */
+function getSharedAudio(): HTMLAudioElement {
+  if (!sharedAudio) {
+    sharedAudio = new Audio(SOUND_URL);
+    sharedAudio.loop = true;
+    sharedAudio.preload = "auto";
+  }
+  return sharedAudio;
+}
+
+/** Get or initialize the shared Web Audio AudioContext. */
+function getAudioContext(): AudioContext | null {
+  try {
+    if (!sharedAudioCtx) {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioCtx) {
+        sharedAudioCtx = new AudioCtx();
+      }
+    }
+    if (sharedAudioCtx && sharedAudioCtx.state === "suspended") {
+      sharedAudioCtx.resume().catch(() => {});
+    }
+    return sharedAudioCtx;
+  } catch {
+    return null;
+  }
+}
+
+/** Play a dual-tone urgent chime using Web Audio API as a fallback. */
+function playSynthBeep() {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(880, now); // A5
+    osc.frequency.setValueAtTime(1320, now + 0.15); // E6
+
+    gain.gain.setValueAtTime(0.35, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.55);
+  } catch {}
+}
+
+/** Immediately stop ALL alert sounds (audio file + synthetic beeps) and vibrations. */
+export function stopDutyAlert() {
+  isAlertActive = false;
+  if (sharedAudio) {
+    try {
+      sharedAudio.pause();
+      sharedAudio.currentTime = 0;
+    } catch {}
+  }
+  if (synthInterval) {
+    clearInterval(synthInterval);
+    synthInterval = null;
+  }
+  if (typeof navigator !== "undefined" && navigator.vibrate) {
+    try {
+      navigator.vibrate(0);
+    } catch {}
+  }
+}
+
+/** Trigger alert audio and vibration. */
+export function playDutyAlert(): Promise<boolean> {
+  isAlertActive = true;
+
+  // 1. Device vibration for mobile nurses
+  if (typeof navigator !== "undefined" && navigator.vibrate) {
+    try {
+      navigator.vibrate([300, 150, 300, 150, 600]);
+    } catch {}
+  }
+
+  // 2. Play the official MP3 recording
+  const audio = getSharedAudio();
+  audio.currentTime = 0;
+  audio.muted = false;
+
+  const playPromise = audio.play();
+  if (playPromise !== undefined) {
+    return playPromise
+      .then(() => true)
+      .catch(() => {
+        // If autoplay is blocked by browser policy:
+        // A. Start Web Audio synthesized chime interval
+        if (!synthInterval && isAlertActive) {
+          playSynthBeep();
+          synthInterval = setInterval(() => {
+            if (isAlertActive) {
+              playSynthBeep();
+            } else {
+              clearInterval(synthInterval);
+              synthInterval = null;
+            }
+          }, 800);
+        }
+
+        // B. Attach a one-time global touch listener to start the MP3 on ANY touch
+        const oneTouch = () => {
+          if (isAlertActive && sharedAudio) {
+            sharedAudio.play().catch(() => {});
+          }
+          if (synthInterval) {
+            clearInterval(synthInterval);
+            synthInterval = null;
+          }
+          window.removeEventListener("touchstart", oneTouch, true);
+          window.removeEventListener("pointerdown", oneTouch, true);
+          window.removeEventListener("click", oneTouch, true);
+        };
+        window.addEventListener("touchstart", oneTouch, { capture: true, once: true });
+        window.addEventListener("pointerdown", oneTouch, { capture: true, once: true });
+        window.addEventListener("click", oneTouch, { capture: true, once: true });
+
+        return false;
+      });
+  }
+  return Promise.resolve(true);
+}
+
+// Global unlocker: prime audio on the very first user interaction anywhere
+if (typeof window !== "undefined") {
+  const primeAudio = () => {
+    getAudioContext();
+    const a = getSharedAudio();
+    // Warm up audio buffer silently if not currently active
+    if (!isAlertActive) {
+      a.muted = true;
+      a.play()
+        .then(() => {
+          a.pause();
+          a.currentTime = 0;
+          a.muted = false;
+        })
+        .catch(() => {
+          a.muted = false;
+        });
+    }
+  };
+  window.addEventListener("pointerdown", primeAudio, { capture: true, once: true });
+  window.addEventListener("touchstart", primeAudio, { capture: true, once: true });
+  window.addEventListener("keydown", primeAudio, { capture: true, once: true });
+}
+
 export interface AssignmentAlerts {
   pending: StaffAssignment[];
-  /** True when the browser blocked autoplay — a user gesture is needed first. */
   needsGesture: boolean;
-  /** Call from a click to unlock + start the ring. */
   enableSound: () => void;
-  /** Stop the ring immediately (e.g. right after accept/decline). */
   stop: () => void;
   isLoading: boolean;
 }
 
 /**
  * Polls the nurse's pending duties and rings `new assignments comming.mp3`
- * on loop until none remain. Browsers block autoplay until the user interacts,
- * so the first ring may need a gesture — surfaced via `needsGesture`.
+ * on loop until none remain.
  */
 export function useAssignmentAlerts(enabled: boolean): AssignmentAlerts {
   const q = useQuery({
     queryKey: ["staff-pending-assignments"],
     queryFn: () => staffPortalService.assignments(true),
-    refetchInterval: 20_000,
+    refetchInterval: 10_000,
     enabled,
   });
 
   const pending = q.data?.items ?? [];
   const pendingCount = pending.length;
-
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const unlockedRef = useRef(false);
-  // Keep the latest pending count readable from the one-off gesture listener.
-  const pendingCountRef = useRef(pendingCount);
-  pendingCountRef.current = pendingCount;
   const [needsGesture, setNeedsGesture] = useState(false);
 
   useEffect(() => {
-    const a = new Audio(SOUND_URL);
-    a.loop = true;
-    a.preload = "auto";
-    audioRef.current = a;
-    return () => {
-      a.pause();
-      audioRef.current = null;
-    };
-  }, []);
-
-  // Browsers block autoplay until the user interacts with the page. Prime the
-  // audio on the FIRST interaction anywhere so a later ring just works without
-  // the nurse having to find the "Tap to enable" button.
-  useEffect(() => {
-    const prime = () => {
-      const a = audioRef.current;
-      if (!a || unlockedRef.current) return;
-      // Unlock silently: mute, play to satisfy the autoplay gesture, then either
-      // keep ringing (if a duty is already pending) or reset — never a blip.
-      const pendingNow = pendingCountRef.current > 0;
-      a.muted = !pendingNow;
-      a.play()
-        .then(() => {
-          unlockedRef.current = true;
-          setNeedsGesture(false);
-          if (pendingNow) {
-            a.muted = false;
-          } else {
-            a.pause();
-            a.currentTime = 0;
-            a.muted = false;
-          }
-        })
-        .catch(() => {
-          a.muted = false;
-        });
-    };
-    const opts = { capture: true } as const;
-    window.addEventListener("pointerdown", prime, opts);
-    window.addEventListener("keydown", prime, opts);
-    window.addEventListener("touchstart", prime, opts);
-    return () => {
-      window.removeEventListener("pointerdown", prime, opts);
-      window.removeEventListener("keydown", prime, opts);
-      window.removeEventListener("touchstart", prime, opts);
-    };
-  }, []);
-
-  useEffect(() => {
-    const a = audioRef.current;
-    if (!a) return;
     if (pendingCount > 0) {
-      a.play()
-        .then(() => {
-          unlockedRef.current = true;
-          setNeedsGesture(false);
-        })
-        .catch(() => setNeedsGesture(true));
+      playDutyAlert().then((started) => {
+        setNeedsGesture(!started);
+      });
     } else {
-      a.pause();
-      a.currentTime = 0;
+      stopDutyAlert();
       setNeedsGesture(false);
     }
+
+    return () => {
+      // Don't kill audio if we're just re-rendering; only when pendingCount reaches 0
+    };
   }, [pendingCount]);
 
+  // Clean up on complete unmount
+  useEffect(() => {
+    return () => {
+      stopDutyAlert();
+    };
+  }, []);
+
   const enableSound = useCallback(() => {
-    const a = audioRef.current;
-    if (!a) return;
-    a.play()
-      .then(() => {
-        unlockedRef.current = true;
-        setNeedsGesture(false);
-      })
-      .catch(() => {});
+    playDutyAlert().then(() => setNeedsGesture(false));
   }, []);
 
   const stop = useCallback(() => {
-    const a = audioRef.current;
-    if (a) {
-      a.pause();
-      a.currentTime = 0;
-    }
+    stopDutyAlert();
   }, []);
 
   return { pending, needsGesture, enableSound, stop, isLoading: q.isLoading };

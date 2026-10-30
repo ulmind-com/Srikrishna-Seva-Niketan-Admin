@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Bell, CalendarClock, Loader2, MapPin, Volume2 } from "lucide-react";
 import { toast } from "sonner";
 import { staffPortalService, type StaffAssignment } from "@/services/staff-portal.service";
+import { stopDutyAlert } from "@/hooks/useAssignmentAlerts";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -119,16 +120,35 @@ export function AssignmentRingCard({
   const acceptMut = useMutation({
     mutationFn: () => staffPortalService.acceptAssignment(assignment.id),
     onSuccess: (a) => {
-      toast.success("Duty accepted");
       invalidate();
-      onAccepted(a);
+      if (a) onAccepted(a);
     },
-    onError: () => toast.error("Could not accept — please try again"),
+    onError: () => {
+      toast.error("Could not sync accept with server. Please refresh.");
+      invalidate();
+    },
   });
+
+  const handleAccept = () => {
+    // 1. Immediately silence all alert ringtones & vibrations!
+    stopDutyAlert();
+
+    // 2. Optimistically update duty acceptance & notify parent to open details instantly
+    const optimisticAccepted: StaffAssignment = {
+      ...assignment,
+      acceptance_status: "accepted",
+    };
+    onAccepted(optimisticAccepted);
+    toast.success("✓ Duty accepted!");
+
+    // 3. Sync to backend in background
+    acceptMut.mutate();
+  };
 
   const declineMut = useMutation({
     mutationFn: () => staffPortalService.declineAssignment(assignment.id, reason.trim() || undefined),
     onSuccess: () => {
+      stopDutyAlert();
       toast.success("Duty declined — the office has been notified");
       invalidate();
       onDismiss();
@@ -184,16 +204,18 @@ export function AssignmentRingCard({
           {!declining ? (
             <div className="space-y-3 pt-1">
               <SlideToConfirm
-                label={busy ? "Accepting…" : "Slide to accept"}
+                label="Slide to accept"
                 tone="accept"
-                disabled={busy}
-                onConfirm={() => acceptMut.mutate()}
+                onConfirm={handleAccept}
               />
               <SlideToConfirm
                 label="Slide to decline"
                 tone="decline"
                 disabled={busy}
-                onConfirm={() => setDeclining(true)}
+                onConfirm={() => {
+                  stopDutyAlert();
+                  setDeclining(true);
+                }}
               />
             </div>
           ) : (

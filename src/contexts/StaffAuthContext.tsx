@@ -8,8 +8,12 @@ import {
   type ReactNode,
 } from "react";
 import {
+  getStoredStaffAccess,
+  getStoredStaffProfile,
+  getStoredStaffRefresh,
   refreshStaffAccessToken,
   registerStaffAuthFailureHandler,
+  setStoredStaffProfile,
   setStoredStaffRefresh,
   staffTokenStore,
 } from "@/services/api/staff-client";
@@ -31,14 +35,22 @@ interface StaffAuthValue {
   logout: () => void;
   /** Re-read the profile after saving or submitting. */
   refresh: () => Promise<void>;
-  setStaff: (staff: Employee) => void;
+  setStaff: (staff: Employee | null) => void;
 }
 
 const StaffAuthContext = createContext<StaffAuthValue | null>(null);
 
 export function StaffAuthProvider({ children }: { children: ReactNode }) {
-  const [staff, setStaff] = useState<Employee | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const initialStaff = getStoredStaffProfile<Employee>();
+  const [staff, setStaffState] = useState<Employee | null>(initialStaff);
+  const [isLoading, setIsLoading] = useState<boolean>(
+    !initialStaff && Boolean(getStoredStaffAccess() || getStoredStaffRefresh())
+  );
+
+  const setStaff = useCallback((val: Employee | null) => {
+    setStaffState(val);
+    setStoredStaffProfile(val);
+  }, []);
 
   const logout = useCallback(() => {
     // Fire-and-forget server revoke; clear local state regardless.
@@ -47,22 +59,38 @@ export function StaffAuthProvider({ children }: { children: ReactNode }) {
     });
     staffTokenStore.clear();
     setStaff(null);
-  }, []);
+  }, [setStaff]);
 
-  // Restore the session on first mount from the HttpOnly refresh cookie: mint a
-  // fresh access token, then load the profile. Keeps staff signed in across
-  // reloads while the refresh session is valid.
+  // Seamless session restore on boot / reload:
+  // 1. If stored profile exists, render immediately with 0 delay (no blank flash).
+  // 2. Validate session via /me or refresh token in background.
+  // 3. Keeps nurse permanently logged in across page refreshes.
   useEffect(() => {
     let cancelled = false;
 
     async function restore() {
+      const hasToken = getStoredStaffAccess() || getStoredStaffRefresh();
+      if (!hasToken) {
+        setIsLoading(false);
+        return;
+      }
+
       try {
-        await refreshStaffAccessToken();
         const profile = await staffPortalService.me();
         if (!cancelled) setStaff(profile);
       } catch {
-        // No valid refresh session — show the login screen.
-        if (!cancelled) staffTokenStore.clear();
+        // Access token might need rotation; try refresh token
+        try {
+          await refreshStaffAccessToken();
+          const profile = await staffPortalService.me();
+          if (!cancelled) setStaff(profile);
+        } catch {
+          // Truly expired or invalid session
+          if (!cancelled) {
+            staffTokenStore.clear();
+            setStaff(null);
+          }
+        }
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -72,7 +100,7 @@ export function StaffAuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [setStaff]);
 
   // A failed refresh inside the Axios interceptor must clear React state too.
   useEffect(() => {
@@ -83,7 +111,7 @@ export function StaffAuthProvider({ children }: { children: ReactNode }) {
         window.location.assign("/staff/login");
       }
     });
-  }, []);
+  }, [setStaff]);
 
   const login = useCallback(async (email: string, password: string) => {
     const session = await staffPortalService.login(email, password);
@@ -91,7 +119,7 @@ export function StaffAuthProvider({ children }: { children: ReactNode }) {
     if (session.refresh_token) setStoredStaffRefresh(session.refresh_token);
     setStaff(session.staff);
     return session.staff;
-  }, []);
+  }, [setStaff]);
 
   const register = useCallback(
     async (payload: {
@@ -107,13 +135,13 @@ export function StaffAuthProvider({ children }: { children: ReactNode }) {
       setStaff(session.staff);
       return session.staff;
     },
-    [],
+    [setStaff],
   );
 
   const refresh = useCallback(async () => {
     const profile = await staffPortalService.me();
     setStaff(profile);
-  }, []);
+  }, [setStaff]);
 
   const value = useMemo<StaffAuthValue>(
     () => ({
@@ -126,7 +154,7 @@ export function StaffAuthProvider({ children }: { children: ReactNode }) {
       refresh,
       setStaff,
     }),
-    [staff, isLoading, login, register, logout, refresh],
+    [staff, isLoading, login, register, logout, refresh, setStaff],
   );
 
   return <StaffAuthContext.Provider value={value}>{children}</StaffAuthContext.Provider>;

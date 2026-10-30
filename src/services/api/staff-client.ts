@@ -20,12 +20,31 @@ import { endpoints } from "./endpoints";
  * `/api/v1/staff-portal`); the access token stays in memory.
  */
 
-/** In-memory access token for the staff session only. */
+/** In-memory access token for the staff session. */
 let staffAccess: string | null = null;
 
-// Cross-site fallback refresh token (see admin tokens.ts): used via the
-// X-Refresh-Token header when the browser blocks the third-party refresh cookie.
+// Persistent keys: used to maintain persistent staff session across page
+// reloads on mobile and desktop without frequent logouts.
+const STAFF_ACCESS_KEY = "ssn_staff_access";
 const STAFF_REFRESH_KEY = "ssn_staff_refresh";
+const STAFF_PROFILE_KEY = "ssn_staff_profile";
+
+export function getStoredStaffAccess(): string | null {
+  try {
+    return localStorage.getItem(STAFF_ACCESS_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredStaffAccess(token: string | null): void {
+  try {
+    if (token) localStorage.setItem(STAFF_ACCESS_KEY, token);
+    else localStorage.removeItem(STAFF_ACCESS_KEY);
+  } catch {
+    /* ignore storage errors */
+  }
+}
 
 export function getStoredStaffRefresh(): string | null {
   try {
@@ -44,14 +63,35 @@ export function setStoredStaffRefresh(token: string | null): void {
   }
 }
 
+export function getStoredStaffProfile<T = any>(): T | null {
+  try {
+    const raw = localStorage.getItem(STAFF_PROFILE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredStaffProfile(profile: any): void {
+  try {
+    if (profile) localStorage.setItem(STAFF_PROFILE_KEY, JSON.stringify(profile));
+    else localStorage.removeItem(STAFF_PROFILE_KEY);
+  } catch {
+    /* ignore storage errors */
+  }
+}
+
 export const staffTokenStore = {
-  getAccess: (): string | null => staffAccess,
+  getAccess: (): string | null => staffAccess || getStoredStaffAccess(),
   setAccess(access: string): void {
     staffAccess = access;
+    setStoredStaffAccess(access);
   },
   clear(): void {
     staffAccess = null;
+    setStoredStaffAccess(null);
     setStoredStaffRefresh(null);
+    setStoredStaffProfile(null);
   },
 };
 
