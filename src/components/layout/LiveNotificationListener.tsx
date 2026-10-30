@@ -117,15 +117,20 @@ export function LiveNotificationListener() {
 
       console.log("[LiveNotif] Unread notifications:", count);
 
-      isAlertingRef.current = true;
       const latest = await fetchLatestNotification();
 
+      // Never alert/ring for internal staff duty assignments
+      if (!latest || latest.type === "assignment") {
+        return;
+      }
+
+      isAlertingRef.current = true;
       setAlert({
-        title: latest?.title || "🔔 Unread Notifications!",
+        title: latest.title || "🔔 Unread Notifications!",
         message:
-          latest?.message ||
+          latest.message ||
           `You have ${count} unread notification(s). Tap to view details.`,
-        type: latest?.type,
+        type: latest.type,
       });
 
       startRinging();
