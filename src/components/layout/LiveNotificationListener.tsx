@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { BellRing, CalendarCheck } from "lucide-react";
-import { STORAGE_KEYS, env } from "@/config/env";
+import { env } from "@/config/env";
+import { tokenStore } from "@/services/api/tokens";
 
 /**
  * LiveNotificationListener
@@ -61,7 +62,7 @@ function stopRinging() {
 
 // ─── Raw fetch helper (no axios, no interceptors) ────────────
 async function fetchUnreadCount(): Promise<number> {
-  const token = localStorage.getItem(STORAGE_KEYS.accessToken);
+  const token = tokenStore.getAccess();
   if (!token) return -1; // not logged in
 
   const res = await fetch(`${env.API_BASE_URL}/notifications/unread-count`, {
@@ -80,7 +81,7 @@ async function fetchLatestNotification(): Promise<{
   message: string;
   type?: string;
 } | null> {
-  const token = localStorage.getItem(STORAGE_KEYS.accessToken);
+  const token = tokenStore.getAccess();
   if (!token) return null;
 
   const res = await fetch(

@@ -5,25 +5,17 @@ import type { User } from "@/types/models";
 
 export interface LoginResponse {
   access_token: string;
-  refresh_token: string;
   token_type: string;
   expires_in: number;
   user: User;
-}
-
-export interface TokenPair {
-  access_token: string;
-  refresh_token: string;
-  token_type: string;
-  expires_in: number;
 }
 
 export const authService = {
   login: (email: string, password: string) =>
     http.post<LoginResponse>(endpoints.auth.login, { email, password }),
 
-  logout: (refresh_token: string) =>
-    http.post<null>(endpoints.auth.logout, { refresh_token }),
+  // Refresh token + CSRF travel in cookies/headers; no body needed.
+  logout: () => http.post<null>(endpoints.auth.logout, {}),
 
   me: () => http.get<User>(endpoints.auth.me),
 

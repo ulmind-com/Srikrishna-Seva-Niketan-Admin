@@ -4,33 +4,32 @@ import axios, {
   type AxiosRequestConfig,
   type InternalAxiosRequestConfig,
 } from "axios";
-import { env, STORAGE_KEYS } from "@/config/env";
+import { env } from "@/config/env";
 import type { ApiEnvelope } from "@/types/api";
+import { getCsrfToken } from "./tokens";
 import { endpoints } from "./endpoints";
 
 /**
  * A dedicated Axios client for the self-service staff portal.
  *
  * It mirrors the admin client (bearer attach, single-flight refresh, envelope
- * unwrapping) but keeps its **own** token storage. Staff tokens carry a
+ * unwrapping) but keeps its **own** access token. Staff tokens carry a
  * `scope: "staff"` claim and resolve to an Employee, not a User — mixing them
- * with the admin client's tokens would sign one session out of the other.
+ * with the admin client's tokens would sign one session out of the other. The
+ * staff refresh token lives only in its own Secure/HttpOnly cookie (scoped to
+ * `/api/v1/staff-portal`); the access token stays in memory.
  */
 
-/** Tokens for the staff session only. */
+/** In-memory access token for the staff session only. */
+let staffAccess: string | null = null;
+
 export const staffTokenStore = {
-  getAccess: (): string | null => localStorage.getItem(STORAGE_KEYS.staffAccessToken),
-  getRefresh: (): string | null => localStorage.getItem(STORAGE_KEYS.staffRefreshToken),
-  set(access: string, refresh: string): void {
-    localStorage.setItem(STORAGE_KEYS.staffAccessToken, access);
-    localStorage.setItem(STORAGE_KEYS.staffRefreshToken, refresh);
-  },
+  getAccess: (): string | null => staffAccess,
   setAccess(access: string): void {
-    localStorage.setItem(STORAGE_KEYS.staffAccessToken, access);
+    staffAccess = access;
   },
   clear(): void {
-    localStorage.removeItem(STORAGE_KEYS.staffAccessToken);
-    localStorage.removeItem(STORAGE_KEYS.staffRefreshToken);
+    staffAccess = null;
   },
 };
 
@@ -38,13 +37,32 @@ const rawStaffClient: AxiosInstance = axios.create({
   baseURL: env.API_BASE_URL,
   timeout: 60_000,
   headers: { "Content-Type": "application/json" },
+  withCredentials: true,
 });
 
 rawStaffClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = staffTokenStore.getAccess();
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  const csrf = getCsrfToken();
+  if (csrf) config.headers["X-CSRF-Token"] = csrf;
   return config;
 });
+
+/**
+ * Exchange the staff HttpOnly refresh cookie for a new access token. Shared by
+ * the 401 interceptor and app-boot restore; uses a bare axios call so it cannot
+ * recurse through the interceptor.
+ */
+export async function refreshStaffAccessToken(): Promise<string> {
+  const { data } = await axios.post<ApiEnvelope<{ access_token: string }>>(
+    `${env.API_BASE_URL}${endpoints.staffPortal.refresh}`,
+    null,
+    { withCredentials: true, headers: { "X-CSRF-Token": getCsrfToken() ?? "" } },
+  );
+  const access = data.data.access_token;
+  staffTokenStore.setAccess(access);
+  return access;
+}
 
 let isRefreshing = false;
 let pendingQueue: Array<(token: string | null) => void> = [];
@@ -84,12 +102,6 @@ rawStaffClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    const refreshToken = staffTokenStore.getRefresh();
-    if (!refreshToken) {
-      onStaffAuthFailure();
-      return Promise.reject(error);
-    }
-
     original._retry = true;
 
     if (isRefreshing) {
@@ -105,15 +117,9 @@ rawStaffClient.interceptors.response.use(
 
     isRefreshing = true;
     try {
-      const { data } = await axios.post<ApiEnvelope<{ access_token: string; refresh_token: string }>>(
-        `${env.API_BASE_URL}${endpoints.staffPortal.refresh}`,
-        { refresh_token: refreshToken },
-        { headers: { "Content-Type": "application/json" } },
-      );
-      const tokens = data.data;
-      staffTokenStore.set(tokens.access_token, tokens.refresh_token);
-      flushQueue(tokens.access_token);
-      original.headers.Authorization = `Bearer ${tokens.access_token}`;
+      const access = await refreshStaffAccessToken();
+      flushQueue(access);
+      original.headers.Authorization = `Bearer ${access}`;
       return rawStaffClient(original);
     } catch (refreshError) {
       flushQueue(null);

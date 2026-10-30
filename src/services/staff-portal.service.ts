@@ -10,10 +10,9 @@ import type {
   StaffBranchOption,
 } from "@/types/models";
 
-/** Token pair + profile returned by register/login. */
+/** Access token + profile returned by register/login (refresh is cookie-only). */
 export interface StaffSession {
   access_token: string;
-  refresh_token: string;
   token_type: string;
   expires_in: number;
   staff: Employee;
@@ -80,6 +79,9 @@ export const staffPortalService = {
       url: endpoints.staffPortal.login,
       data: { email, password },
     }),
+
+  logout: () =>
+    staffRequest<null>({ method: "POST", url: endpoints.staffPortal.logout }),
 
   me: () => staffRequest<Employee>({ method: "GET", url: endpoints.staffPortal.me }),
 

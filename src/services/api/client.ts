@@ -6,28 +6,58 @@ import axios, {
 } from "axios";
 import { env } from "@/config/env";
 import type { ApiEnvelope } from "@/types/api";
-import { tokenStore } from "./tokens";
+import { getCsrfToken, tokenStore } from "./tokens";
 
 /**
  * Central Axios client with:
- *  - automatic Bearer token attachment
- *  - transparent refresh-token rotation on 401 (single-flight)
+ *  - automatic in-memory Bearer token attachment
+ *  - transparent refresh on 401 via the HttpOnly refresh cookie (single-flight)
+ *  - CSRF header attachment for cookie-authenticated auth calls
  *  - unwrapping of the backend `{ success, data, ... }` envelope
  *  - a global error normaliser
+ *
+ * `withCredentials` is on so the browser sends the cross-site refresh/CSRF
+ * cookies on every request to the API.
  */
 
 const rawClient: AxiosInstance = axios.create({
   baseURL: env.API_BASE_URL,
   timeout: 30_000,
   headers: { "Content-Type": "application/json" },
+  withCredentials: true,
 });
 
-// ---- Request: attach access token ----
+// ---- Request: attach access token + CSRF header ----
 rawClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = tokenStore.getAccess();
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  // The double-submit CSRF check guards cookie-authed auth calls (refresh,
+  // logout). Echo the cookie value in the header; harmless elsewhere.
+  const csrf = getCsrfToken();
+  if (csrf) config.headers["X-CSRF-Token"] = csrf;
   return config;
 });
+
+/**
+ * Exchange the HttpOnly refresh cookie for a new access token.
+ *
+ * Shared by the 401 interceptor and app-boot session restore. Uses a bare axios
+ * call (not `rawClient`) so it cannot recurse through the interceptor. Returns
+ * the new access token; throws if the refresh session is invalid/expired.
+ */
+export async function refreshAccessToken(): Promise<string> {
+  const { data } = await axios.post<ApiEnvelope<{ access_token: string }>>(
+    `${env.API_BASE_URL}/auth/refresh`,
+    null,
+    {
+      withCredentials: true,
+      headers: { "X-CSRF-Token": getCsrfToken() ?? "" },
+    },
+  );
+  const access = data.data.access_token;
+  tokenStore.setAccess(access);
+  return access;
+}
 
 // ---- Response: transparent refresh on 401 ----
 let isRefreshing = false;
@@ -61,14 +91,9 @@ rawClient.interceptors.response.use(
     const isAuthEndpoint = original?.url?.includes("/auth/");
 
     if (status === 401 && original && !original._retry && !isAuthEndpoint) {
-      const refresh = tokenStore.getRefresh();
-      if (!refresh) {
-        onAuthFailure();
-        return Promise.reject(error);
-      }
-
       if (isRefreshing) {
-        // Wait for the in-flight refresh, then replay this request.
+        // Wait for the in-flight refresh, then replay this request. This is
+        // what stops concurrent 401s from each firing their own refresh.
         return new Promise((resolve, reject) => {
           pendingQueue.push((token) => {
             if (!token) return reject(error);
@@ -82,12 +107,8 @@ rawClient.interceptors.response.use(
       original._retry = true;
       isRefreshing = true;
       try {
-        const { data } = await axios.post<
-          ApiEnvelope<{ access_token: string; refresh_token: string }>
-        >(`${env.API_BASE_URL}/auth/refresh`, { refresh_token: refresh });
-        const access = data.data.access_token;
-        const newRefresh = data.data.refresh_token;
-        tokenStore.set(access, newRefresh);
+        // Refresh reads the HttpOnly cookie; no token travels in JS.
+        const access = await refreshAccessToken();
         flushQueue(access);
         original.headers.Authorization = `Bearer ${access}`;
         return rawClient(original);

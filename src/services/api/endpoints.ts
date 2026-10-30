@@ -74,6 +74,7 @@ export const endpoints = {
     verifyOtp: "/staff-portal/verify-otp",
     login: "/staff-portal/login",
     refresh: "/staff-portal/refresh",
+    logout: "/staff-portal/logout",
     google: "/staff-portal/google",
     me: "/staff-portal/me",
     upload: "/staff-portal/me/upload",

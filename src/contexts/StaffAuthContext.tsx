@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import {
+  refreshStaffAccessToken,
   registerStaffAuthFailureHandler,
   staffTokenStore,
 } from "@/services/api/staff-client";
@@ -39,24 +40,27 @@ export function StaffAuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const logout = useCallback(() => {
+    // Fire-and-forget server revoke; clear local state regardless.
+    staffPortalService.logout().catch(() => {
+      /* ignore network errors on logout */
+    });
     staffTokenStore.clear();
     setStaff(null);
   }, []);
 
-  // Restore the session on first mount if a token is present.
+  // Restore the session on first mount from the HttpOnly refresh cookie: mint a
+  // fresh access token, then load the profile. Keeps staff signed in across
+  // reloads while the refresh session is valid.
   useEffect(() => {
     let cancelled = false;
 
     async function restore() {
-      if (!staffTokenStore.getAccess()) {
-        setIsLoading(false);
-        return;
-      }
       try {
+        await refreshStaffAccessToken();
         const profile = await staffPortalService.me();
         if (!cancelled) setStaff(profile);
       } catch {
-        // Token expired or revoked — drop it and show the login screen.
+        // No valid refresh session — show the login screen.
         if (!cancelled) staffTokenStore.clear();
       } finally {
         if (!cancelled) setIsLoading(false);
@@ -82,7 +86,7 @@ export function StaffAuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const session = await staffPortalService.login(email, password);
-    staffTokenStore.set(session.access_token, session.refresh_token);
+    staffTokenStore.setAccess(session.access_token);
     setStaff(session.staff);
     return session.staff;
   }, []);
@@ -96,7 +100,7 @@ export function StaffAuthProvider({ children }: { children: ReactNode }) {
       otp?: string;
     }) => {
       const session = await staffPortalService.register(payload);
-      staffTokenStore.set(session.access_token, session.refresh_token);
+      staffTokenStore.setAccess(session.access_token);
       setStaff(session.staff);
       return session.staff;
     },

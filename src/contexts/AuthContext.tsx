@@ -9,7 +9,10 @@ import {
 } from "react";
 import { authService } from "@/services/auth.service";
 import { tokenStore } from "@/services/api/tokens";
-import { registerAuthFailureHandler } from "@/services/api/client";
+import {
+  refreshAccessToken,
+  registerAuthFailureHandler,
+} from "@/services/api/client";
 import { STORAGE_KEYS } from "@/config/env";
 import type { User } from "@/types/models";
 
@@ -37,7 +40,8 @@ function readStoredUser(): User | null {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUserState] = useState<User | null>(readStoredUser);
-  const [isLoading, setIsLoading] = useState<boolean>(Boolean(tokenStore.getAccess()));
+  // Start loading: on mount we attempt a cookie-based session restore.
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const setUser = useCallback((next: User) => {
     setUserState(next);
@@ -52,16 +56,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(
     async (email: string, password: string) => {
       const res = await authService.login(email, password);
-      tokenStore.set(res.access_token, res.refresh_token);
+      tokenStore.setAccess(res.access_token);
       setUser(res.user);
     },
     [setUser]
   );
 
   const logout = useCallback(async () => {
-    const refresh = tokenStore.getRefresh();
     try {
-      if (refresh) await authService.logout(refresh);
+      await authService.logout();
     } catch {
       /* ignore network errors on logout */
     } finally {
@@ -91,19 +94,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user]
   );
 
-  // Hydrate the current user on mount when a token exists.
+  // On mount, restore the session from the HttpOnly refresh cookie: mint a new
+  // access token, then hydrate the user. A reload keeps the user signed in as
+  // long as the refresh session is still valid; otherwise it falls through to
+  // login cleanly.
   useEffect(() => {
     registerAuthFailureHandler(clearSession);
-    if (!tokenStore.getAccess()) {
-      setIsLoading(false);
-      return;
-    }
     let active = true;
-    authService
-      .me()
-      .then((me) => active && setUser(me))
-      .catch(() => active && clearSession())
-      .finally(() => active && setIsLoading(false));
+    (async () => {
+      try {
+        await refreshAccessToken();
+        const me = await authService.me();
+        if (active) setUser(me);
+      } catch {
+        if (active) clearSession();
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    })();
     return () => {
       active = false;
     };
