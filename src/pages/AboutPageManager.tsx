@@ -280,7 +280,7 @@ export function AboutPageManager() {
                             </Field>
                             <Field label="Address (optional — shows on map)">
                               <Input
-                                placeholder="e.g. 5th Floor, Tower-C, Unitech Cyber Park, Gurgaon"
+                                placeholder="e.g. Salt Lake Sector 5, Kolkata"
                                 {...register(`about_founders.${i}.address` as const)}
                                 disabled={!canEdit}
                               />
@@ -325,7 +325,7 @@ export function AboutPageManager() {
               </Field>
               <Field label="Address Line 2">
                 <Input
-                  placeholder="Sector-39, Gurgaon, India – 122003"
+                  placeholder="Kolkata, West Bengal, India"
                   {...register("about_address_line2")}
                   disabled={!canEdit}
                 />

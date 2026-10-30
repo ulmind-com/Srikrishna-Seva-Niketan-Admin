@@ -89,7 +89,7 @@ const DEFAULT_CONFIG: BookingFormConfig = {
       ],
     },
   ],
-  cities: ["Faridabad", "Gurugram", "Noida", "Delhi", "Other"],
+  cities: ["Salt Lake", "Sector 5", "New Town", "Park Street", "Other"],
   service_care_hints: {
     "Home Sample Collection": "What test/sample collection is required?",
     "ICU Setup": "What ICU setup and equipment are needed?",
