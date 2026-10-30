@@ -1,56 +1,33 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { BellRing, CalendarCheck } from "lucide-react";
+import { BellRing, CalendarCheck, CheckCircle2, AlertTriangle, ArrowRight } from "lucide-react";
 import { env } from "@/config/env";
 import { tokenStore } from "@/services/api/tokens";
+import { playDutyAlertSound } from "@/utils/audioAlert";
 
 /**
  * LiveNotificationListener
  * 
- * Polls the backend for new unread notifications every 5 seconds using
- * raw `fetch()` (bypassing axios to avoid any interceptor issues).
- * When a new notification is detected, plays a ringing sound and shows
- * a Zomato/Swiggy-style full-screen alert modal.
- * 
- * Also listens for `visibilitychange` to immediately re-poll when the
- * tab becomes visible (handles mobile Chrome throttling).
+ * Polls the backend for new unread notifications every 6 seconds.
+ * When a high-priority event is detected:
+ *   1. New Booking ("prottekta booking e")
+ *   2. Duty Accepted by Nurse
+ *   3. Duty Declined by Nurse (with Reason)
+ * It plays the ringing sound and shows a full-screen alert modal with action.
  */
 
 // ─── Sound ───────────────────────────────────────────────────
 let ringTimer: ReturnType<typeof setInterval> | null = null;
 
 function playSound() {
-  try {
-    const Ctx = window.AudioContext || (window as any).webkitAudioContext;
-    if (!Ctx) return;
-    const ctx = new Ctx();
-    const now = ctx.currentTime;
-
-    const beep = (freq: number, start: number, dur: number) => {
-      const o = ctx.createOscillator();
-      const g = ctx.createGain();
-      o.type = "sine";
-      o.frequency.value = freq;
-      g.gain.setValueAtTime(0, start);
-      g.gain.linearRampToValueAtTime(0.25, start + 0.04);
-      g.gain.exponentialRampToValueAtTime(0.001, start + dur);
-      o.connect(g).connect(ctx.destination);
-      o.start(start);
-      o.stop(start + dur);
-    };
-
-    beep(660, now, 0.3);
-    beep(880, now + 0.18, 0.5);
-  } catch {
-    /* ignore */
-  }
+  playDutyAlertSound();
 }
 
 function startRinging() {
   stopRinging();
   playSound();
-  ringTimer = setInterval(playSound, 3000);
+  ringTimer = setInterval(playSound, 3500);
 }
 
 function stopRinging() {
@@ -60,35 +37,36 @@ function stopRinging() {
   }
 }
 
-// ─── Raw fetch helper (no axios, no interceptors) ────────────
+// ─── Raw fetch helpers ─────────────────────────────────────────
 async function fetchUnreadCount(): Promise<number> {
   const token = tokenStore.getAccess();
-  if (!token) return -1; // not logged in
+  if (!token) return -1;
 
   const res = await fetch(`${env.API_BASE_URL}/notifications/unread-count`, {
     headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store"
+    cache: "no-store",
   });
 
   if (!res.ok) return -1;
   const json = await res.json();
-  // Backend returns: { success: true, data: { unread: N }, message: "..." }
   return json?.data?.unread ?? 0;
 }
 
 async function fetchLatestNotification(): Promise<{
+  id: string;
   title: string;
   message: string;
   type?: string;
+  reference_id?: string;
 } | null> {
   const token = tokenStore.getAccess();
   if (!token) return null;
 
   const res = await fetch(
     `${env.API_BASE_URL}/notifications?page=1&page_size=1&is_read=false`,
-    { 
+    {
       headers: { Authorization: `Bearer ${token}` },
-      cache: "no-store" 
+      cache: "no-store",
     }
   );
 
@@ -96,42 +74,78 @@ async function fetchLatestNotification(): Promise<{
   const json = await res.json();
   const item = json?.data?.items?.[0];
   if (!item) return null;
-  return { title: item.title, message: item.message, type: item.type };
+  return {
+    id: item.id,
+    title: item.title,
+    message: item.message,
+    type: item.type,
+    reference_id: item.reference_id,
+  };
 }
 
 // ─── Component ───────────────────────────────────────────────
 export function LiveNotificationListener() {
   const navigate = useNavigate();
   const isAlertingRef = useRef(false);
+  const lastAlertedIdRef = useRef<string | null>(null);
+
   const [alert, setAlert] = useState<{
+    id: string;
     title: string;
     message: string;
     type?: string;
+    kind: "booking" | "accepted" | "declined" | "general";
   } | null>(null);
 
   const poll = useCallback(async () => {
     try {
       const count = await fetchUnreadCount();
-      if (count <= 0) return; // not logged in or API error or 0 unread
+      if (count <= 0) return;
 
-      if (isAlertingRef.current) return; // already alerting
-
-      console.log("[LiveNotif] Unread notifications:", count);
+      if (isAlertingRef.current) return;
 
       const latest = await fetchLatestNotification();
+      if (!latest) return;
 
-      // Never alert/ring for internal staff duty assignments
-      if (!latest || latest.type === "assignment") {
+      // Don't re-alert for the exact same dismissed notification in memory
+      if (lastAlertedIdRef.current === latest.id) return;
+
+      const titleLower = (latest.title || "").toLowerCase();
+      const isBooking = latest.type === "booking";
+      const isDutyAccepted = titleLower.includes("accepted");
+      const isDutyDeclined = titleLower.includes("declined");
+
+      // Only trigger audio ring & modal for high-priority operational events:
+      // 1. Every new patient booking
+      // 2. Nurse accepted duty assignment
+      // 3. Nurse declined duty assignment
+      if (!isBooking && !isDutyAccepted && !isDutyDeclined) {
         return;
       }
 
       isAlertingRef.current = true;
+      lastAlertedIdRef.current = latest.id;
+
+      let displayTitle = latest.title;
+      let kind: "booking" | "accepted" | "declined" | "general" = "general";
+
+      if (isDutyAccepted) {
+        kind = "accepted";
+        displayTitle = "✅ Duty Accepted by Nurse";
+      } else if (isDutyDeclined) {
+        kind = "declined";
+        displayTitle = "🚨 Duty Declined — Reassign Needed";
+      } else if (isBooking) {
+        kind = "booking";
+        displayTitle = "🛎️ New Patient Booking Received";
+      }
+
       setAlert({
-        title: latest.title || "🔔 Unread Notifications!",
-        message:
-          latest.message ||
-          `You have ${count} unread notification(s). Tap to view details.`,
+        id: latest.id,
+        title: displayTitle,
+        message: latest.message,
         type: latest.type,
+        kind,
       });
 
       startRinging();
@@ -141,16 +155,11 @@ export function LiveNotificationListener() {
   }, []);
 
   useEffect(() => {
-    // Poll immediately on mount
     poll();
+    const id = setInterval(poll, 7000);
 
-    // Then every 10 seconds to keep reminding them of unread notifications
-    const id = setInterval(poll, 10000);
-
-    // Also poll when tab becomes visible (mobile Chrome throttles setInterval)
     const onVisible = () => {
       if (document.visibilityState === "visible") {
-        console.log("[LiveNotif] Tab visible, polling now");
         poll();
       }
     };
@@ -166,51 +175,72 @@ export function LiveNotificationListener() {
   const dismiss = useCallback(() => {
     setAlert(null);
     stopRinging();
-    // Use a short delay before allowing next alert so they aren't instantly bombarded
     setTimeout(() => {
       isAlertingRef.current = false;
-    }, 2000);
+    }, 2500);
   }, []);
 
   const viewDetails = useCallback(() => {
+    const kind = alert?.kind;
     const navType = alert?.type;
     setAlert(null);
     stopRinging();
     isAlertingRef.current = false;
-    
-    // Route to the correct page based on type
-    if (navType === "contact") navigate("/contact");
-    else if (navType === "rental") navigate("/equipment");
-    else navigate("/bookings");
-  }, [navigate, alert]);
 
-  // ─── Render ──────────────────────────────────────────────
+    if (kind === "accepted" || kind === "declined" || navType === "assignment") {
+      navigate("/assignments");
+    } else if (kind === "booking" || navType === "booking") {
+      navigate("/bookings");
+    } else if (navType === "contact") {
+      navigate("/contact");
+    } else if (navType === "rental") {
+      navigate("/equipment");
+    } else {
+      navigate("/notifications");
+    }
+  }, [alert, navigate]);
+
   return (
     <AnimatePresence>
       {alert && (
         <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
-          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={dismiss}
           />
 
-          {/* Card */}
           <motion.div
-            initial={{ scale: 0.8, opacity: 0, y: 40 }}
+            initial={{ scale: 0.85, opacity: 0, y: 35 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.9, opacity: 0, y: -20 }}
             transition={{ type: "spring", damping: 22, stiffness: 260 }}
-            className="relative w-full max-w-md overflow-hidden rounded-3xl bg-white text-center shadow-2xl"
+            className="relative w-full max-w-md overflow-hidden rounded-3xl bg-card text-card-foreground text-center shadow-2xl border border-border"
           >
-            {/* Top accent */}
-            <div className="h-1.5 w-full bg-gradient-to-r from-primary via-accent to-primary" />
+            {/* Top accent bar */}
+            <div
+              className={`h-2 w-full ${
+                alert.kind === "accepted"
+                  ? "bg-emerald-500"
+                  : alert.kind === "declined"
+                  ? "bg-rose-500"
+                  : "bg-primary"
+              }`}
+            />
 
-            <div className="px-8 pt-8 pb-10">
-              {/* Bell icon */}
-              <div className="mx-auto mb-6 relative flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <div className="px-6 pt-7 pb-8 sm:px-8">
+              {/* Animated Icon Ring */}
+              <div
+                className={`mx-auto mb-5 relative flex h-20 w-20 items-center justify-center rounded-full ${
+                  alert.kind === "accepted"
+                    ? "bg-emerald-500/15 text-emerald-400"
+                    : alert.kind === "declined"
+                    ? "bg-rose-500/15 text-rose-400"
+                    : "bg-primary/15 text-primary"
+                }`}
+              >
                 <motion.div
                   animate={{
                     scale: [1, 1.4, 1],
@@ -221,7 +251,13 @@ export function LiveNotificationListener() {
                     repeat: Infinity,
                     ease: "easeInOut",
                   }}
-                  className="absolute inset-0 rounded-full bg-primary/20"
+                  className={`absolute inset-0 rounded-full ${
+                    alert.kind === "accepted"
+                      ? "bg-emerald-500/20"
+                      : alert.kind === "declined"
+                      ? "bg-rose-500/20"
+                      : "bg-primary/20"
+                  }`}
                 />
                 <motion.div
                   animate={{ rotate: [0, -12, 12, -12, 12, 0] }}
@@ -231,30 +267,65 @@ export function LiveNotificationListener() {
                     repeatDelay: 0.8,
                   }}
                 >
-                  <BellRing className="h-10 w-10" />
+                  {alert.kind === "accepted" ? (
+                    <CheckCircle2 className="h-10 w-10 text-emerald-400" />
+                  ) : alert.kind === "declined" ? (
+                    <AlertTriangle className="h-10 w-10 text-rose-400" />
+                  ) : (
+                    <BellRing className="h-10 w-10 text-primary" />
+                  )}
                 </motion.div>
               </div>
 
-              <h2 className="text-2xl font-bold tracking-tight text-gray-900 mb-2">
+              <h2 className="text-xl font-bold tracking-tight text-foreground mb-2">
                 {alert.title}
               </h2>
-              <p className="text-sm leading-relaxed text-gray-500 mb-8">
-                {alert.message}
-              </p>
 
-              <div className="flex flex-col gap-3">
+              <div className="mb-6 rounded-2xl bg-muted/40 p-3.5 border border-border/60">
+                <p className="text-sm leading-relaxed text-foreground font-medium">
+                  {alert.message}
+                </p>
+                {alert.kind === "declined" && (
+                  <p className="mt-2 text-xs font-semibold text-rose-400">
+                    ⚠️ Action Required: Please assign another nurse from the office panel.
+                  </p>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-2.5">
                 <button
                   onClick={viewDetails}
-                  className="w-full flex items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-4 text-[15px] font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90 active:scale-[0.97]"
+                  className={`w-full flex items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-semibold text-white shadow-lg transition-all active:scale-[0.97] ${
+                    alert.kind === "declined"
+                      ? "bg-rose-600 hover:bg-rose-500 shadow-rose-600/25"
+                      : alert.kind === "accepted"
+                      ? "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/25"
+                      : "bg-primary hover:bg-primary/90 shadow-primary/25"
+                  }`}
                 >
-                  <CalendarCheck className="h-5 w-5" />
-                  View Details
+                  {alert.kind === "declined" ? (
+                    <>
+                      <CalendarCheck className="h-4 w-4" />
+                      <span>Reassign Duty Now</span>
+                      <ArrowRight className="h-4 w-4" />
+                    </>
+                  ) : alert.kind === "accepted" ? (
+                    <>
+                      <CheckCircle2 className="h-4 w-4" />
+                      <span>View Assignment</span>
+                    </>
+                  ) : (
+                    <>
+                      <CalendarCheck className="h-4 w-4" />
+                      <span>View &amp; Assign Duty</span>
+                    </>
+                  )}
                 </button>
                 <button
                   onClick={dismiss}
-                  className="w-full rounded-2xl bg-gray-100 px-5 py-3.5 text-[15px] font-medium text-gray-700 transition-colors hover:bg-gray-200 active:scale-[0.97]"
+                  className="w-full rounded-2xl bg-muted/60 px-5 py-3 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors active:scale-[0.97]"
                 >
-                  Dismiss
+                  Dismiss Ring
                 </button>
               </div>
             </div>

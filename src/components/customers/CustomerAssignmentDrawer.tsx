@@ -132,7 +132,7 @@ export function CustomerAssignmentDrawer({
       toast.success(
         `Duty successfully assigned to ${created.employee_name || "Nurse"}!`,
         {
-          description: `Assigned for ${customer?.name ?? "Customer"}. Staff has been notified.`,
+          description: `Assigned for ${customer?.name ?? "Customer"}. Live push alert with sound dispatched to nurse device.`,
           action: {
             label: "View in Assignments",
             onClick: () => navigate("/assignments"),

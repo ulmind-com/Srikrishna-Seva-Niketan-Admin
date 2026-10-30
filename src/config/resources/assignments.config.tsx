@@ -1,4 +1,4 @@
-import { CalendarClock } from "lucide-react";
+import { CalendarClock, CheckCircle2, XCircle, Clock, AlertTriangle } from "lucide-react";
 import type { Assignment } from "@/types/models";
 import { resourceServices } from "@/services/resources";
 import type { ResourceConfig } from "@/components/resource/types";
@@ -23,12 +23,6 @@ const STATUS_VARIANT: Record<string, "success" | "secondary" | "warning" | "dang
   scheduled: "secondary",
   completed: "warning",
   cancelled: "danger",
-};
-
-const ACCEPTANCE: Record<string, { label: string; variant: "success" | "warning" | "danger" }> = {
-  pending: { label: "Pending", variant: "warning" },
-  accepted: { label: "Accepted", variant: "success" },
-  declined: { label: "Declined", variant: "danger" },
 };
 
 export const assignmentsConfig: ResourceConfig<Assignment> = {
@@ -151,26 +145,64 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
       ),
     },
     {
-      header: "Response",
+      header: "Staff Response",
       cell: (r) => {
-        const a = ACCEPTANCE[r.acceptance_status ?? "pending"];
-        if (!a) return <span className="text-xs text-muted-foreground">—</span>;
+        if (r.acceptance_status === "accepted") {
+          return (
+            <div className="flex flex-col gap-0.5 items-start">
+              <Badge variant="success" className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 gap-1 text-[11px] font-semibold">
+                <CheckCircle2 className="h-3 w-3" /> Accepted
+              </Badge>
+              {r.accepted_at && (
+                <span className="text-[10px] text-muted-foreground">
+                  {new Date(r.accepted_at).toLocaleString("en-IN", {
+                    timeZone: "Asia/Kolkata",
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+              )}
+            </div>
+          );
+        }
+
+        if (r.acceptance_status === "declined") {
+          return (
+            <div className="flex flex-col gap-1 items-start max-w-[240px]">
+              <Badge variant="danger" className="bg-rose-500/15 text-rose-400 border-rose-500/30 gap-1 text-[11px] font-semibold">
+                <XCircle className="h-3 w-3" /> Declined
+              </Badge>
+              {r.decline_reason && (
+                <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1 text-xs text-rose-300 font-medium">
+                  <span className="font-bold text-[10px] uppercase tracking-wider block text-rose-400 flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" /> Reason:
+                  </span>
+                  “{r.decline_reason}”
+                </div>
+              )}
+              {r.declined_at && (
+                <span className="text-[10px] text-muted-foreground">
+                  {new Date(r.declined_at).toLocaleString("en-IN", {
+                    timeZone: "Asia/Kolkata",
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+              )}
+            </div>
+          );
+        }
+
         return (
-          <div className="space-y-0.5">
-            <Badge
-              variant={a.variant}
-              className={a.variant === "warning" ? "animate-pulse" : undefined}
-            >
-              {a.label}
+          <div className="flex flex-col gap-0.5 items-start">
+            <Badge variant="warning" className="bg-amber-500/15 text-amber-400 border-amber-500/30 gap-1 text-[11px] font-semibold animate-pulse">
+              <Clock className="h-3 w-3" /> Awaiting Response
             </Badge>
-            {r.acceptance_status === "declined" && r.decline_reason && (
-              <p
-                className="max-w-[200px] truncate text-xs text-muted-foreground"
-                title={r.decline_reason}
-              >
-                “{r.decline_reason}”
-              </p>
-            )}
+            <span className="text-[10px] text-muted-foreground">Push sent to nurse</span>
           </div>
         );
       },
