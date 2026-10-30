@@ -22,7 +22,7 @@ import { getCsrfToken, getStoredRefresh, setStoredRefresh, tokenStore } from "./
 
 const rawClient: AxiosInstance = axios.create({
   baseURL: env.API_BASE_URL,
-  timeout: 30_000,
+  timeout: 90_000,
   headers: { "Content-Type": "application/json" },
   withCredentials: true,
 });
@@ -89,8 +89,19 @@ rawClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const original = error.config as
-      | (InternalAxiosRequestConfig & { _retry?: boolean })
+      | (InternalAxiosRequestConfig & { _retry?: boolean; _retryTimeout?: boolean })
       | undefined;
+
+    // Retry once automatically on network timeout (e.g. Render server cold-start)
+    const isTimeout =
+      error.code === "ECONNABORTED" ||
+      error.message?.toLowerCase().includes("timeout") ||
+      !error.response;
+    if (isTimeout && original && !original._retryTimeout) {
+      original._retryTimeout = true;
+      await new Promise((r) => setTimeout(r, 1200));
+      return rawClient(original);
+    }
 
     const status = error.response?.status;
     const isAuthEndpoint = original?.url?.includes("/auth/");
@@ -112,7 +123,7 @@ rawClient.interceptors.response.use(
       original._retry = true;
       isRefreshing = true;
       try {
-        // Refresh reads the HttpOnly cookie; no token travels in JS.
+        // Refresh reads the HttpOnly cookie or X-Refresh-Token fallback
         const access = await refreshAccessToken();
         flushQueue(access);
         original.headers.Authorization = `Bearer ${access}`;
