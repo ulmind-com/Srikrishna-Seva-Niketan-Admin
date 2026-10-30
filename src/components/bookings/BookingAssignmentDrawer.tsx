@@ -104,7 +104,7 @@ export function BookingAssignmentDrawer({
         customerLocationId = convRes.customer.location_id || booking.location_id;
 
         // If customer geocoding returned coordinates and form didn't supply pin, use them
-        if (values.dest_lat == null && convRes.customer.lat != null) {
+        if ((!values.dest_lat || values.dest_lat === "") && convRes.customer.lat != null) {
           values.dest_lat = convRes.customer.lat;
           values.dest_lng = convRes.customer.lng;
         }
@@ -116,6 +116,51 @@ export function BookingAssignmentDrawer({
         customer_id: customerId,
         location_id: values.location_id || customerLocationId,
       };
+
+      // Strip empty strings and NaNs that fail backend validation
+      if (!assignmentPayload.end_date) delete assignmentPayload.end_date;
+      if (
+        assignmentPayload.dest_lat === "" ||
+        assignmentPayload.dest_lat == null ||
+        Number.isNaN(assignmentPayload.dest_lat)
+      ) {
+        delete assignmentPayload.dest_lat;
+      }
+      if (
+        assignmentPayload.dest_lng === "" ||
+        assignmentPayload.dest_lng == null ||
+        Number.isNaN(assignmentPayload.dest_lng)
+      ) {
+        delete assignmentPayload.dest_lng;
+      }
+      if (
+        assignmentPayload.duration_days === "" ||
+        assignmentPayload.duration_days == null ||
+        Number.isNaN(assignmentPayload.duration_days)
+      ) {
+        delete assignmentPayload.duration_days;
+      }
+      if (
+        assignmentPayload.customer_rate === "" ||
+        assignmentPayload.customer_rate == null ||
+        Number.isNaN(assignmentPayload.customer_rate)
+      ) {
+        delete assignmentPayload.customer_rate;
+      }
+      if (
+        assignmentPayload.employee_payout === "" ||
+        assignmentPayload.employee_payout == null ||
+        Number.isNaN(assignmentPayload.employee_payout)
+      ) {
+        delete assignmentPayload.employee_payout;
+      }
+      if (
+        assignmentPayload.other_expense === "" ||
+        assignmentPayload.other_expense == null ||
+        Number.isNaN(assignmentPayload.other_expense)
+      ) {
+        delete assignmentPayload.other_expense;
+      }
 
       const created = await resourceServices.assignments.create(assignmentPayload);
       return { created, customerId };

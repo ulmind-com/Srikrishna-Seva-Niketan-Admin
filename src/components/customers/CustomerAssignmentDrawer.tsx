@@ -76,8 +76,53 @@ export function CustomerAssignmentDrawer({
   }, [customer]);
 
   const createMutation = useMutation({
-    mutationFn: (values: Record<string, unknown>) =>
-      resourceServices.assignments.create(values),
+    mutationFn: (values: Record<string, unknown>) => {
+      const cleanPayload = { ...values };
+      if (!cleanPayload.end_date) delete cleanPayload.end_date;
+      if (
+        cleanPayload.dest_lat === "" ||
+        cleanPayload.dest_lat == null ||
+        Number.isNaN(cleanPayload.dest_lat)
+      ) {
+        delete cleanPayload.dest_lat;
+      }
+      if (
+        cleanPayload.dest_lng === "" ||
+        cleanPayload.dest_lng == null ||
+        Number.isNaN(cleanPayload.dest_lng)
+      ) {
+        delete cleanPayload.dest_lng;
+      }
+      if (
+        cleanPayload.duration_days === "" ||
+        cleanPayload.duration_days == null ||
+        Number.isNaN(cleanPayload.duration_days)
+      ) {
+        delete cleanPayload.duration_days;
+      }
+      if (
+        cleanPayload.customer_rate === "" ||
+        cleanPayload.customer_rate == null ||
+        Number.isNaN(cleanPayload.customer_rate)
+      ) {
+        delete cleanPayload.customer_rate;
+      }
+      if (
+        cleanPayload.employee_payout === "" ||
+        cleanPayload.employee_payout == null ||
+        Number.isNaN(cleanPayload.employee_payout)
+      ) {
+        delete cleanPayload.employee_payout;
+      }
+      if (
+        cleanPayload.other_expense === "" ||
+        cleanPayload.other_expense == null ||
+        Number.isNaN(cleanPayload.other_expense)
+      ) {
+        delete cleanPayload.other_expense;
+      }
+      return resourceServices.assignments.create(cleanPayload);
+    },
     onSuccess: (created) => {
       qc.invalidateQueries({ queryKey: ["assignments"] });
       qc.invalidateQueries({ queryKey: ["customers"] });

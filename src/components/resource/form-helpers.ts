@@ -36,6 +36,7 @@ function fallbackForType(field: FieldConfig): unknown {
     case "tags":
       return [];
     case "number":
+    case "geopoint":
       return undefined;
     case "image":
     case "video":

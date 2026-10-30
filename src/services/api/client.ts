@@ -121,10 +121,16 @@ export function normalizeError(error: unknown): NormalizedError {
         if (e.field) fields[e.field] = e.message;
       }
     }
+    const fieldMsg = Object.entries(fields)
+      .map(([k, v]) => `${k}: ${v.replace(/^Value error,\s*/i, "")}`)
+      .join(" · ");
+
     return {
       status: error.response?.status ?? 0,
       message:
-        envelope?.message ||
+        (envelope?.message === "Validation failed" && fieldMsg
+          ? fieldMsg
+          : envelope?.message) ||
         error.message ||
         "Something went wrong. Please try again.",
       fields: Object.keys(fields).length ? fields : undefined,
