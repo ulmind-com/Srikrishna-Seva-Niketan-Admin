@@ -23,6 +23,27 @@ import { endpoints } from "./endpoints";
 /** In-memory access token for the staff session only. */
 let staffAccess: string | null = null;
 
+// Cross-site fallback refresh token (see admin tokens.ts): used via the
+// X-Refresh-Token header when the browser blocks the third-party refresh cookie.
+const STAFF_REFRESH_KEY = "ssn_staff_refresh";
+
+export function getStoredStaffRefresh(): string | null {
+  try {
+    return localStorage.getItem(STAFF_REFRESH_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredStaffRefresh(token: string | null): void {
+  try {
+    if (token) localStorage.setItem(STAFF_REFRESH_KEY, token);
+    else localStorage.removeItem(STAFF_REFRESH_KEY);
+  } catch {
+    /* ignore storage errors */
+  }
+}
+
 export const staffTokenStore = {
   getAccess: (): string | null => staffAccess,
   setAccess(access: string): void {
@@ -30,6 +51,7 @@ export const staffTokenStore = {
   },
   clear(): void {
     staffAccess = null;
+    setStoredStaffRefresh(null);
   },
 };
 
@@ -54,12 +76,18 @@ rawStaffClient.interceptors.request.use((config: InternalAxiosRequestConfig) => 
  * recurse through the interceptor.
  */
 export async function refreshStaffAccessToken(): Promise<string> {
-  const { data } = await axios.post<ApiEnvelope<{ access_token: string }>>(
-    `${env.API_BASE_URL}${endpoints.staffPortal.refresh}`,
-    null,
-    { withCredentials: true, headers: { "X-CSRF-Token": getCsrfToken() ?? "" } },
-  );
+  const stored = getStoredStaffRefresh();
+  const { data } = await axios.post<
+    ApiEnvelope<{ access_token: string; refresh_token?: string }>
+  >(`${env.API_BASE_URL}${endpoints.staffPortal.refresh}`, null, {
+    withCredentials: true,
+    headers: {
+      "X-CSRF-Token": getCsrfToken() ?? "",
+      ...(stored ? { "X-Refresh-Token": stored } : {}),
+    },
+  });
   const access = data.data.access_token;
+  if (data.data.refresh_token) setStoredStaffRefresh(data.data.refresh_token);
   staffTokenStore.setAccess(access);
   return access;
 }

@@ -1,10 +1,13 @@
 import { endpoints } from "./api/endpoints";
 import { http } from "./api/http";
 import { apiRequest } from "./api/client";
+import { getStoredRefresh } from "./api/tokens";
 import type { User } from "@/types/models";
 
 export interface LoginResponse {
   access_token: string;
+  // Cross-site fallback token (also set as an HttpOnly cookie where allowed).
+  refresh_token?: string;
   token_type: string;
   expires_in: number;
   user: User;
@@ -14,8 +17,16 @@ export const authService = {
   login: (email: string, password: string) =>
     http.post<LoginResponse>(endpoints.auth.login, { email, password }),
 
-  // Refresh token + CSRF travel in cookies/headers; no body needed.
-  logout: () => http.post<null>(endpoints.auth.logout, {}),
+  // Cookie path uses the refresh cookie + CSRF; the X-Refresh-Token header is
+  // the fallback that lets a cross-site session be revoked when the cookie is
+  // blocked by the browser.
+  logout: () =>
+    apiRequest<null>({
+      method: "POST",
+      url: endpoints.auth.logout,
+      data: {},
+      headers: { "X-Refresh-Token": getStoredRefresh() ?? "" },
+    }),
 
   me: () => http.get<User>(endpoints.auth.me),
 

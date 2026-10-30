@@ -1,5 +1,5 @@
 import { endpoints } from "./api/endpoints";
-import { staffRequest } from "./api/staff-client";
+import { staffRequest, getStoredStaffRefresh } from "./api/staff-client";
 import { http } from "./api/http";
 import type {
   DailyRoster,
@@ -10,9 +10,11 @@ import type {
   StaffBranchOption,
 } from "@/types/models";
 
-/** Access token + profile returned by register/login (refresh is cookie-only). */
+/** Access token + profile returned by register/login. The refresh token is set
+ * as an HttpOnly cookie and also returned here as a cross-site fallback. */
 export interface StaffSession {
   access_token: string;
+  refresh_token?: string;
   token_type: string;
   expires_in: number;
   staff: Employee;
@@ -81,7 +83,11 @@ export const staffPortalService = {
     }),
 
   logout: () =>
-    staffRequest<null>({ method: "POST", url: endpoints.staffPortal.logout }),
+    staffRequest<null>({
+      method: "POST",
+      url: endpoints.staffPortal.logout,
+      headers: { "X-Refresh-Token": getStoredStaffRefresh() ?? "" },
+    }),
 
   me: () => staffRequest<Employee>({ method: "GET", url: endpoints.staffPortal.me }),
 

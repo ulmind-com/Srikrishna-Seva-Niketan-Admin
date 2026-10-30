@@ -10,6 +10,7 @@ import {
 import {
   refreshStaffAccessToken,
   registerStaffAuthFailureHandler,
+  setStoredStaffRefresh,
   staffTokenStore,
 } from "@/services/api/staff-client";
 import { staffPortalService } from "@/services/staff-portal.service";
@@ -87,6 +88,7 @@ export function StaffAuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     const session = await staffPortalService.login(email, password);
     staffTokenStore.setAccess(session.access_token);
+    if (session.refresh_token) setStoredStaffRefresh(session.refresh_token);
     setStaff(session.staff);
     return session.staff;
   }, []);
@@ -101,6 +103,7 @@ export function StaffAuthProvider({ children }: { children: ReactNode }) {
     }) => {
       const session = await staffPortalService.register(payload);
       staffTokenStore.setAccess(session.access_token);
+      if (session.refresh_token) setStoredStaffRefresh(session.refresh_token);
       setStaff(session.staff);
       return session.staff;
     },

@@ -6,7 +6,7 @@ import axios, {
 } from "axios";
 import { env } from "@/config/env";
 import type { ApiEnvelope } from "@/types/api";
-import { getCsrfToken, tokenStore } from "./tokens";
+import { getCsrfToken, getStoredRefresh, setStoredRefresh, tokenStore } from "./tokens";
 
 /**
  * Central Axios client with:
@@ -46,15 +46,20 @@ rawClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
  * the new access token; throws if the refresh session is invalid/expired.
  */
 export async function refreshAccessToken(): Promise<string> {
-  const { data } = await axios.post<ApiEnvelope<{ access_token: string }>>(
-    `${env.API_BASE_URL}/auth/refresh`,
-    null,
-    {
-      withCredentials: true,
-      headers: { "X-CSRF-Token": getCsrfToken() ?? "" },
+  const stored = getStoredRefresh();
+  const { data } = await axios.post<
+    ApiEnvelope<{ access_token: string; refresh_token?: string }>
+  >(`${env.API_BASE_URL}/auth/refresh`, null, {
+    withCredentials: true,
+    headers: {
+      "X-CSRF-Token": getCsrfToken() ?? "",
+      // Cross-site fallback when the refresh cookie is blocked by the browser.
+      ...(stored ? { "X-Refresh-Token": stored } : {}),
     },
-  );
+  });
   const access = data.data.access_token;
+  // Rotation: persist the new refresh token for the next reload.
+  if (data.data.refresh_token) setStoredRefresh(data.data.refresh_token);
   tokenStore.setAccess(access);
   return access;
 }

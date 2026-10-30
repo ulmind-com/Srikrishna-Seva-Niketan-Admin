@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { authService } from "@/services/auth.service";
-import { tokenStore } from "@/services/api/tokens";
+import { setStoredRefresh, tokenStore } from "@/services/api/tokens";
 import {
   refreshAccessToken,
   registerAuthFailureHandler,
@@ -57,6 +57,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (email: string, password: string) => {
       const res = await authService.login(email, password);
       tokenStore.setAccess(res.access_token);
+      // Cross-site fallback: keep the refresh token for reloads where the
+      // HttpOnly cookie is blocked by the browser.
+      if (res.refresh_token) setStoredRefresh(res.refresh_token);
       setUser(res.user);
     },
     [setUser]
