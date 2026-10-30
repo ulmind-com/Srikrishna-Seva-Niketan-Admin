@@ -15,6 +15,7 @@ import {
   tokenStore,
 } from "@/services/api/tokens";
 import {
+  isAuthRejection,
   refreshAccessToken,
   registerAuthFailureHandler,
 } from "@/services/api/client";
@@ -129,8 +130,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (active) setUser(me);
           if (active) setIsLoading(false);
           return;
-        } catch {
-          // Token might have expired, try refresh below
+        } catch (err) {
+          // A real 401 means the access token expired -> refresh below.
+          // Any other error (network/timeout/5xx) is transient: keep the
+          // cached session and stop loading, the next call will recover.
+          if (!isAuthRejection(err)) {
+            if (active) setIsLoading(false);
+            return;
+          }
         }
       }
 
@@ -139,9 +146,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await refreshAccessToken();
         const me = await authService.me();
         if (active) setUser(me);
-      } catch {
-        // Both access token and refresh token failed -> session truly expired
-        if (active) clearSession();
+      } catch (err) {
+        // Only clear when the session is genuinely rejected. On a transient
+        // failure keep the user logged in (cached) rather than kicking them
+        // to /login on every slow reload.
+        if (active && isAuthRejection(err)) clearSession();
       } finally {
         if (active) setIsLoading(false);
       }

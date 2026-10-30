@@ -121,6 +121,8 @@ export async function refreshStaffAccessToken(): Promise<string> {
     ApiEnvelope<{ access_token: string; refresh_token?: string }>
   >(`${env.API_BASE_URL}${endpoints.staffPortal.refresh}`, null, {
     withCredentials: true,
+    // Bound the refresh so it can't hang forever on a slow backend.
+    timeout: 90_000,
     headers: {
       "X-CSRF-Token": getCsrfToken() ?? "",
       ...(stored ? { "X-Refresh-Token": stored } : {}),
@@ -130,6 +132,17 @@ export async function refreshStaffAccessToken(): Promise<string> {
   if (data.data.refresh_token) setStoredStaffRefresh(data.data.refresh_token);
   staffTokenStore.setAccess(access);
   return access;
+}
+
+/**
+ * True only for a *genuine* auth rejection (expired/invalid session).
+ * Network errors, timeouts and 5xx are transient — they must NOT log the
+ * nurse out, otherwise a slow backend kicks them to /staff/login on reload.
+ */
+export function isStaffAuthRejection(error: unknown): boolean {
+  if (!axios.isAxiosError(error)) return false;
+  const status = error.response?.status;
+  return status === 401 || status === 403;
 }
 
 let isRefreshing = false;
@@ -203,7 +216,9 @@ rawStaffClient.interceptors.response.use(
       return rawStaffClient(original);
     } catch (refreshError) {
       flushQueue(null);
-      onStaffAuthFailure();
+      // Only force logout on a genuine rejection; keep the session on a
+      // network/timeout failure so the next call can retry.
+      if (isStaffAuthRejection(refreshError)) onStaffAuthFailure();
       return Promise.reject(refreshError);
     } finally {
       isRefreshing = false;

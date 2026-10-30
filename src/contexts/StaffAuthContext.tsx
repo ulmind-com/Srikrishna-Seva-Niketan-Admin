@@ -11,6 +11,7 @@ import {
   getStoredStaffAccess,
   getStoredStaffProfile,
   getStoredStaffRefresh,
+  isStaffAuthRejection,
   refreshStaffAccessToken,
   registerStaffAuthFailureHandler,
   setStoredStaffProfile,
@@ -78,15 +79,21 @@ export function StaffAuthProvider({ children }: { children: ReactNode }) {
       try {
         const profile = await staffPortalService.me();
         if (!cancelled) setStaff(profile);
-      } catch {
-        // Access token might need rotation; try refresh token
+      } catch (err) {
+        // Only a real 401 means the token must rotate; a transient
+        // network/timeout error should keep the cached session as-is.
+        if (!isStaffAuthRejection(err)) {
+          if (!cancelled) setIsLoading(false);
+          return;
+        }
         try {
           await refreshStaffAccessToken();
           const profile = await staffPortalService.me();
           if (!cancelled) setStaff(profile);
-        } catch {
-          // Truly expired or invalid session
-          if (!cancelled) {
+        } catch (refreshErr) {
+          // Clear only when genuinely rejected; keep the nurse logged in on
+          // a transient failure instead of bouncing to login on reload.
+          if (!cancelled && isStaffAuthRejection(refreshErr)) {
             staffTokenStore.clear();
             setStaff(null);
           }

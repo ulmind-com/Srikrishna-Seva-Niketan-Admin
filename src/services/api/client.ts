@@ -51,6 +51,8 @@ export async function refreshAccessToken(): Promise<string> {
     ApiEnvelope<{ access_token: string; refresh_token?: string }>
   >(`${env.API_BASE_URL}/auth/refresh`, null, {
     withCredentials: true,
+    // Bound the refresh so it can't hang forever on a slow backend.
+    timeout: 90_000,
     headers: {
       "X-CSRF-Token": getCsrfToken() ?? "",
       // Cross-site fallback when the refresh cookie is blocked by the browser.
@@ -62,6 +64,17 @@ export async function refreshAccessToken(): Promise<string> {
   if (data.data.refresh_token) setStoredRefresh(data.data.refresh_token);
   tokenStore.setAccess(access);
   return access;
+}
+
+/**
+ * True only for a *genuine* auth rejection (expired/invalid session).
+ * Network errors, timeouts and 5xx are transient — they must NOT log the
+ * user out, otherwise a slow backend kicks the user to /login on reload.
+ */
+export function isAuthRejection(error: unknown): boolean {
+  if (!axios.isAxiosError(error)) return false;
+  const status = error.response?.status;
+  return status === 401 || status === 403;
 }
 
 // ---- Response: transparent refresh on 401 ----
@@ -130,7 +143,9 @@ rawClient.interceptors.response.use(
         return rawClient(original);
       } catch (refreshErr) {
         flushQueue(null);
-        onAuthFailure();
+        // Only force logout when the refresh was genuinely rejected. A
+        // network/timeout failure keeps the session so the next call retries.
+        if (isAuthRejection(refreshErr)) onAuthFailure();
         return Promise.reject(refreshErr);
       } finally {
         isRefreshing = false;
