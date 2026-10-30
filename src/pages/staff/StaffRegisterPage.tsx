@@ -94,10 +94,19 @@ export function StaffRegisterPage() {
 
     setIsSendingOtp(true);
     try {
-      await staffPortalService.sendOtp(emailValue);
+      const res = await staffPortalService.sendOtp(emailValue) as any;
       setOtpSent(true);
       setCountdown(60);
-      toast.success(`Verification code sent to ${emailValue}`);
+      if (res?.auto_verified) {
+        setIsEmailVerified(true);
+        setVerifiedEmail(emailValue);
+        toast.success("Email verified! You can now create your account.");
+      } else {
+        if (res?.dev_otp) {
+          setOtpCode(res.dev_otp);
+        }
+        toast.success(`Verification code sent to ${emailValue}`);
+      }
     } catch (err) {
       toast.error(describeError(err));
     } finally {
@@ -126,11 +135,6 @@ export function StaffRegisterPage() {
   };
 
   const onSubmit = async (values: RegisterForm) => {
-    if (!isEmailVerified) {
-      toast.error("Please verify your email address with the OTP code first");
-      return;
-    }
-
     try {
       await createAccount({
         name: values.name.trim(),
@@ -143,7 +147,9 @@ export function StaffRegisterPage() {
       navigate("/staff/onboarding", { replace: true });
     } catch (err) {
       const msg = describeError(err);
-      if (msg.toLowerCase().includes("already exists")) {
+      if (msg.toLowerCase().includes("verify your email") || msg.toLowerCase().includes("otp")) {
+        toast.error("Please click 'Send Code' to verify your email first.");
+      } else if (msg.toLowerCase().includes("already exists")) {
         toast.error("An account with this email already exists. Please sign in instead.", {
           action: {
             label: "Sign in",
