@@ -74,13 +74,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(async () => {
-    try {
-      await authService.logout();
-    } catch {
+    // Fire the server-side revoke in the background (it captures the current
+    // refresh token synchronously), then clear local state immediately so
+    // sign-out is instant even when the backend is slow or unreachable.
+    authService.logout().catch(() => {
       /* ignore network errors on logout */
-    } finally {
-      clearSession();
-    }
+    });
+    clearSession();
   }, [clearSession]);
 
   const refreshUser = useCallback(async () => {
