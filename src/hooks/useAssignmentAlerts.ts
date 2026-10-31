@@ -80,6 +80,9 @@ export function stopDutyAlert() {
     try {
       sharedAudio.pause();
       sharedAudio.currentTime = 0;
+      sharedAudio.src = "";
+      sharedAudio.load();
+      sharedAudio = null;
     } catch {}
   }
 

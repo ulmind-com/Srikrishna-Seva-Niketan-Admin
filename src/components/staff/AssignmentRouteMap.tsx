@@ -256,7 +256,7 @@ export function AssignmentRouteMap({ assignment }: { assignment: StaffAssignment
     return DEFAULT_CENTER;
   }, [route?.dest_lat, route?.dest_lng, assignment]);
 
-  // 1. Fetch real road-following directions (Ola Maps -> OSRM -> Haversine fallback)
+  // 1. Fetch real road-following directions (Instant synchronous baseline -> Ola Maps -> OSRM)
   const fetchDirections = useCallback(
     async (nurseLat: number, nurseLng: number, pref: RoutePreference) => {
       if (inFlightRouteRef.current) return;
@@ -266,23 +266,64 @@ export function AssignmentRouteMap({ assignment }: { assignment: StaffAssignment
       const targetLat = dest ? dest[0] : DEFAULT_CENTER[0];
       const targetLng = dest ? dest[1] : DEFAULT_CENTER[1];
 
-      try {
-        // Step 1: Try backend Ola Maps routing
-        const res = await staffPortalService
-          .route(assignment.id, nurseLat, nurseLng, pref)
-          .catch(() => null);
+      // Instant synchronous Haversine calculation: metrics NEVER show blank --:--
+      const baseDistM = Math.max(50, Math.round(haversineMeters([nurseLat, nurseLng], [targetLat, targetLng])));
+      const baseDurS = Math.max(60, Math.round(baseDistM / 6.5)); // ~23 km/h average speed
+      const baseReadableDist = baseDistM < 1000 ? `${baseDistM} m` : `${(baseDistM / 1000).toFixed(1)} km`;
+      const baseReadableDur = `${Math.max(1, Math.round(baseDurS / 60))} min`;
 
-        if (res && res.geometry && res.geometry.length > 1) {
-          setRoute(res);
-          lastRoutedCoordRef.current = [nurseLat, nurseLng];
-          lastRouteTimeRef.current = Date.now();
-          return;
+      setRoute((prev) => {
+        if (prev && prev.geometry && prev.geometry.length > 2) {
+          return {
+            ...prev,
+            distance_m: baseDistM,
+            duration_s: baseDurS,
+            readable_distance: baseReadableDist,
+            readable_duration: baseReadableDur,
+          };
         }
+        return {
+          distance_m: baseDistM,
+          duration_s: baseDurS,
+          readable_distance: baseReadableDist,
+          readable_duration: baseReadableDur,
+          geometry: [
+            [nurseLng, nurseLat],
+            [targetLng, targetLat],
+          ],
+          dest_lat: targetLat,
+          dest_lng: targetLng,
+          preference: pref,
+          steps: [
+            {
+              instruction: `Proceed along route towards ${assignment.place_name || assignment.customer_name}`,
+              distance_m: baseDistM,
+              maneuver: "straight",
+            },
+          ],
+        };
+      });
 
-        // Step 2: Fallback to OSRM road router
+      try {
+        // Step 1: Try backend Ola Maps routing with 4s timeout
+        try {
+          const res = await Promise.race([
+            staffPortalService.route(assignment.id, nurseLat, nurseLng, pref),
+            new Promise<null>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 4000)),
+          ]).catch(() => null);
+
+          if (res && res.geometry && res.geometry.length > 1) {
+            setRoute(res);
+            lastRoutedCoordRef.current = [nurseLat, nurseLng];
+            lastRouteTimeRef.current = Date.now();
+            return;
+          }
+        } catch {}
+
+        // Step 2: Fallback to OSRM road router with 4s timeout
         try {
           const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${nurseLng},${nurseLat};${targetLng},${targetLat}?overview=full&geometries=geojson&steps=true`;
-          const resp = await fetch(osrmUrl);
+          const resp = await fetch(osrmUrl, { signal: AbortSignal.timeout(4000) });
           if (resp.ok) {
             const data = await resp.json();
             if (data?.routes?.[0]) {
@@ -316,29 +357,7 @@ export function AssignmentRouteMap({ assignment }: { assignment: StaffAssignment
           }
         } catch {}
 
-        // Step 3: Haversine mathematical calculation so metrics NEVER show blank --:--
-        const distM = Math.round(haversineMeters([nurseLat, nurseLng], [targetLat, targetLng]));
-        const durS = Math.round(distM / 6.5); // ~23 km/h
-        setRoute({
-          distance_m: distM,
-          duration_s: durS,
-          readable_distance: distM < 1000 ? `${distM} m` : `${(distM / 1000).toFixed(1)} km`,
-          readable_duration: `${Math.max(1, Math.round(durS / 60))} min`,
-          geometry: [
-            [nurseLng, nurseLat],
-            [targetLng, targetLat],
-          ],
-          dest_lat: targetLat,
-          dest_lng: targetLng,
-          preference: pref,
-          steps: [
-            {
-              instruction: `Proceed along route towards ${assignment.place_name || assignment.customer_name}`,
-              distance_m: distM,
-              maneuver: "straight",
-            },
-          ],
-        });
+        // Baseline is already set above, so mark coordinates timestamp
         lastRoutedCoordRef.current = [nurseLat, nurseLng];
         lastRouteTimeRef.current = Date.now();
       } catch {

@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, CalendarClock, CheckCheck, Loader2 } from "lucide-react";
 import { staffPortalService } from "@/services/staff-portal.service";
 import { Badge } from "@/components/ui/badge";
-import { playDutyAlertSound } from "@/utils/audioAlert";
 
 /** Relative "2h ago" style time for a notification. */
 function timeAgo(iso?: string | null): string {
@@ -46,10 +45,6 @@ export function StaffNotifications() {
         prevUnreadRef.current = unread;
       }
       return;
-    }
-
-    if (unread > prevUnreadRef.current) {
-      playDutyAlertSound();
     }
     prevUnreadRef.current = unread;
   }, [unread, feed.isLoading]);

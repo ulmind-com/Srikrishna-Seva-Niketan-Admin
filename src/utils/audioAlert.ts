@@ -75,8 +75,27 @@ export function stopAnyActiveAudio(): void {
     try {
       activeAudio.pause();
       activeAudio.currentTime = 0;
+      activeAudio.src = "";
+      activeAudio.load();
     } catch {}
     activeAudio = null;
+  }
+  if (typeof document !== "undefined") {
+    try {
+      document.querySelectorAll("audio").forEach((el) => {
+        try {
+          el.pause();
+          el.currentTime = 0;
+          el.src = "";
+          el.load();
+        } catch {}
+      });
+    } catch {}
+  }
+  if (typeof window !== "undefined" && "speechSynthesis" in window) {
+    try {
+      window.speechSynthesis.cancel();
+    } catch {}
   }
 }
 

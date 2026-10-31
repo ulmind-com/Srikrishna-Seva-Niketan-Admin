@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { BellRing, CalendarCheck, CheckCircle2, AlertTriangle, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { env } from "@/config/env";
@@ -87,6 +88,7 @@ async function fetchLatestNotification(): Promise<{
 // ─── Component ───────────────────────────────────────────────
 export function LiveNotificationListener() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const isAlertingRef = useRef(false);
   const lastAlertedIdRef = useRef<string | null>(null);
 
@@ -110,6 +112,11 @@ export function LiveNotificationListener() {
 
       // Don't re-alert for the exact same dismissed notification in memory
       if (lastAlertedIdRef.current === latest.id) return;
+
+      // Invalidate relevant query caches immediately on any incoming event so tables refresh automatically
+      qc.invalidateQueries({ queryKey: ["bookings"] });
+      qc.invalidateQueries({ queryKey: ["assignments"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
 
       const titleLower = (latest.title || "").toLowerCase();
       const messageLower = (latest.message || "").toLowerCase();
@@ -163,7 +170,7 @@ export function LiveNotificationListener() {
     } catch (err) {
       console.warn("[LiveNotif] Poll error:", err);
     }
-  }, []);
+  }, [qc]);
 
   useEffect(() => {
     poll();
