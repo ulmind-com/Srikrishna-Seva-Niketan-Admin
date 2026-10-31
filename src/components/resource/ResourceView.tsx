@@ -110,7 +110,6 @@ export function ResourceView<T extends { id: string }>({
   const listQuery = useQuery({
     queryKey: [config.queryKey, "list", params],
     queryFn: () => config.service.list(params),
-    refetchInterval: 8_000,
   });
 
   const saveMutation = useMutation({

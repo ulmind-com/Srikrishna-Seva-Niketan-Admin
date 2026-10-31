@@ -83,7 +83,7 @@ export function BookingsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["bookings", "list", params],
     queryFn: () => bookingService.list(params),
-    refetchInterval: 6_000,
+    refetchInterval: 20_000,
   });
 
   const items = data?.items ?? [];
