@@ -19,18 +19,36 @@ function timeAgo(iso?: string | null): string {
 }
 
 /**
+ * Hook to get staff notification unread badge count for header bell.
+ */
+export function useStaffNotificationCount() {
+  const feed = useQuery({
+    queryKey: ["staff-notifications"],
+    queryFn: () => staffPortalService.notifications(),
+    refetchInterval: 15_000,
+  });
+  const items = feed.data?.items ?? [];
+  const unread = items.filter((n) => !n.is_read).length;
+  return { unread, count: items.length, isLoading: feed.isLoading };
+}
+
+interface StaffNotificationsProps {
+  mode?: "inline" | "popup";
+  onClose?: () => void;
+}
+
+/**
  * The staff member's own live notification feed.
  *
- * Polls every 20s so a new duty assignment (or a status change made by the
- * office) appears here on its own, with an unread count the nurse can clear.
+ * Supports inline card mode and popup sheet mode.
  */
-export function StaffNotifications() {
+export function StaffNotifications({ mode = "inline", onClose }: StaffNotificationsProps) {
   const qc = useQueryClient();
 
   const feed = useQuery({
     queryKey: ["staff-notifications"],
     queryFn: () => staffPortalService.notifications(),
-    refetchInterval: 20_000,
+    refetchInterval: 15_000,
   });
 
   const items = feed.data?.items ?? [];
@@ -58,8 +76,8 @@ export function StaffNotifications() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["staff-notifications"] }),
   });
 
-  return (
-    <section className="no-print rounded-2xl border border-border bg-card shadow-soft">
+  const content = (
+    <>
       <div className="flex items-center justify-between gap-2 border-b border-border p-4">
         <div className="flex items-center gap-2">
           <div className="relative">
@@ -93,12 +111,15 @@ export function StaffNotifications() {
           No notifications yet. New duty assignments will appear here.
         </p>
       ) : (
-        <ul className="max-h-80 divide-y divide-border overflow-y-auto">
+        <ul className={`${mode === "popup" ? "max-h-[70vh]" : "max-h-80"} divide-y divide-border overflow-y-auto`}>
           {items.map((n) => (
             <li key={n.id}>
               <button
                 type="button"
-                onClick={() => !n.is_read && markRead.mutate(n.id)}
+                onClick={() => {
+                  if (!n.is_read) markRead.mutate(n.id);
+                  onClose?.();
+                }}
                 className={`flex w-full items-start gap-3 p-4 text-left transition hover:bg-muted/40 ${
                   n.is_read ? "opacity-70" : ""
                 }`}
@@ -128,6 +149,16 @@ export function StaffNotifications() {
           ))}
         </ul>
       )}
+    </>
+  );
+
+  if (mode === "popup") {
+    return <div className="no-print">{content}</div>;
+  }
+
+  return (
+    <section className="no-print rounded-2xl border border-border bg-card shadow-soft">
+      {content}
     </section>
   );
 }

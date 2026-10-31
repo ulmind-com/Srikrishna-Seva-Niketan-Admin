@@ -46,6 +46,25 @@ const SHIFT_LABEL: Record<string, string> = {
   custom: "Custom",
 };
 
+const COMPLETED_DUTIES_KEY = "ssn_completed_duties";
+
+function getCompletedDuties(): Set<string> {
+  try {
+    const raw = sessionStorage.getItem(COMPLETED_DUTIES_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function saveCompletedDuty(id: string) {
+  try {
+    const s = getCompletedDuties();
+    s.add(id);
+    sessionStorage.setItem(COMPLETED_DUTIES_KEY, JSON.stringify([...s]));
+  } catch {}
+}
+
 function fmtDate(iso?: string | null) {
   if (!iso) return "Ongoing";
   try {
@@ -89,8 +108,9 @@ export function AssignmentDetailSheet({ assignment, open, onOpenChange }: Props)
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmCollectOpen, setConfirmCollectOpen] = useState(false);
 
+  const isLocallyCompleted = assignment?.id ? getCompletedDuties().has(assignment.id) : false;
   const isPostpaid = assignment?.payment_type === "postpaid";
-  const isCompleted = assignment?.status === "completed";
+  const isCompleted = assignment?.status === "completed" || isLocallyCompleted;
   const isPaymentCollected =
     assignment?.payment_status === "paid" || assignment?.payment_status === "received";
   const collectAmount = assignment?.collect_amount ?? 0;
@@ -105,6 +125,17 @@ export function AssignmentDetailSheet({ assignment, open, onOpenChange }: Props)
       if (assignment) {
         assignment.payment_status = "paid";
       }
+      qc.setQueryData(["staff-assignments"], (old: any) => {
+        if (!old || !old.items) return old;
+        return {
+          ...old,
+          items: old.items.map((item: StaffAssignment) =>
+            item.id === assignment?.id
+              ? { ...item, payment_status: "paid" }
+              : item
+          ),
+        };
+      });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["staff-assignments"] });
@@ -120,7 +151,11 @@ export function AssignmentDetailSheet({ assignment, open, onOpenChange }: Props)
       );
     },
     onError: (err: any) => {
-      toast.error(err?.message || "Could not record payment. Please try again.");
+      const msg =
+        err?.message === "Network Error"
+          ? "সার্ভারের সাথে কানেক্ট হচ্ছে... অনুগ্রহ করে ২ সেকেন্ড পর আবার বাটনে ট্যাপ করুন।"
+          : err?.message || "Could not record payment. Please try again.";
+      toast.error(msg);
       qc.invalidateQueries({ queryKey: ["staff-assignments"] });
     },
   });
@@ -137,11 +172,27 @@ export function AssignmentDetailSheet({ assignment, open, onOpenChange }: Props)
       stopDutyAlert();
       // 2. Close confirmation modal right away
       setConfirmOpen(false);
-      // 3. Optimistic local update
+      // 3. Optimistic local update & persist in session storage
       if (assignment) {
+        saveCompletedDuty(assignment.id);
         assignment.status = "completed";
         if (isPostpaid) assignment.payment_status = "paid";
       }
+      qc.setQueryData(["staff-assignments"], (old: any) => {
+        if (!old || !old.items) return old;
+        return {
+          ...old,
+          items: old.items.map((item: StaffAssignment) =>
+            item.id === assignment?.id
+              ? {
+                  ...item,
+                  status: "completed",
+                  ...(isPostpaid ? { payment_status: "paid" } : {}),
+                }
+              : item
+          ),
+        };
+      });
     },
     onSuccess: () => {
       stopDutyAlert();
@@ -155,7 +206,11 @@ export function AssignmentDetailSheet({ assignment, open, onOpenChange }: Props)
       });
     },
     onError: (err: any) => {
-      toast.error(err?.message || "Could not complete assignment. Please try again.");
+      const msg =
+        err?.message === "Network Error"
+          ? "সার্ভারের সাথে কানেক্ট হচ্ছে... অনুগ্রহ করে ২ সেকেন্ড পর আবার বাটনে ট্যাপ করুন।"
+          : err?.message || "Could not complete assignment. Please try again.";
+      toast.error(msg);
       qc.invalidateQueries({ queryKey: ["staff-assignments"] });
     },
   });

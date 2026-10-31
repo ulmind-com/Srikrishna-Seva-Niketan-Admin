@@ -40,7 +40,19 @@ export function StaffDuties() {
     queryFn: () => staffPortalService.assignments(),
     refetchInterval: 6_000,
   });
-  const accepted = (duties.data?.items ?? []).filter((a) => a.acceptance_status === "accepted");
+
+  let locallyCompleted: Set<string> = new Set();
+  try {
+    const raw = sessionStorage.getItem("ssn_completed_duties");
+    if (raw) locallyCompleted = new Set(JSON.parse(raw));
+  } catch {}
+
+  const accepted = (duties.data?.items ?? []).filter(
+    (a) => a.acceptance_status === "accepted"
+  );
+  const activeDuties = accepted.filter(
+    (a) => a.status !== "completed" && !locallyCompleted.has(a.id)
+  );
 
   const ringing = alerts.pending[0];
 
@@ -61,48 +73,78 @@ export function StaffDuties() {
         />
       )}
 
-      {accepted.length > 0 && (
-        <section className="no-print rounded-2xl border border-border bg-card shadow-soft">
-          <div className="border-b border-border p-4">
-            <h2 className="text-sm font-semibold">My duties</h2>
+      {accepted.length === 0 ? (
+        <div className="rounded-3xl border border-border/80 bg-card p-6 sm:p-8 text-center shadow-soft">
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-primary/10 text-primary mb-3">
+            <CalendarClock className="h-6 w-6" />
+          </div>
+          <h3 className="text-sm sm:text-base font-bold text-foreground">
+            বর্তমানে কোনো রানিং ডিউটি নেই
+          </h3>
+          <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+            অফিস থেকে নতুন রোগী বা ডিউটি অ্যাসাইন করা মাত্রই আপনার ফোনে স্বয়ংক্রিয় অ্যালার্ম ও নোটিফিকেশন বেজে উঠবে।
+          </p>
+        </div>
+      ) : (
+        <section className="no-print rounded-3xl border border-border/80 bg-card shadow-soft overflow-hidden">
+          <div className="border-b border-border p-4 flex items-center justify-between">
+            <h2 className="text-sm font-bold text-foreground">
+              অ্যাক্টিভ ডিউটি (Current Assignments)
+            </h2>
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+              {activeDuties.length} Active
+            </span>
           </div>
           <ul className="divide-y divide-border">
-            {accepted.map((a) => (
-              <li key={a.id}>
-                <button
-                  type="button"
-                  onClick={() => setSheetAssignment(a)}
-                  className="flex w-full items-center gap-3 p-4 text-left transition hover:bg-muted/40"
-                >
-                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
-                    <CalendarClock className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="truncate text-sm font-semibold">{a.customer_name}</p>
-                      {a.status === "completed" ? (
-                        <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-500 border border-emerald-500/20">
-                          ✓ Completed
-                        </span>
-                      ) : a.payment_type === "postpaid" ? (
-                        <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-500 border border-amber-500/20">
-                          Postpaid · Cash: ₹{(a.collect_amount ?? 0).toLocaleString()}
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center rounded-full bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold text-cyan-500 border border-cyan-500/20">
-                          Prepaid
-                        </span>
-                      )}
+            {accepted.map((a) => {
+              const isCompleted = a.status === "completed" || locallyCompleted.has(a.id);
+              return (
+                <li key={a.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSheetAssignment(a)}
+                    className="flex w-full items-center gap-3.5 p-4 text-left transition hover:bg-muted/40 active:bg-muted/60"
+                  >
+                    <div
+                      className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${
+                        isCompleted
+                          ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                          : "bg-primary/10 text-primary border border-primary/20"
+                      }`}
+                    >
+                      <CalendarClock className="h-5 w-5" />
                     </div>
-                    <p className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
-                      <MapPin className="h-3 w-3" />
-                      {PLACE_LABEL[a.place_type] ?? a.place_type} · from {fmtDate(a.start_date)}
-                    </p>
-                  </div>
-                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                </button>
-              </li>
-            ))}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="truncate text-sm font-bold text-foreground">
+                          {a.customer_name}
+                        </p>
+                        {isCompleted ? (
+                          <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-500 border border-emerald-500/20">
+                            ✓ সম্পন্ন (Completed)
+                          </span>
+                        ) : a.payment_type === "postpaid" ? (
+                          <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-500 border border-amber-500/20">
+                            Postpaid · Cash: ₹{(a.collect_amount ?? 0).toLocaleString()}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center rounded-full bg-cyan-500/10 px-2 py-0.5 text-[10px] font-bold text-cyan-500 border border-cyan-500/20">
+                            Prepaid
+                          </span>
+                        )}
+                      </div>
+                      <p className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5 truncate">
+                        <MapPin className="h-3.5 w-3.5 shrink-0" />
+                        <span>
+                          {PLACE_LABEL[a.place_type] ?? a.place_type} · from {fmtDate(a.start_date)}
+                        </span>
+                      </p>
+                    </div>
+                    <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground/60" />
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}

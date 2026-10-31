@@ -453,28 +453,56 @@ export function AssignmentRouteMap({ assignment }: { assignment: StaffAssignment
     [fetchDirections, preference, isNavLocked, panToNurse, heading, isWalking]
   );
 
-  const handlePositionError = useCallback((err: GeolocationPositionError) => {
-    switch (err.code) {
-      case err.PERMISSION_DENIED:
-        setGeoState("denied");
-        setGeoErrorMsg("Location permission denied. Please allow location access in browser settings.");
-        break;
-      case err.POSITION_UNAVAILABLE:
-        setGeoState("unavailable");
-        setGeoErrorMsg("GPS signal unavailable. Please ensure device location is switched on.");
-        break;
-      case err.TIMEOUT:
-        setGeoState("timeout");
-        setGeoErrorMsg("Location request timed out. Retrying GPS lock…");
-        break;
-      default:
-        setGeoState("unavailable");
-        setGeoErrorMsg("Unable to determine GPS location.");
-    }
-  }, []);
+  const handlePositionError = useCallback(
+    (err: GeolocationPositionError) => {
+      if (err.code === err.TIMEOUT || err.code === err.POSITION_UNAVAILABLE) {
+        // Fallback: try standard accuracy (cell/WiFi network) if high-accuracy GPS timed out indoors
+        if ("geolocation" in navigator) {
+          navigator.geolocation.getCurrentPosition(
+            handlePositionUpdate,
+            () => {
+              setGeoState("unavailable");
+              setGeoErrorMsg("GPS unavailable indoors. Showing route from branch office.");
+              fetchDirections(DEFAULT_CENTER[0], DEFAULT_CENTER[1], preference);
+            },
+            { enableHighAccuracy: false, timeout: 8000, maximumAge: 30000 }
+          );
+          return;
+        }
+      }
+
+      switch (err.code) {
+        case err.PERMISSION_DENIED:
+          setGeoState("denied");
+          setGeoErrorMsg("Location permission denied. Showing route from branch office.");
+          fetchDirections(DEFAULT_CENTER[0], DEFAULT_CENTER[1], preference);
+          break;
+        case err.POSITION_UNAVAILABLE:
+          setGeoState("unavailable");
+          setGeoErrorMsg("GPS signal unavailable. Showing route from branch office.");
+          fetchDirections(DEFAULT_CENTER[0], DEFAULT_CENTER[1], preference);
+          break;
+        case err.TIMEOUT:
+          setGeoState("timeout");
+          setGeoErrorMsg("GPS lock timed out. Showing route from branch office.");
+          fetchDirections(DEFAULT_CENTER[0], DEFAULT_CENTER[1], preference);
+          break;
+        default:
+          setGeoState("unavailable");
+          setGeoErrorMsg("Unable to determine GPS location.");
+          fetchDirections(DEFAULT_CENTER[0], DEFAULT_CENTER[1], preference);
+      }
+    },
+    [fetchDirections, handlePositionUpdate, preference]
+  );
 
   // 4. Initialize Geolocation watch & immediate kickstart
   useEffect(() => {
+    // Immediate baseline route calculation so metrics NEVER show --:--
+    const initLat = origin ? origin[0] : DEFAULT_CENTER[0];
+    const initLng = origin ? origin[1] : DEFAULT_CENTER[1];
+    fetchDirections(initLat, initLng, preference);
+
     if (!("geolocation" in navigator)) {
       setGeoState("denied");
       setGeoErrorMsg("Geolocation is not supported by your browser.");
@@ -490,7 +518,7 @@ export function AssignmentRouteMap({ assignment }: { assignment: StaffAssignment
     // Immediate initial fix
     navigator.geolocation.getCurrentPosition(handlePositionUpdate, handlePositionError, {
       enableHighAccuracy: true,
-      timeout: 10_000,
+      timeout: 8_000,
       maximumAge: 10_000,
     });
 
@@ -500,7 +528,7 @@ export function AssignmentRouteMap({ assignment }: { assignment: StaffAssignment
       handlePositionError,
       {
         enableHighAccuracy: true,
-        timeout: 15_000,
+        timeout: 12_000,
         maximumAge: 10_000,
       }
     );

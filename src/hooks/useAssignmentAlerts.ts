@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { staffPortalService, type StaffAssignment } from "@/services/staff-portal.service";
 import { stopAnyActiveAudio } from "@/utils/audioAlert";
 
@@ -11,6 +11,24 @@ let sharedAudioCtx: AudioContext | null = null;
 let synthInterval: any = null;
 let isAlertActive = false;
 let activeOneTouch: (() => void) | null = null;
+
+/** Dismissed IDs persist in session so they survive re-renders and poll cycles. */
+const DISMISSED_KEY = "ssn_dismissed_assignments";
+
+function getDismissedSet(): Set<string> {
+  try {
+    const raw = sessionStorage.getItem(DISMISSED_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function saveDismissedSet(s: Set<string>) {
+  try {
+    sessionStorage.setItem(DISMISSED_KEY, JSON.stringify([...s]));
+  } catch {}
+}
 
 /** Initialize or get the shared HTMLAudioElement. */
 function getSharedAudio(): HTMLAudioElement {
@@ -202,12 +220,14 @@ export interface AssignmentAlerts {
  * on loop until none remain or duty is accepted/dismissed.
  */
 export function useAssignmentAlerts(enabled: boolean): AssignmentAlerts {
-  const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => new Set());
+  const qc = useQueryClient();
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => getDismissedSet());
+  const cooldownRef = useRef(false);
 
   const q = useQuery({
     queryKey: ["staff-pending-assignments"],
     queryFn: () => staffPortalService.assignments(true),
-    refetchInterval: 10_000,
+    refetchInterval: () => (cooldownRef.current ? false : 10_000),
     enabled,
   });
 
@@ -217,7 +237,7 @@ export function useAssignmentAlerts(enabled: boolean): AssignmentAlerts {
   const [needsGesture, setNeedsGesture] = useState(false);
 
   useEffect(() => {
-    if (pendingCount > 0) {
+    if (pendingCount > 0 && !cooldownRef.current) {
       playDutyAlert().then((started) => {
         setNeedsGesture(!started);
       });
@@ -240,18 +260,55 @@ export function useAssignmentAlerts(enabled: boolean): AssignmentAlerts {
 
   const dismiss = useCallback((id?: string) => {
     stopDutyAlert();
-    if (id) {
-      setDismissedIds((prev) => new Set(prev).add(id));
-    } else {
-      // dismiss all currently pending
-      setDismissedIds(new Set(rawPending.map((p) => p.id)));
-    }
-  }, [rawPending]);
+    setDismissedIds((prev) => {
+      const next = new Set(prev);
+      if (id) {
+        next.add(id);
+      } else {
+        rawPending.forEach((p) => next.add(p.id));
+      }
+      saveDismissedSet(next);
+      return next;
+    });
+
+    // Optimistically evict dismissed duty from React Query pending cache
+    qc.setQueryData(["staff-pending-assignments"], (old: any) => {
+      if (!old || !old.items) return old;
+      const items = old.items.filter((p: StaffAssignment) => (id ? p.id !== id : false));
+      return { ...old, items, total: items.length };
+    });
+
+    // Pause polling for 15s to let backend process the accept/decline
+    cooldownRef.current = true;
+    qc.cancelQueries({ queryKey: ["staff-pending-assignments"] });
+    setTimeout(() => {
+      cooldownRef.current = false;
+      qc.invalidateQueries({ queryKey: ["staff-pending-assignments"] });
+      qc.invalidateQueries({ queryKey: ["staff-assignments"] });
+    }, 15_000);
+  }, [rawPending, qc]);
 
   const stop = useCallback(() => {
     stopDutyAlert();
-    setDismissedIds(new Set(rawPending.map((p) => p.id)));
-  }, [rawPending]);
+    setDismissedIds((prev) => {
+      const next = new Set(prev);
+      rawPending.forEach((p) => next.add(p.id));
+      saveDismissedSet(next);
+      return next;
+    });
+
+    qc.setQueryData(["staff-pending-assignments"], (old: any) => {
+      if (!old) return old;
+      return { ...old, items: [], total: 0 };
+    });
+
+    cooldownRef.current = true;
+    qc.cancelQueries({ queryKey: ["staff-pending-assignments"] });
+    setTimeout(() => {
+      cooldownRef.current = false;
+      qc.invalidateQueries({ queryKey: ["staff-pending-assignments"] });
+    }, 15_000);
+  }, [rawPending, qc]);
 
   return { pending, needsGesture, enableSound, stop, dismiss, isLoading: q.isLoading };
 }

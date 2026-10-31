@@ -156,24 +156,33 @@ export function BookingAssignmentDrawer({
         delete assignmentPayload.duration_days;
       }
       if (
-        assignmentPayload.customer_rate === "" ||
-        assignmentPayload.customer_rate == null ||
-        Number.isNaN(assignmentPayload.customer_rate)
+        assignmentPayload.customer_rate !== undefined &&
+        assignmentPayload.customer_rate !== ""
       ) {
+        const n = Number(assignmentPayload.customer_rate);
+        if (!Number.isNaN(n)) assignmentPayload.customer_rate = Math.round(n);
+        else delete assignmentPayload.customer_rate;
+      } else {
         delete assignmentPayload.customer_rate;
       }
       if (
-        assignmentPayload.employee_payout === "" ||
-        assignmentPayload.employee_payout == null ||
-        Number.isNaN(assignmentPayload.employee_payout)
+        assignmentPayload.employee_payout !== undefined &&
+        assignmentPayload.employee_payout !== ""
       ) {
+        const n = Number(assignmentPayload.employee_payout);
+        if (!Number.isNaN(n)) assignmentPayload.employee_payout = Math.round(n);
+        else delete assignmentPayload.employee_payout;
+      } else {
         delete assignmentPayload.employee_payout;
       }
       if (
-        assignmentPayload.other_expense === "" ||
-        assignmentPayload.other_expense == null ||
-        Number.isNaN(assignmentPayload.other_expense)
+        assignmentPayload.other_expense !== undefined &&
+        assignmentPayload.other_expense !== ""
       ) {
+        const n = Number(assignmentPayload.other_expense);
+        if (!Number.isNaN(n)) assignmentPayload.other_expense = Math.round(n);
+        else delete assignmentPayload.other_expense;
+      } else {
         delete assignmentPayload.other_expense;
       }
 
