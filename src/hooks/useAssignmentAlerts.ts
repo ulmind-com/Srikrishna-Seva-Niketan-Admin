@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { staffPortalService, type StaffAssignment } from "@/services/staff-portal.service";
+import { stopAnyActiveAudio } from "@/utils/audioAlert";
 
 /** The ring tone lives in public/. The filename has spaces — encode them. */
 const SOUND_URL = "/new%20assignments%20comming.mp3";
@@ -9,6 +10,7 @@ let sharedAudio: HTMLAudioElement | null = null;
 let sharedAudioCtx: AudioContext | null = null;
 let synthInterval: any = null;
 let isAlertActive = false;
+let activeOneTouch: (() => void) | null = null;
 
 /** Initialize or get the shared HTMLAudioElement. */
 function getSharedAudio(): HTMLAudioElement {
@@ -65,16 +67,33 @@ function playSynthBeep() {
 /** Immediately stop ALL alert sounds (audio file + synthetic beeps) and vibrations. */
 export function stopDutyAlert() {
   isAlertActive = false;
+
+  // Remove any pending one-touch autoplay resume listeners
+  if (activeOneTouch && typeof window !== "undefined") {
+    window.removeEventListener("touchstart", activeOneTouch, true);
+    window.removeEventListener("pointerdown", activeOneTouch, true);
+    window.removeEventListener("click", activeOneTouch, true);
+    activeOneTouch = null;
+  }
+
   if (sharedAudio) {
     try {
       sharedAudio.pause();
       sharedAudio.currentTime = 0;
     } catch {}
   }
+
+  // Cancel any general audio and speech synthesis
+  stopAnyActiveAudio();
+  if (typeof window !== "undefined" && "speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
+
   if (synthInterval) {
     clearInterval(synthInterval);
     synthInterval = null;
   }
+
   if (typeof navigator !== "undefined" && navigator.vibrate) {
     try {
       navigator.vibrate(0);
@@ -129,7 +148,9 @@ export function playDutyAlert(): Promise<boolean> {
           window.removeEventListener("touchstart", oneTouch, true);
           window.removeEventListener("pointerdown", oneTouch, true);
           window.removeEventListener("click", oneTouch, true);
+          if (activeOneTouch === oneTouch) activeOneTouch = null;
         };
+        activeOneTouch = oneTouch;
         window.addEventListener("touchstart", oneTouch, { capture: true, once: true });
         window.addEventListener("pointerdown", oneTouch, { capture: true, once: true });
         window.addEventListener("click", oneTouch, { capture: true, once: true });
@@ -169,14 +190,17 @@ export interface AssignmentAlerts {
   needsGesture: boolean;
   enableSound: () => void;
   stop: () => void;
+  dismiss: (id?: string) => void;
   isLoading: boolean;
 }
 
 /**
  * Polls the nurse's pending duties and rings `new assignments comming.mp3`
- * on loop until none remain.
+ * on loop until none remain or duty is accepted/dismissed.
  */
 export function useAssignmentAlerts(enabled: boolean): AssignmentAlerts {
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => new Set());
+
   const q = useQuery({
     queryKey: ["staff-pending-assignments"],
     queryFn: () => staffPortalService.assignments(true),
@@ -184,7 +208,8 @@ export function useAssignmentAlerts(enabled: boolean): AssignmentAlerts {
     enabled,
   });
 
-  const pending = q.data?.items ?? [];
+  const rawPending = q.data?.items ?? [];
+  const pending = rawPending.filter((item) => !dismissedIds.has(item.id));
   const pendingCount = pending.length;
   const [needsGesture, setNeedsGesture] = useState(false);
 
@@ -197,10 +222,6 @@ export function useAssignmentAlerts(enabled: boolean): AssignmentAlerts {
       stopDutyAlert();
       setNeedsGesture(false);
     }
-
-    return () => {
-      // Don't kill audio if we're just re-rendering; only when pendingCount reaches 0
-    };
   }, [pendingCount]);
 
   // Clean up on complete unmount
@@ -214,9 +235,20 @@ export function useAssignmentAlerts(enabled: boolean): AssignmentAlerts {
     playDutyAlert().then(() => setNeedsGesture(false));
   }, []);
 
+  const dismiss = useCallback((id?: string) => {
+    stopDutyAlert();
+    if (id) {
+      setDismissedIds((prev) => new Set(prev).add(id));
+    } else {
+      // dismiss all currently pending
+      setDismissedIds(new Set(rawPending.map((p) => p.id)));
+    }
+  }, [rawPending]);
+
   const stop = useCallback(() => {
     stopDutyAlert();
-  }, []);
+    setDismissedIds(new Set(rawPending.map((p) => p.id)));
+  }, [rawPending]);
 
-  return { pending, needsGesture, enableSound, stop, isLoading: q.isLoading };
+  return { pending, needsGesture, enableSound, stop, dismiss, isLoading: q.isLoading };
 }

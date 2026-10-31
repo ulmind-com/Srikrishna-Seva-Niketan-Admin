@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import { motion } from "framer-motion";
-import { CalendarCheck, Download, Eye, UserCheck } from "lucide-react";
+import { CalendarCheck, CheckCircle2, Download, Eye, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import type { ListParams } from "@/types/api";
 import type { Booking, BookingStatus } from "@/types/models";
@@ -48,6 +48,7 @@ const STATUS_FILTERS: { label: string; value: string }[] = [
 ];
 
 export function BookingsPage() {
+  const qc = useQueryClient();
   const { hasPermission } = useAuth();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -56,6 +57,17 @@ export function BookingsPage() {
   const [selected, setSelected] = useState<Booking | null>(null);
   const [assigningBooking, setAssigningBooking] = useState<Booking | null>(null);
   const [exporting, setExporting] = useState(false);
+
+  const completeMutation = useMutation({
+    mutationFn: (id: string) => bookingService.changeStatus(id, "completed"),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["bookings"] });
+      qc.invalidateQueries({ queryKey: ["assignments"] });
+      qc.invalidateQueries({ queryKey: ["reports"] });
+      toast.success("✓ কাজ সম্পন্ন হিসেবে মার্ক করা হয়েছে (Duty completed)");
+    },
+    onError: (err) => toast.error(normalizeError(err).message),
+  });
 
   const params: ListParams = useMemo(
     () => ({
@@ -217,6 +229,19 @@ export function BookingsPage() {
                           <span className="truncate max-w-[120px]">{b.assigned_staff_name}</span>
                         </span>
                       )}
+                      {b.staff_acceptance_status === "accepted" ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded border border-emerald-500/30">
+                          ✓ Nurse Accepted
+                        </span>
+                      ) : b.staff_acceptance_status === "declined" ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-400 bg-rose-500/15 px-1.5 py-0.5 rounded border border-rose-500/30">
+                          ✗ Nurse Declined
+                        </span>
+                      ) : b.assigned_staff_name ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded border border-amber-500/30">
+                          ⏳ Awaiting Nurse
+                        </span>
+                      ) : null}
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
@@ -224,16 +249,31 @@ export function BookingsPage() {
                       className="flex items-center justify-end gap-2"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 gap-1.5 border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300 text-xs font-semibold shadow-xs"
-                        onClick={() => setAssigningBooking(b)}
-                        title="Assign Nurse or Duty"
-                      >
-                        <UserCheck className="h-3.5 w-3.5 text-emerald-400" />
-                        <span>Assign Duty</span>
-                      </Button>
+                      {(b.status === "assigned" || b.status === "in_progress") && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 gap-1.5 border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300 text-xs font-semibold shadow-xs"
+                          onClick={() => completeMutation.mutate(b.id)}
+                          disabled={completeMutation.isPending}
+                          title="Mark Duty Complete"
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                          <span>Complete</span>
+                        </Button>
+                      )}
+                      {b.status !== "completed" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 gap-1.5 border-blue-500/40 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300 text-xs font-semibold shadow-xs"
+                          onClick={() => setAssigningBooking(b)}
+                          title="Assign Nurse or Duty"
+                        >
+                          <UserCheck className="h-3.5 w-3.5 text-blue-400" />
+                          <span>{b.assigned_staff_name ? "Reassign" : "Assign Duty"}</span>
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon-sm"

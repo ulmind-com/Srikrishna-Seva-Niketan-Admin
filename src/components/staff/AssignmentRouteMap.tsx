@@ -212,35 +212,143 @@ export function AssignmentRouteMap({ assignment }: { assignment: StaffAssignment
   const prevCoordRef = useRef<[number, number] | null>(null);
   const watchIdRef = useRef<number | null>(null);
 
-  const dest: [number, number] | null =
-    route?.dest_lat != null && route?.dest_lng != null
-      ? [route.dest_lat, route.dest_lng]
-      : assignment.dest_lat != null && assignment.dest_lng != null
-        ? [assignment.dest_lat, assignment.dest_lng]
-        : null;
+  // SpeechSynthesis TTS Voice Guidance references
+  const lastSpokenRef = useRef<string>("");
+  const lastSpokenTimeRef = useRef<number>(0);
 
-  // 1. Fetch real road-following directions from Ola Maps backend
+  const speakAloud = useCallback(
+    (text: string) => {
+      if (isMuted || typeof window === "undefined" || !("speechSynthesis" in window)) return;
+      const clean = text.replace(/[^\w\s.,-]/gi, " ").replace(/\s+/g, " ").trim();
+      if (!clean || clean.length < 3) return;
+
+      const now = Date.now();
+      if (lastSpokenRef.current === clean && now - lastSpokenTimeRef.current < 12_000) {
+        return;
+      }
+
+      try {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(clean);
+        utterance.lang = "en-IN";
+        utterance.rate = 0.95; // clean, steady pacing
+        utterance.pitch = 1.0;
+        utterance.volume = 1.0;
+        lastSpokenRef.current = clean;
+        lastSpokenTimeRef.current = now;
+        window.speechSynthesis.speak(utterance);
+      } catch {}
+    },
+    [isMuted]
+  );
+
+  const dest: [number, number] | null = useMemo(() => {
+    if (route?.dest_lat != null && route?.dest_lng != null) {
+      return [route.dest_lat, route.dest_lng];
+    }
+    if (assignment.dest_lat != null && assignment.dest_lng != null) {
+      return [assignment.dest_lat, assignment.dest_lng];
+    }
+    const anyA = assignment as any;
+    if (anyA.customer_lat != null && anyA.customer_lng != null) {
+      return [anyA.customer_lat, anyA.customer_lng];
+    }
+    return DEFAULT_CENTER;
+  }, [route?.dest_lat, route?.dest_lng, assignment]);
+
+  // 1. Fetch real road-following directions (Ola Maps -> OSRM -> Haversine fallback)
   const fetchDirections = useCallback(
     async (nurseLat: number, nurseLng: number, pref: RoutePreference) => {
       if (inFlightRouteRef.current) return;
       inFlightRouteRef.current = true;
       setLoadingRoute(true);
 
+      const targetLat = dest ? dest[0] : DEFAULT_CENTER[0];
+      const targetLng = dest ? dest[1] : DEFAULT_CENTER[1];
+
       try {
-        const res = await staffPortalService.route(assignment.id, nurseLat, nurseLng, pref);
+        // Step 1: Try backend Ola Maps routing
+        const res = await staffPortalService
+          .route(assignment.id, nurseLat, nurseLng, pref)
+          .catch(() => null);
+
         if (res && res.geometry && res.geometry.length > 1) {
           setRoute(res);
           lastRoutedCoordRef.current = [nurseLat, nurseLng];
           lastRouteTimeRef.current = Date.now();
+          return;
         }
+
+        // Step 2: Fallback to OSRM road router
+        try {
+          const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${nurseLng},${nurseLat};${targetLng},${targetLat}?overview=full&geometries=geojson&steps=true`;
+          const resp = await fetch(osrmUrl);
+          if (resp.ok) {
+            const data = await resp.json();
+            if (data?.routes?.[0]) {
+              const r = data.routes[0];
+              const distM = Math.round(r.distance);
+              const durS = Math.round(r.duration);
+              const geom = (r.geometry?.coordinates ?? [[nurseLng, nurseLat], [targetLng, targetLat]]) as [number, number][];
+              const steps = (r.legs?.[0]?.steps ?? []).map((s: any) => ({
+                instruction:
+                  s.maneuver?.instruction ||
+                  (s.name ? `Head on ${s.name}` : "Proceed along road"),
+                distance_m: Math.round(s.distance),
+                maneuver: s.maneuver?.modifier || s.maneuver?.type || "straight",
+              }));
+
+              setRoute({
+                distance_m: distM,
+                duration_s: durS,
+                readable_distance: distM < 1000 ? `${distM} m` : `${(distM / 1000).toFixed(1)} km`,
+                readable_duration: `${Math.max(1, Math.round(durS / 60))} min`,
+                geometry: geom,
+                dest_lat: targetLat,
+                dest_lng: targetLng,
+                preference: pref,
+                steps: steps.length > 0 ? steps : undefined,
+              });
+              lastRoutedCoordRef.current = [nurseLat, nurseLng];
+              lastRouteTimeRef.current = Date.now();
+              return;
+            }
+          }
+        } catch {}
+
+        // Step 3: Haversine mathematical calculation so metrics NEVER show blank --:--
+        const distM = Math.round(haversineMeters([nurseLat, nurseLng], [targetLat, targetLng]));
+        const durS = Math.round(distM / 6.5); // ~23 km/h
+        setRoute({
+          distance_m: distM,
+          duration_s: durS,
+          readable_distance: distM < 1000 ? `${distM} m` : `${(distM / 1000).toFixed(1)} km`,
+          readable_duration: `${Math.max(1, Math.round(durS / 60))} min`,
+          geometry: [
+            [nurseLng, nurseLat],
+            [targetLng, targetLat],
+          ],
+          dest_lat: targetLat,
+          dest_lng: targetLng,
+          preference: pref,
+          steps: [
+            {
+              instruction: `Proceed along route towards ${assignment.place_name || assignment.customer_name}`,
+              distance_m: distM,
+              maneuver: "straight",
+            },
+          ],
+        });
+        lastRoutedCoordRef.current = [nurseLat, nurseLng];
+        lastRouteTimeRef.current = Date.now();
       } catch {
-        // Fallback gracefully
+        // Safe failover
       } finally {
         setLoadingRoute(false);
         inFlightRouteRef.current = false;
       }
     },
-    [assignment.id]
+    [assignment.id, assignment.place_name, assignment.customer_name, dest]
   );
 
   // 2. Smoothly follow the nurse while walking (lower-middle screen offset)
@@ -695,6 +803,24 @@ export function AssignmentRouteMap({ assignment }: { assignment: StaffAssignment
       ? formatDistance(nextStep.distance_m)
       : distanceDisplay;
 
+  // Auto-speak turn-by-turn voice directions automatically (NO NEED to touch speaker button)
+  useEffect(() => {
+    if (!route || isMuted) return;
+    if (instructionText && !instructionText.includes("Acquiring road guidance")) {
+      const phrase = instructionDist ? `${instructionDist}, ${instructionText}` : instructionText;
+      speakAloud(phrase);
+    }
+  }, [route?.distance_m, instructionText, instructionDist, isMuted, speakAloud]);
+
+  // Clean up any ongoing speech synthesis on unmount
+  useEffect(() => {
+    return () => {
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
   return (
     <div
       className={`relative flex flex-col overflow-hidden rounded-3xl border border-border/80 bg-neutral-950 font-sans shadow-2xl transition-all duration-300 ${
@@ -767,13 +893,25 @@ export function AssignmentRouteMap({ assignment }: { assignment: StaffAssignment
             <button
               type="button"
               onClick={() => {
-                setIsMuted(!isMuted);
-                if (isMuted) playSynthesizedChime();
+                const nextMuted = !isMuted;
+                setIsMuted(nextMuted);
+                if (nextMuted) {
+                  if (typeof window !== "undefined" && "speechSynthesis" in window) {
+                    window.speechSynthesis.cancel();
+                  }
+                } else {
+                  playSynthesizedChime();
+                  speakAloud(`Voice navigation active. Following route to ${assignment.customer_name}.`);
+                }
               }}
               className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-neutral-800/80 text-neutral-300 hover:text-white hover:bg-neutral-800 border border-white/5 transition"
-              title={isMuted ? "Unmute sound" : "Mute sound"}
+              title={isMuted ? "Unmute voice navigation" : "Voice navigation active (click to mute)"}
             >
-              {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4 text-blue-400" />}
+              {isMuted ? (
+                <VolumeX className="h-4 w-4 text-neutral-400" />
+              ) : (
+                <Volume2 className="h-4 w-4 text-emerald-400 animate-pulse" />
+              )}
             </button>
           </div>
         </div>

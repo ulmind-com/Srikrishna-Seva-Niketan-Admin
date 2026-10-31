@@ -15,6 +15,7 @@ import {
   Ban,
   UserPlus,
   UserCheck,
+  CheckCircle2,
   MessageSquare,
   ClipboardList,
   CreditCard,
@@ -146,23 +147,69 @@ export function BookingDrawer({ booking, onClose, onAssignDuty }: Props) {
 
             <div className="flex-1 space-y-6 overflow-y-auto p-6">
               {booking.assigned_staff_name && (
-                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="grid h-10 w-10 place-items-center rounded-lg bg-emerald-500/20 text-emerald-400">
-                      <UserCheck className="h-5 w-5" />
+                <div
+                  className={`rounded-xl border p-3.5 flex flex-col gap-2 ${
+                    booking.staff_acceptance_status === "accepted"
+                      ? "border-emerald-500/40 bg-emerald-500/10"
+                      : booking.staff_acceptance_status === "declined"
+                      ? "border-rose-500/40 bg-rose-500/10"
+                      : "border-amber-500/40 bg-amber-500/10"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`grid h-10 w-10 place-items-center rounded-lg ${
+                          booking.staff_acceptance_status === "accepted"
+                            ? "bg-emerald-500/20 text-emerald-400"
+                            : booking.staff_acceptance_status === "declined"
+                            ? "bg-rose-500/20 text-rose-400"
+                            : "bg-amber-500/20 text-amber-400"
+                        }`}
+                      >
+                        <UserCheck className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p
+                          className={`text-[11px] font-semibold uppercase tracking-wider ${
+                            booking.staff_acceptance_status === "accepted"
+                              ? "text-emerald-400"
+                              : booking.staff_acceptance_status === "declined"
+                              ? "text-rose-400"
+                              : "text-amber-400"
+                          }`}
+                        >
+                          Assigned Nurse / Staff
+                        </p>
+                        <p className="text-sm font-bold text-foreground">
+                          {booking.assigned_staff_name}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider">
-                        Assigned Nurse / Staff
-                      </p>
-                      <p className="text-sm font-bold text-foreground">
-                        {booking.assigned_staff_name}
-                      </p>
-                    </div>
+                    <span
+                      className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${
+                        booking.staff_acceptance_status === "accepted"
+                          ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                          : booking.staff_acceptance_status === "declined"
+                          ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                          : "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                      }`}
+                    >
+                      {booking.staff_acceptance_status === "accepted"
+                        ? "✓ Nurse Accepted"
+                        : booking.staff_acceptance_status === "declined"
+                        ? "🚨 Nurse Declined"
+                        : "⏳ Awaiting Nurse"}
+                    </span>
                   </div>
-                  <span className="text-[11px] font-medium bg-emerald-500/20 text-emerald-300 px-2.5 py-1 rounded-full border border-emerald-500/40">
-                    Already Assigned
-                  </span>
+                  {booking.staff_decline_reason && (
+                    <div className="rounded-lg bg-rose-500/15 border border-rose-500/30 p-2 text-xs text-rose-300">
+                      <span className="font-bold uppercase tracking-wider text-[10px] block text-rose-400">
+                        Decline Reason:
+                      </span>
+                      “{booking.staff_decline_reason}”
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -339,32 +386,44 @@ export function BookingDrawer({ booking, onClose, onAssignDuty }: Props) {
             </div>
 
             {canUpdate && !isTerminal && (
-              <div className="flex flex-wrap gap-2 border-t border-border bg-muted/30 p-4">
-                <Button
-                  variant="success"
-                  className="flex-1"
-                  onClick={() => action.mutate("approve")}
-                  loading={action.isPending}
-                  disabled={booking.status === "approved"}
-                >
-                  <Check /> Approve
-                </Button>
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => action.mutate("reject")}
-                  loading={action.isPending}
-                >
-                  <X /> Reject
-                </Button>
-                <Button
-                  variant="destructive"
-                  className="flex-1"
-                  onClick={() => action.mutate("cancel")}
-                  loading={action.isPending}
-                >
-                  <Ban /> Cancel
-                </Button>
+              <div className="flex flex-col gap-2 border-t border-border bg-muted/30 p-4">
+                {(booking.status === "assigned" || booking.status === "in_progress") && (
+                  <Button
+                    variant="outline"
+                    className="w-full border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 font-semibold shadow-xs"
+                    onClick={() => changeStatus.mutate("completed")}
+                    loading={changeStatus.isPending}
+                  >
+                    <CheckCircle2 className="h-4 w-4 mr-1.5" /> কাজ সম্পন্ন (Mark Job Done)
+                  </Button>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="success"
+                    className="flex-1"
+                    onClick={() => action.mutate("approve")}
+                    loading={action.isPending}
+                    disabled={booking.status === "approved"}
+                  >
+                    <Check /> Approve
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => action.mutate("reject")}
+                    loading={action.isPending}
+                  >
+                    <X /> Reject
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    className="flex-1"
+                    onClick={() => action.mutate("cancel")}
+                    loading={action.isPending}
+                  >
+                    <Ban /> Cancel
+                  </Button>
+                </div>
               </div>
             )}
             {isTerminal && (

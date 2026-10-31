@@ -68,10 +68,23 @@ export function playSynthesizedChime(): void {
   }
 }
 
+let activeAudio: HTMLAudioElement | null = null;
+
+export function stopAnyActiveAudio(): void {
+  if (activeAudio) {
+    try {
+      activeAudio.pause();
+      activeAudio.currentTime = 0;
+    } catch {}
+    activeAudio = null;
+  }
+}
+
 /**
  * Plays the official alert sound + triggers mobile device vibration.
  */
 export function playDutyAlertSound(): void {
+  stopAnyActiveAudio();
   // 1. Device vibration
   if (typeof navigator !== "undefined" && "vibrate" in navigator) {
     try {
@@ -85,6 +98,7 @@ export function playDutyAlertSound(): void {
   try {
     const audio = new Audio("/new assignments comming.mp3");
     audio.volume = 0.85;
+    activeAudio = audio;
     const playPromise = audio.play();
     if (playPromise !== undefined) {
       playPromise.catch(() => {

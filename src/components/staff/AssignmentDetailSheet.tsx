@@ -87,16 +87,49 @@ interface Props {
 export function AssignmentDetailSheet({ assignment, open, onOpenChange }: Props) {
   const qc = useQueryClient();
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmCollectOpen, setConfirmCollectOpen] = useState(false);
 
   const isPostpaid = assignment?.payment_type === "postpaid";
   const isCompleted = assignment?.status === "completed";
+  const isPaymentCollected =
+    assignment?.payment_status === "paid" || assignment?.payment_status === "received";
   const collectAmount = assignment?.collect_amount ?? 0;
+
+  const collectPaymentMutation = useMutation({
+    mutationFn: () => {
+      if (!assignment) throw new Error("No duty selected");
+      return staffPortalService.collectPayment(assignment.id);
+    },
+    onMutate: () => {
+      setConfirmCollectOpen(false);
+      if (assignment) {
+        assignment.payment_status = "paid";
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["staff-assignments"] });
+      qc.invalidateQueries({ queryKey: ["report"] });
+      qc.invalidateQueries({ queryKey: ["payments"] });
+      qc.invalidateQueries({ queryKey: ["assignments"] });
+      qc.invalidateQueries({ queryKey: ["bookings"] });
+      toast.success(
+        `✓ কাস্টমারের থেকে ₹${collectAmount.toLocaleString()} ক্যাশ সফলভাবে গ্রহণ হয়েছে!`,
+        {
+          description: "অটোমেটিক রিপোর্টে ক্যাশ রেকর্ড হিসেবে যুক্ত হয়েছে।",
+        }
+      );
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || "Could not record payment. Please try again.");
+      qc.invalidateQueries({ queryKey: ["staff-assignments"] });
+    },
+  });
 
   const completeMutation = useMutation({
     mutationFn: () => {
       if (!assignment) throw new Error("No duty selected");
       return staffPortalService.completeAssignment(assignment.id, {
-        cash_collected: isPostpaid,
+        cash_collected: isPostpaid && !isPaymentCollected,
       });
     },
     onMutate: () => {
@@ -117,14 +150,9 @@ export function AssignmentDetailSheet({ assignment, open, onOpenChange }: Props)
       qc.invalidateQueries({ queryKey: ["report"] });
       qc.invalidateQueries({ queryKey: ["assignments"] });
       qc.invalidateQueries({ queryKey: ["bookings"] });
-      toast.success(
-        isPostpaid
-          ? `✓ ₹${collectAmount.toLocaleString()} ক্যাশ গ্রহণ ও কাজ সম্পন্ন সফল হয়েছে!`
-          : "✓ কাজ সম্পন্ন সফল হয়েছে! অফিসে রিপোর্ট সাবমিট হয়েছে।",
-        {
-          description: `Customer: ${assignment?.customer_name}. ধন্যবাদ!`,
-        }
-      );
+      toast.success("✓ কাজ সম্পন্ন সফল হয়েছে! অফিসে রিপোর্ট সাবমিট হয়েছে।", {
+        description: `Customer: ${assignment?.customer_name}. ধন্যবাদ!`,
+      });
     },
     onError: (err: any) => {
       toast.error(err?.message || "Could not complete assignment. Please try again.");
@@ -180,32 +208,77 @@ export function AssignmentDetailSheet({ assignment, open, onOpenChange }: Props)
                     </div>
                   </div>
                 ) : isPostpaid ? (
-                  <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4.5 space-y-3">
+                  <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4.5 space-y-3.5">
                     <div className="flex items-start gap-3">
                       <div className="h-9 w-9 rounded-xl bg-amber-500/20 text-amber-500 grid place-items-center shrink-0">
                         <Banknote className="h-5 w-5" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-xs font-semibold uppercase tracking-wider text-amber-500">
-                          Postpaid Duty — Cash Collection Required
+                          Postpaid Duty — Cash Collection
                         </p>
                         <p className="text-xl font-bold text-foreground mt-0.5">
                           কাস্টমার থেকে ক্যাশ নেবেন:{" "}
                           <span className="text-amber-400">₹{collectAmount.toLocaleString()}</span>
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          সার্ভিস সম্পন্ন করার পর কাস্টমারের থেকে এই টাকাটি ক্যাশে সংগ্রহ করুন এবং নিচের বাটনে ক্লিক করে কনফার্ম করুন।
+                          সার্ভিসের পর কাস্টমারের থেকে ক্যাশ সংগ্রহ করে নিচের "টাকা গ্রহণ করেছি" বাটনে ক্লিক করুন। এরপর শিফট শেষ হলে "কাজ সম্পন্ন" বাটনে ক্লিক করবেন।
                         </p>
                       </div>
                     </div>
-                    <Button
-                      size="lg"
-                      onClick={() => setConfirmOpen(true)}
-                      className="w-full bg-gradient-to-r from-amber-500 to-emerald-600 hover:from-amber-600 hover:to-emerald-700 text-white font-semibold shadow-lg shadow-amber-500/20 transition-all hover:scale-[1.01]"
-                    >
-                      <Banknote className="mr-2 h-5 w-5" />
-                      টাকা রিসিভ ও কাজ সম্পন্ন (Collect ₹{collectAmount.toLocaleString()} &amp; Finish)
-                    </Button>
+
+                    {isPaymentCollected ? (
+                      <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/15 p-3 text-emerald-400 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+                          <span className="text-xs font-bold">
+                            ✓ টাকা বুঝে পেয়েছি (₹{collectAmount.toLocaleString()} ক্যাশ রিসিভড)
+                          </span>
+                        </div>
+                        <span className="text-[10px] uppercase font-bold tracking-wider bg-emerald-500/20 px-2 py-0.5 rounded">
+                          রিপোর্টে সেভড
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <Button
+                          size="lg"
+                          onClick={() => setConfirmCollectOpen(true)}
+                          disabled={collectPaymentMutation.isPending}
+                          className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-semibold shadow-md shadow-amber-500/20 transition-all hover:scale-[1.01]"
+                        >
+                          {collectPaymentMutation.isPending ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <Banknote className="mr-2 h-4 w-4" />
+                          )}
+                          টাকা গ্রহণ করেছি (₹{collectAmount.toLocaleString()})
+                        </Button>
+
+                        <Button
+                          size="lg"
+                          variant="outline"
+                          onClick={() => setConfirmOpen(true)}
+                          disabled={completeMutation.isPending}
+                          className="w-full border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 font-semibold shadow-sm"
+                        >
+                          <CheckCircle2 className="mr-2 h-4 w-4 text-emerald-400" />
+                          কাজ সম্পন্ন (Job Done)
+                        </Button>
+                      </div>
+                    )}
+
+                    {isPaymentCollected && (
+                      <Button
+                        size="lg"
+                        onClick={() => setConfirmOpen(true)}
+                        disabled={completeMutation.isPending}
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-md shadow-emerald-600/20 transition-all hover:scale-[1.01]"
+                      >
+                        <CheckCircle2 className="mr-2 h-4 w-4" />
+                        কাজ সম্পন্ন (Mark Job Done)
+                      </Button>
+                    )}
                   </div>
                 ) : (
                   <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 p-4.5 space-y-3">
@@ -276,6 +349,45 @@ export function AssignmentDetailSheet({ assignment, open, onOpenChange }: Props)
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Collect Payment Dialog */}
+      <Dialog open={confirmCollectOpen} onOpenChange={setConfirmCollectOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Banknote className="h-5 w-5 text-amber-500" />
+              টাকা গ্রহণ কনফার্মেশন (Receive Cash)
+            </DialogTitle>
+            <DialogDescription className="pt-2 text-foreground/90 space-y-2">
+              <div>
+                আপনি কি নিশ্চিত যে কাস্টমার{" "}
+                <span className="font-semibold text-primary">{assignment?.customer_name}</span>-এর কাছ থেকে{" "}
+                <span className="font-bold text-amber-500">₹{collectAmount.toLocaleString()}</span> ক্যাশ হাতে বুঝে পেয়েছেন?
+                <p className="text-xs text-muted-foreground mt-2">
+                  কনফার্ম করলে এটি অফিসের ইনকাম রিপোর্ট এবং পেমেন্ট লিস্টে স্বয়ংক্রিয়ভাবে "Cash Collected" হিসেবে রেকর্ড হয়ে যাবে।
+                </p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setConfirmCollectOpen(false)}
+              disabled={collectPaymentMutation.isPending}
+            >
+              বাতিল (Cancel)
+            </Button>
+            <Button
+              onClick={() => collectPaymentMutation.mutate()}
+              disabled={collectPaymentMutation.isPending}
+              className="bg-amber-600 hover:bg-amber-700 text-white font-medium"
+            >
+              {collectPaymentMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {collectPaymentMutation.isPending ? "রেকর্ড হচ্ছে…" : "হ্যাঁ, ক্যাশ বুঝে পেয়েছি"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Confirmation Dialog */}
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>

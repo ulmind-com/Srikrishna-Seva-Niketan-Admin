@@ -378,6 +378,8 @@ export interface Booking extends BaseDoc {
   source?: string | null;
   assigned_staff_id?: string | null;
   assigned_staff_name?: string | null;
+  staff_acceptance_status?: "accepted" | "declined" | "pending" | null;
+  staff_decline_reason?: string | null;
   admin_notes?: string | null;
   message?: string | null;
 }

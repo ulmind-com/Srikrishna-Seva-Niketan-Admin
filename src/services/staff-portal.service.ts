@@ -164,6 +164,11 @@ export const staffPortalService = {
       url: endpoints.staffPortal.assignmentComplete(id),
       data: payload ?? {},
     }),
+  collectPayment: (id: string) =>
+    staffRequest<StaffAssignment>({
+      method: "POST",
+      url: endpoints.staffPortal.assignmentCollectPayment(id),
+    }),
   /** Route from the nurse's current GPS to the duty location. */
   route: (
     id: string,

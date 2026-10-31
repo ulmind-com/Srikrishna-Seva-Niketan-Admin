@@ -52,10 +52,12 @@ export function StaffDuties() {
           needsGesture={alerts.needsGesture}
           onEnableSound={alerts.enableSound}
           onAccepted={(a) => {
-            alerts.stop();
+            alerts.dismiss(ringing.id);
             setSheetAssignment(a);
           }}
-          onDismiss={() => alerts.stop()}
+          onDismiss={() => {
+            alerts.dismiss(ringing.id);
+          }}
         />
       )}
 

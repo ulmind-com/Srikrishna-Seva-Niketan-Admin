@@ -87,6 +87,7 @@ export const endpoints = {
     assignmentAccept: (id: string) => `/staff-portal/me/assignments/${id}/accept`,
     assignmentDecline: (id: string) => `/staff-portal/me/assignments/${id}/decline`,
     assignmentComplete: (id: string) => `/staff-portal/me/assignments/${id}/complete`,
+    assignmentCollectPayment: (id: string) => `/staff-portal/me/assignments/${id}/collect-payment`,
     assignmentRoute: (id: string) => `/staff-portal/me/assignments/${id}/route`,
     location: "/staff-portal/me/location",
     verifyId: "/staff-portal/me/verify-id",

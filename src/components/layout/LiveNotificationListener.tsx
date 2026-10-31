@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { BellRing, CalendarCheck, CheckCircle2, AlertTriangle, ArrowRight } from "lucide-react";
+import { toast } from "sonner";
 import { env } from "@/config/env";
 import { tokenStore } from "@/services/api/tokens";
 import { playDutyAlertSound } from "@/utils/audioAlert";
@@ -9,12 +10,12 @@ import { playDutyAlertSound } from "@/utils/audioAlert";
 /**
  * LiveNotificationListener
  * 
- * Polls the backend for new unread notifications every 6 seconds.
- * When a high-priority event is detected:
- *   1. New Booking ("prottekta booking e")
- *   2. Duty Accepted by Nurse
- *   3. Duty Declined by Nurse (with Reason)
- * It plays the ringing sound and shows a full-screen alert modal with action.
+ * Polls the backend for new unread notifications every 7 seconds.
+ * 
+ * User preference:
+ * - Nurse duty ACCEPT and duty COMPLETE must NOT play any sound or interrupt admin with a ringing modal.
+ *   (Shows a discreet toast so admin is kept informed silently).
+ * - Only brand new patient bookings and urgent duty declines ring the admin.
  */
 
 // ─── Sound ───────────────────────────────────────────────────
@@ -111,15 +112,28 @@ export function LiveNotificationListener() {
       if (lastAlertedIdRef.current === latest.id) return;
 
       const titleLower = (latest.title || "").toLowerCase();
+      const messageLower = (latest.message || "").toLowerCase();
       const isBooking = latest.type === "booking";
-      const isDutyAccepted = titleLower.includes("accepted");
-      const isDutyDeclined = titleLower.includes("declined");
+      const isDutyAccepted = titleLower.includes("accepted") || messageLower.includes("accepted");
+      const isDutyCompleted = titleLower.includes("complete") || messageLower.includes("completed");
+      const isDutyDeclined = titleLower.includes("declined") || messageLower.includes("declined");
 
-      // Only trigger audio ring & modal for high-priority operational events:
-      // 1. Every new patient booking
-      // 2. Nurse accepted duty assignment
-      // 3. Nurse declined duty assignment
-      if (!isBooking && !isDutyAccepted && !isDutyDeclined) {
+      // Per user request:
+      // When nurse accepts or completes duty, NO SOUND and NO MODAL in admin panel.
+      // Instead, show a clean, silent toast message so admin is aware without disruption.
+      if (isDutyAccepted || isDutyCompleted) {
+        lastAlertedIdRef.current = latest.id;
+        toast.info(latest.title, {
+          description: latest.message,
+          duration: 4000,
+        });
+        return;
+      }
+
+      // Only ring and show modal for:
+      // 1. Every incoming patient booking
+      // 2. Urgent duty decline (needs immediate reassign)
+      if (!isBooking && !isDutyDeclined) {
         return;
       }
 
@@ -127,12 +141,9 @@ export function LiveNotificationListener() {
       lastAlertedIdRef.current = latest.id;
 
       let displayTitle = latest.title;
-      let kind: "booking" | "accepted" | "declined" | "general" = "general";
+      let kind: "booking" | "declined" | "general" = "general";
 
-      if (isDutyAccepted) {
-        kind = "accepted";
-        displayTitle = "✅ Duty Accepted by Nurse";
-      } else if (isDutyDeclined) {
+      if (isDutyDeclined) {
         kind = "declined";
         displayTitle = "🚨 Duty Declined — Reassign Needed";
       } else if (isBooking) {
