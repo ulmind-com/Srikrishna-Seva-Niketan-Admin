@@ -30,7 +30,7 @@ export const staffConfig: ResourceConfig<StaffMember> = {
     {
       header: "Staff",
       cell: (r) => (
-        <MediaCell image={r.photo} title={r.name} subtitle={r.service_label} />
+        <MediaCell image={r.photo} title={r.name} subtitle={r.service_label} verified={true} />
       ),
     },
     {

@@ -4,6 +4,7 @@ import { Helmet } from "react-helmet-async";
 import { AlertTriangle, ArrowLeft, Loader2 } from "lucide-react";
 import { resourceServices } from "@/services/resources";
 import { StaffDocuments } from "@/components/documents/StaffDocuments";
+import { VerifiedBadge } from "@/components/common/VerifiedBadge";
 import { Badge } from "@/components/ui/badge";
 import {
   VERIFICATION_LABEL,
@@ -48,7 +49,12 @@ export function EmployeeDocumentsPage() {
       <div className="no-print flex flex-wrap items-start justify-between gap-3">
         <div>
           <BackLink />
-          <h1 className="mt-2 text-2xl font-bold tracking-tight">{staff.name}</h1>
+          <h1 className="mt-2 text-2xl font-bold tracking-tight flex items-center gap-2">
+            <span>{staff.name}</span>
+            {verified && (
+              <VerifiedBadge size={22} title="Verified Medical Staff" />
+            )}
+          </h1>
           <p className="text-sm text-muted-foreground">
             {staff.designation ?? staff.category} ·{" "}
             <span className="font-mono">{staff.code}</span>

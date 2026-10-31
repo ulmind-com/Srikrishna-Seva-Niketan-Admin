@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { BranchName } from "@/components/common/BranchName";
+import { VerifiedBadge } from "@/components/common/VerifiedBadge";
 import { ImageUpload } from "@/components/common/ImageUpload";
 import { formatDate } from "@/components/documents/document-utils";
 import type { Employee, ImageAsset } from "@/types/models";
@@ -234,7 +235,12 @@ function ReviewCard({
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold">{staff.name}</p>
+          <div className="flex items-center gap-1.5 truncate">
+            <p className="truncate font-semibold">{staff.name}</p>
+            {staff.verification_status === "verified" && (
+              <VerifiedBadge size={16} title="Verified Medical Staff" />
+            )}
+          </div>
           <p className="truncate text-sm text-muted-foreground">
             {staff.category} · <BranchName id={staff.location_id} /> ·{" "}
             <span className="font-mono text-xs">{staff.code}</span>

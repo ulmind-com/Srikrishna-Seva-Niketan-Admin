@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StaffDocuments } from "@/components/documents/StaffDocuments";
 import { StaffDuties } from "@/components/staff/StaffDuties";
+import { VerifiedBadge } from "@/components/common/VerifiedBadge";
 import {
   VERIFICATION_LABEL,
   VERIFICATION_VARIANT,
@@ -78,7 +79,12 @@ export function StaffStatusPage() {
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-xl font-bold tracking-tight">{staff.name}</h1>
+            <h1 className="truncate text-xl font-bold tracking-tight flex items-center gap-1.5">
+              <span>{staff.name}</span>
+              {status === "verified" && (
+                <VerifiedBadge size={22} title="Official Verified Staff Member" />
+              )}
+            </h1>
             <p className="text-sm text-muted-foreground">
               {staff.designation ?? staff.category} · Staff code{" "}
               <span className="font-mono">{staff.code}</span>

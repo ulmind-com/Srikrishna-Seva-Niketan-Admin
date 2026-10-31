@@ -3,6 +3,7 @@ import type { Assignment } from "@/types/models";
 import { resourceServices } from "@/services/resources";
 import type { ResourceConfig } from "@/components/resource/types";
 import { Badge } from "@/components/ui/badge";
+import { VerifiedBadge } from "@/components/common/VerifiedBadge";
 import { BranchName } from "@/components/common/BranchName";
 import {
   AssignmentProgress,
@@ -54,7 +55,12 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
       header: "Staff → Customer",
       cell: (r) => (
         <div className="flex flex-col">
-          <span className="font-medium">{r.employee_name}</span>
+          <span className="font-medium flex items-center gap-1.5">
+            <span>{r.employee_name}</span>
+            {r.acceptance_status === "accepted" && (
+              <VerifiedBadge size={15} title="Verified Staff" />
+            )}
+          </span>
           <span className="text-xs text-muted-foreground">→ {r.customer_name}</span>
         </div>
       ),

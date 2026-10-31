@@ -4,6 +4,7 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { resourceServices } from "@/services/resources";
 import { StaffDocuments } from "@/components/documents/StaffDocuments";
+import { VerifiedBadge } from "@/components/common/VerifiedBadge";
 import { Badge } from "@/components/ui/badge";
 import {
   VERIFICATION_LABEL,
@@ -57,7 +58,12 @@ export function EmployeeIdCardPage() {
           >
             <ArrowLeft className="h-4 w-4" /> Back to Staff Register
           </Link>
-          <h1 className="mt-2 text-2xl font-bold tracking-tight">{staff.name}</h1>
+          <h1 className="mt-2 text-2xl font-bold tracking-tight flex items-center gap-2">
+            <span>{staff.name}</span>
+            {staff.verification_status === "verified" && (
+              <VerifiedBadge size={22} title="Verified Medical Staff" />
+            )}
+          </h1>
           <p className="text-sm text-muted-foreground">
             {staff.designation ?? staff.category} ·{" "}
             <span className="font-mono">{staff.code}</span>

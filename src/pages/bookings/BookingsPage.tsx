@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import { motion } from "framer-motion";
 import { CalendarCheck, CheckCircle2, Download, Eye, UserCheck } from "lucide-react";
+import { VerifiedBadge } from "@/components/common/VerifiedBadge";
 import { toast } from "sonner";
 import type { ListParams } from "@/types/api";
 import type { Booking, BookingStatus } from "@/types/models";
@@ -227,6 +228,7 @@ export function BookingsPage() {
                         >
                           <UserCheck className="h-3 w-3 shrink-0" />
                           <span className="truncate max-w-[120px]">{b.assigned_staff_name}</span>
+                          {b.staff_acceptance_status === "accepted" && <VerifiedBadge size={13} />}
                         </span>
                       )}
                       {b.staff_acceptance_status === "accepted" ? (

@@ -44,6 +44,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import { VerifiedBadge } from "@/components/common/VerifiedBadge";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { formatDate, humanize } from "@/lib/utils";
 
@@ -181,8 +182,11 @@ export function BookingDrawer({ booking, onClose, onAssignDuty }: Props) {
                         >
                           Assigned Nurse / Staff
                         </p>
-                        <p className="text-sm font-bold text-foreground">
-                          {booking.assigned_staff_name}
+                        <p className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                          <span>{booking.assigned_staff_name}</span>
+                          {booking.staff_acceptance_status === "accepted" && (
+                            <VerifiedBadge size={16} title="Verified Medical Staff" />
+                          )}
                         </p>
                       </div>
                     </div>

@@ -2,6 +2,7 @@ import { Star } from "lucide-react";
 import type { ImageAsset } from "@/types/models";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { VerifiedBadge } from "@/components/common/VerifiedBadge";
 import { cn, formatDate, initials } from "@/lib/utils";
 
 /** Thumbnail + title + subtitle cell used across catalogue tables. */
@@ -9,10 +10,12 @@ export function MediaCell({
   image,
   title,
   subtitle,
+  verified,
 }: {
   image?: ImageAsset | null;
   title: string;
   subtitle?: string | null;
+  verified?: boolean;
 }) {
   return (
     <div className="flex items-center gap-4 group">
@@ -29,7 +32,12 @@ export function MediaCell({
         )}
       </div>
       <div className="min-w-0">
-        <p className="truncate font-semibold text-foreground/90 transition-colors group-hover:text-foreground">{title}</p>
+        <div className="flex items-center gap-1.5 truncate">
+          <p className="truncate font-semibold text-foreground/90 transition-colors group-hover:text-foreground">
+            {title}
+          </p>
+          {verified && <VerifiedBadge size={16} title="Verified Staff" />}
+        </div>
         {subtitle && (
           <p className="truncate text-[13px] text-muted-foreground mt-0.5">{subtitle}</p>
         )}

@@ -65,7 +65,14 @@ export const employeesConfig: ResourceConfig<Employee> = {
   columns: [
     {
       header: "Staff",
-      cell: (r) => <MediaCell image={r.photo} title={r.name} subtitle={r.code} />,
+      cell: (r) => (
+        <MediaCell
+          image={r.photo}
+          title={r.name}
+          subtitle={r.code}
+          verified={r.verification_status === "verified"}
+        />
+      ),
     },
     {
       header: "Category",
