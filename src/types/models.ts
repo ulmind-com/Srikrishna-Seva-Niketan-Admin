@@ -103,6 +103,14 @@ export interface Employee extends BaseDoc {
   id_proof?: ImageAsset | null;
   id_proof_type?: string | null;
   id_proof_number?: string | null;
+  // ---- Additional KYC documents (number + photo each) ----
+  voter_number?: string | null;
+  voter_photo?: ImageAsset | null;
+  pan_number?: string | null;
+  pan_photo?: ImageAsset | null;
+  bank_account_number?: string | null;
+  bank_ifsc?: string | null;
+  bank_photo?: ImageAsset | null;
   location_id: string;
   status: EmployeeStatus;
   rating: number;

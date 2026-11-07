@@ -211,8 +211,16 @@
     width: 210mm !important;
     padding: 14mm !important;
   }
+  /* The staff application form is a dense single-page A4 — tighter padding and
+     a fixed page height keep it to exactly one printed sheet. */
+  .doc-sheet.app-form-sheet {
+    padding: 9mm 12mm !important;
+    height: 297mm !important;
+    overflow: hidden !important;
+  }
   @page {
     margin: 0;
+    size: A4;
   }
 }
 

@@ -85,6 +85,14 @@ export function StaffLoginPage() {
           {errors.password && (
             <p className="text-xs font-medium text-destructive">{errors.password.message}</p>
           )}
+          <div className="text-right">
+            <Link
+              to="/staff/forgot-password"
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              Forgot password?
+            </Link>
+          </div>
         </div>
 
         <Button type="submit" size="lg" className="w-full" loading={isSubmitting}>

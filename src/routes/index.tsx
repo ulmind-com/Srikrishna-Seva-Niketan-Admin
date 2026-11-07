@@ -25,7 +25,11 @@ import { StaffVerificationPage } from "@/pages/StaffVerificationPage";
 import { LocationStaffOverviewPage } from "@/pages/LocationStaffOverviewPage";
 import { StaffDeploymentPage } from "@/pages/StaffDeploymentPage";
 import { DailyShiftPage } from "@/pages/DailyShiftPage";
+import { AttendancePage } from "@/pages/AttendancePage";
+import { PayslipPage } from "@/pages/PayslipPage";
+import { CustomerAgreementPage } from "@/pages/CustomerAgreementPage";
 import { StaffLoginPage } from "@/pages/staff/StaffLoginPage";
+import { StaffForgotPasswordPage } from "@/pages/staff/StaffForgotPasswordPage";
 import { StaffRegisterPage } from "@/pages/staff/StaffRegisterPage";
 import { StaffOnboardingPage } from "@/pages/staff/StaffOnboardingPage";
 import { StaffStatusPage } from "@/pages/staff/StaffStatusPage";
@@ -61,6 +65,7 @@ export function AppRoutes() {
 
       {/* ---- Self-service staff portal (own auth, outside the admin shell) ---- */}
       <Route path="/staff/login" element={<StaffLoginPage />} />
+      <Route path="/staff/forgot-password" element={<StaffForgotPasswordPage />} />
       <Route path="/staff/register" element={<StaffRegisterPage />} />
       <Route path="/staff/onboarding" element={<StaffOnboardingPage />} />
       <Route path="/staff-portal" element={<StaffStatusPage />} />
@@ -84,9 +89,12 @@ export function AppRoutes() {
           <Route path="/staff-verification" element={<StaffVerificationPage />} />
           <Route path="/staff-by-branch" element={<LocationStaffOverviewPage />} />
           <Route path="/customers" element={<CustomersPage />} />
+          <Route path="/customers/:id/agreement" element={<CustomerAgreementPage />} />
           <Route path="/assignments" element={<AssignmentsPage />} />
           <Route path="/staff-deployment" element={<StaffDeploymentPage />} />
           <Route path="/daily-shifts" element={<DailyShiftPage />} />
+          <Route path="/attendance" element={<AttendancePage />} />
+          <Route path="/payslips" element={<PayslipPage />} />
           <Route path="/expenses" element={<ExpensesPage />} />
           <Route path="/payments" element={<PaymentsPage />} />
           <Route path="/reports" element={<ReportsPage />} />

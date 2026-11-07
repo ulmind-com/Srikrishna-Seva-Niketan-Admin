@@ -36,6 +36,10 @@ export interface StaffOnboardingPayload {
   previous_employer?: string;
   id_proof_type?: string;
   id_proof_number?: string;
+  voter_number?: string;
+  pan_number?: string;
+  bank_account_number?: string;
+  bank_ifsc?: string;
   document_verification?: Record<string, unknown>;
 }
 
@@ -82,6 +86,22 @@ export const staffPortalService = {
       data: { email, password },
     }),
 
+  /** Email a password-reset OTP to a registered staff member. */
+  forgotPassword: (email: string) =>
+    staffRequest<{ email: string; dev_otp?: string }>({
+      method: "POST",
+      url: endpoints.staffPortal.forgotPassword,
+      data: { email },
+    }),
+
+  /** Set a new password with the emailed reset OTP. */
+  resetPassword: (email: string, otp: string, new_password: string) =>
+    staffRequest<{ email: string; reset: boolean }>({
+      method: "POST",
+      url: endpoints.staffPortal.resetPassword,
+      data: { email, otp, new_password },
+    }),
+
   logout: () =>
     staffRequest<null>({
       method: "POST",
@@ -101,8 +121,11 @@ export const staffPortalService = {
   submit: () =>
     staffRequest<Employee>({ method: "POST", url: endpoints.staffPortal.submit }),
 
-  /** Upload the staff member's own photo / signature / ID proof. */
-  upload: (file: File | Blob, kind: "photo" | "signature" | "id_proof") => {
+  /** Upload the staff member's own photo / signature / ID / KYC documents. */
+  upload: (
+    file: File | Blob,
+    kind: "photo" | "signature" | "id_proof" | "voter_photo" | "pan_photo" | "bank_photo",
+  ) => {
     const form = new FormData();
     const name = file instanceof File ? file.name : `${kind}.png`;
     form.append("file", file, name);

@@ -1,5 +1,4 @@
 import { type ReactNode } from "react";
-import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { cn, formatCompact } from "@/lib/utils";
 
@@ -10,6 +9,11 @@ interface StatCardProps {
   hint?: string;
   tone?: "primary" | "success" | "warning" | "danger" | "accent";
   index?: number;
+  /**
+   * Accepted for call-site compatibility but intentionally ignored: the
+   * dashboard stat cards are a read-only overview (a "pointer / view"), so a
+   * card never navigates on click. Quick-action buttons handle navigation.
+   */
   to?: string;
 }
 
@@ -28,15 +32,13 @@ export function StatCard({
   hint,
   tone = "primary",
   index = 0,
-  to,
 }: StatCardProps) {
-  const CardContent = (
+  return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.06, duration: 0.3 }}
-      whileHover={{ y: -3 }}
-      className="group relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-card transition-shadow hover:shadow-pop"
+      className="group relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-card"
     >
       <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-primary/5 opacity-0 transition-opacity group-hover:opacity-100" />
       <div className="relative flex items-start justify-between">
@@ -60,14 +62,4 @@ export function StatCard({
       </div>
     </motion.div>
   );
-
-  if (to) {
-    return (
-      <Link to={to} className="block">
-        {CardContent}
-      </Link>
-    );
-  }
-
-  return CardContent;
 }

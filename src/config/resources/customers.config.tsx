@@ -1,4 +1,5 @@
-import { Contact } from "lucide-react";
+import { Contact, FileSignature } from "lucide-react";
+import { Link } from "react-router-dom";
 import type { Customer } from "@/types/models";
 import { resourceServices } from "@/services/resources";
 import type { ResourceConfig } from "@/components/resource/types";
@@ -68,6 +69,17 @@ export const customersConfig: ResourceConfig<Customer> = {
     {
       header: "Branch",
       cell: (r) => <BranchName id={r.location_id} className="text-sm" />,
+    },
+    {
+      header: "Agreement",
+      cell: (r) => (
+        <Link
+          to={`/customers/${r.id}/agreement`}
+          className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+        >
+          <FileSignature className="h-3.5 w-3.5" /> Generate
+        </Link>
+      ),
     },
     { header: "Active", cell: (r) => <BoolCell value={r.is_active} /> },
     { header: "Updated", cell: (r) => <DateCell value={r.updated_at} /> },

@@ -22,7 +22,7 @@ export function StaffIdCard({
   authorizedSignatureUrl?: string | null;
 }) {
   return (
-    <div className="id-card relative overflow-hidden rounded-[14px] bg-white text-[#111]">
+    <div className="id-card relative aspect-[54/85.6] w-full overflow-hidden rounded-[14px] bg-white text-[#111]">
       {/* Decorative corner pattern (top-left) */}
       <svg
         className="pointer-events-none absolute -left-2 -top-2 h-28 w-28 opacity-[0.18]"
@@ -55,7 +55,7 @@ export function StaffIdCard({
         </g>
       </svg>
 
-      <div className="relative px-5 pb-5 pt-6">
+      <div className="relative flex h-full flex-col px-5 pb-4 pt-5">
         {/* ---- Crest + organisation ---- */}
         <div className="flex flex-col items-center text-center">
           <img
@@ -85,7 +85,7 @@ export function StaffIdCard({
         </div>
 
         {/* ---- Portrait ---- */}
-        <div className="mt-4 flex justify-center">
+        <div className="mt-3 flex justify-center">
           <div className="h-[118px] w-[96px] overflow-hidden border-[2.5px] border-[#c0121f] bg-[#eef2f7]">
             {staff.photo?.url ? (
               <img
@@ -103,7 +103,7 @@ export function StaffIdCard({
         </div>
 
         {/* ---- Field list ---- */}
-        <dl className="mt-4 space-y-[5px] pl-1">
+        <dl className="mt-3 space-y-1 pl-1">
           <Row label="NAME" value={staff.name} />
           <Row label="D.O.B." value={formatDate(staff.dob)} />
           <Row label="GENDER" value={staff.gender ?? "—"} capitalize />
@@ -112,7 +112,7 @@ export function StaffIdCard({
         </dl>
 
         {/* ---- Signatures ---- */}
-        <div className="mt-5 flex items-end justify-between gap-3">
+        <div className="mt-auto flex items-end justify-between gap-3 pt-3">
           <div className="flex-1 text-center">
             <div className="mx-auto mb-0.5 flex h-9 items-end justify-center">
               {authorizedSignatureUrl ? (

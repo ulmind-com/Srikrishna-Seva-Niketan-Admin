@@ -9,14 +9,13 @@ import { settingsService } from "@/services/settings.service";
 import { staffPortalService } from "@/services/staff-portal.service";
 import type { Employee, ImageAsset } from "@/types/models";
 import { StaffIdCard } from "./StaffIdCard";
-import { ApplicationFormI, ApplicationFormII } from "./StaffApplicationForms";
+import { ApplicationFormI } from "./StaffApplicationForms";
 
-type DocKey = "id-card" | "form-1" | "form-2";
+type DocKey = "id-card" | "form-1";
 
 const TABS: { key: DocKey; label: string; icon: typeof IdCard }[] = [
   { key: "id-card", label: "ID Card", icon: IdCard },
-  { key: "form-1", label: "Application Form I", icon: FileText },
-  { key: "form-2", label: "Form II — Undertaking", icon: FileText },
+  { key: "form-1", label: "Application Form", icon: FileText },
 ];
 
 /**
@@ -124,8 +123,12 @@ export function StaffDocuments({
       window.print();
       return;
     }
-    const wMm = ((node.offsetWidth / 96) * 25.4).toFixed(1);
-    const hMm = ((node.offsetHeight / 96) * 25.4).toFixed(1);
+    // Print at the exact CR80 card size, not the on-screen pixel size (which
+    // came out far too big). CR80 is 85.6 × 54 mm; this is a portrait card, so
+    // it prints 54 mm wide × 85.6 mm tall. The card element is locked to the
+    // CR80 aspect ratio, so these fixed dimensions never distort it.
+    const wMm = "54";
+    const hMm = "85.6";
     setDownloading(true);
     try {
       const dataUrl = await toPng(node, {
@@ -243,11 +246,6 @@ export function StaffDocuments({
           {active === "form-1" && (
             <div className="print-target">
               <ApplicationFormI staff={staff} branchName={branchName} />
-            </div>
-          )}
-          {active === "form-2" && (
-            <div className="print-target">
-              <ApplicationFormII staff={staff} branchName={branchName} />
             </div>
           )}
         </div>

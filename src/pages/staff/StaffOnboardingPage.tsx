@@ -25,6 +25,7 @@ import {
   type StaffOnboardingPayload,
 } from "@/services/staff-portal.service";
 import { SignaturePad, type SignaturePadHandle } from "@/components/common/SignaturePad";
+import { KycDocsSection } from "@/components/staff/KycDocsSection";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -551,6 +552,8 @@ function OnboardingForm({ staff }: { staff: Employee }) {
                     </p>
                   )}
                 </div>
+
+                <KycDocsSection staff={staff} />
               </div>
             )}
 
