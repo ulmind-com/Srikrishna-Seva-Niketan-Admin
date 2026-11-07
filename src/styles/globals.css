@@ -182,6 +182,26 @@
   }
 }
 
+/* Native date/time picker icon — keep it clearly visible in both themes.
+   The browser's default indicator is near-black, so it vanishes on the dark
+   surface; invert it to white in dark mode and keep it crisp in light mode. */
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="month"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.9;
+}
+input[type="time"]::-webkit-calendar-picker-indicator:hover,
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="month"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+.dark input[type="time"]::-webkit-calendar-picker-indicator,
+.dark input[type="date"]::-webkit-calendar-picker-indicator,
+.dark input[type="month"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(1.4);
+}
+
 /* Only the element marked .print-target reaches the paper. */
 @media print {
   body * {
