@@ -23,6 +23,7 @@ const STATUS_LABEL: Record<string, string> = {
   half_day: "Half day",
   leave: "Leave",
   off: "Off",
+  absent: "Absent",
   unmarked: "—",
 };
 const STATUS_CLS: Record<string, string> = {
@@ -30,6 +31,7 @@ const STATUS_CLS: Record<string, string> = {
   half_day: "text-amber-600",
   leave: "text-rose-600",
   off: "text-slate-500",
+  absent: "text-rose-700 font-semibold",
   unmarked: "text-muted-foreground/50",
 };
 const SHIFT_LABEL: Record<string, string> = {
@@ -38,6 +40,27 @@ const SHIFT_LABEL: Record<string, string> = {
   full_24h: "24h",
   custom: "Custom",
 };
+
+/** "18:00" -> "6:00 PM". */
+function fmtTime(t?: string | null): string {
+  if (!t) return "?";
+  const [h, m] = t.split(":");
+  const hi = Number(h);
+  const mi = Number(m);
+  if (Number.isNaN(hi) || Number.isNaN(mi)) return t;
+  const suffix = hi < 12 ? "AM" : "PM";
+  const h12 = hi % 12 || 12;
+  return `${h12}:${String(mi).padStart(2, "0")} ${suffix}`;
+}
+
+/** Shift cell for a payslip day — time window for custom shifts. */
+function dayShiftText(d: { shift: string | null; start_time?: string | null; end_time?: string | null }): string {
+  if (!d.shift) return "—";
+  if (d.shift === "custom" && (d.start_time || d.end_time)) {
+    return `${fmtTime(d.start_time)} – ${fmtTime(d.end_time)}`;
+  }
+  return SHIFT_LABEL[d.shift] ?? d.shift;
+}
 
 function currentMonth(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -232,8 +255,10 @@ export function PayslipPage() {
               {/* Summary */}
               <div className="my-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {[
-                  { label: "Present", value: slip.summary.present_days },
+                  { label: "Days worked", value: slip.summary.worked_days },
+                  { label: "Present (shifts)", value: slip.summary.present_days },
                   { label: "Half days", value: slip.summary.half_days },
+                  { label: "Absent", value: slip.summary.absent_days },
                   { label: "Leave", value: slip.summary.leave_days },
                   { label: "Off", value: slip.summary.off_days },
                   { label: "Payable days", value: slip.summary.payable_days },
@@ -282,11 +307,11 @@ export function PayslipPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {slip.days.map((d) => (
-                      <tr key={d.date}>
+                    {slip.days.map((d, i) => (
+                      <tr key={`${d.date}-${d.shift ?? "none"}-${i}`}>
                         <td className="px-3 py-1.5 tabular-nums">{d.date}</td>
                         <td className={`px-3 py-1.5 font-medium ${STATUS_CLS[d.status]}`}>{STATUS_LABEL[d.status]}</td>
-                        <td className="px-3 py-1.5 text-muted-foreground">{d.shift ? SHIFT_LABEL[d.shift] : "—"}</td>
+                        <td className="px-3 py-1.5 text-muted-foreground">{dayShiftText(d)}</td>
                         <td className="px-3 py-1.5 text-muted-foreground">{d.customer_name ?? "—"}</td>
                         <td className="px-3 py-1.5 text-right tabular-nums">{d.amount ? inr(d.amount) : "—"}</td>
                       </tr>

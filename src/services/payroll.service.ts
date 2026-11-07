@@ -1,7 +1,7 @@
 import { endpoints } from "./api/endpoints";
 import { http } from "./api/http";
 
-export type AttendanceStatus = "present" | "half_day" | "leave" | "off";
+export type AttendanceStatus = "present" | "half_day" | "leave" | "off" | "absent";
 export type ShiftKind = "day" | "night" | "full_24h" | "custom";
 
 export interface AttendanceRecord {
@@ -12,6 +12,8 @@ export interface AttendanceRecord {
   date: string;
   status: AttendanceStatus;
   shift: ShiftKind;
+  start_time?: string | null;
+  end_time?: string | null;
   assignment_id?: string | null;
   customer_name?: string | null;
   pay_rate?: number | null;
@@ -28,6 +30,7 @@ export interface DayRoster {
     half_day: number;
     leave: number;
     off: number;
+    absent: number;
   };
   records: AttendanceRecord[];
 }
@@ -36,6 +39,8 @@ export interface AttendanceBulkItem {
   employee_id: string;
   status: AttendanceStatus;
   shift: ShiftKind;
+  start_time?: string | null;
+  end_time?: string | null;
   pay_rate?: number | null;
   note?: string | null;
 }
@@ -44,6 +49,8 @@ export interface PayslipDay {
   date: string;
   status: AttendanceStatus | "unmarked";
   shift: ShiftKind | null;
+  start_time?: string | null;
+  end_time?: string | null;
   customer_name?: string | null;
   pay_rate?: number | null;
   amount: number;
@@ -54,12 +61,15 @@ export interface PayslipSummary {
   half_days: number;
   leave_days: number;
   off_days: number;
+  absent_days: number;
+  worked_days: number;
   marked_days: number;
   unmarked_days: number;
   payable_days: number;
   gross_pay: number;
   by_shift: Record<string, number>;
   off_dates: string[];
+  absent_dates: string[];
 }
 
 export interface Payslip {
@@ -75,6 +85,7 @@ export interface Payslip {
   period: { month: string; start: string; end: string; days_in_month: number };
   summary: PayslipSummary;
   off_dates: string[];
+  absent_dates: string[];
   days: PayslipDay[];
 }
 
@@ -89,6 +100,8 @@ export interface PayrollRunRow {
   half_days: number;
   leave_days: number;
   off_days: number;
+  absent_days: number;
+  worked_days: number;
   payable_days: number;
   gross_pay: number;
   by_shift: Record<string, number>;

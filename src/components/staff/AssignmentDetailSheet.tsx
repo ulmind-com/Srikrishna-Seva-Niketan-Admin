@@ -392,7 +392,7 @@ export function AssignmentDetailSheet({ assignment, open, onOpenChange }: Props)
                   </Row>
                 )}
                 <Row icon={Clock} label="Shift">
-                  {SHIFT_LABEL[assignment.shift] ?? assignment.shift}
+                  {assignment.shift_label ?? SHIFT_LABEL[assignment.shift] ?? assignment.shift}
                 </Row>
               </div>
 

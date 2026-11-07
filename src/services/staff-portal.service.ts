@@ -251,6 +251,10 @@ export interface StaffAssignment {
   place_name?: string | null;
   address?: string | null;
   shift: string;
+  start_time?: string | null;
+  end_time?: string | null;
+  /** Readable shift, e.g. "6:00 AM - 6:00 PM" (server-computed). */
+  shift_label?: string;
   start_date: string;
   end_date?: string | null;
   acceptance_status: "pending" | "accepted" | "declined";

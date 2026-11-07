@@ -67,6 +67,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Assignments", to: "/assignments", icon: CalendarClock, permission: "assignments:view" },
       { label: "Staff Deployment", to: "/staff-deployment", icon: Activity, permission: "assignments:view" },
       { label: "Attendance", to: "/attendance", icon: CalendarCheck, permission: "payroll:view" },
+      { label: "Attendance Report", to: "/attendance-report", icon: CalendarCheck, permission: "payroll:view" },
       { label: "Payslips", to: "/payslips", icon: Receipt, permission: "payroll:view" },
       { label: "Payments", to: "/payments", icon: Receipt, permission: "payments:view" },
       { label: "Monthly Bills", to: "/monthly-bills", icon: Receipt, permission: "assignments:view" },

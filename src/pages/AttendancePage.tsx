@@ -38,7 +38,8 @@ import {
 const STATUSES: { key: AttendanceStatus; label: string; cls: string }[] = [
   { key: "present", label: "Present", cls: "bg-emerald-500 text-white border-emerald-500" },
   { key: "half_day", label: "Half", cls: "bg-amber-500 text-white border-amber-500" },
-  { key: "leave", label: "Leave", cls: "bg-rose-500 text-white border-rose-500" },
+  { key: "absent", label: "Absent", cls: "bg-rose-600 text-white border-rose-600" },
+  { key: "leave", label: "Leave", cls: "bg-rose-400 text-white border-rose-400" },
   { key: "off", label: "Off", cls: "bg-slate-500 text-white border-slate-500" },
 ];
 
@@ -147,7 +148,7 @@ export function AttendancePage() {
 
   // Live counts from the current (unsaved) marks across visible staff.
   const counts = useMemo(() => {
-    const c = { present: 0, half_day: 0, leave: 0, off: 0, unmarked: 0 };
+    const c = { present: 0, half_day: 0, absent: 0, leave: 0, off: 0, unmarked: 0 };
     for (const e of visible) {
       const s = marks[e.id]?.status;
       if (!s) c.unmarked += 1;
