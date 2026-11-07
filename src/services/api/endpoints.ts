@@ -108,6 +108,10 @@ export const endpoints = {
     deployment: "/assignments/deployment",
     issueBill: (id: string) => `/assignments/${id}/issue-bill`,
   },
+  billing: {
+    monthly: "/billing/monthly",
+    issueMonthly: "/billing/monthly/issue",
+  },
   expenses: { root: "/expenses" },
   payments: { root: "/payments" },
   payroll: {

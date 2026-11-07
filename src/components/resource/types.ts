@@ -14,6 +14,7 @@ export type FieldType =
   | "video"
   | "tags"
   | "date"
+  | "time"
   | "geopoint"
   | "divider";
 
@@ -41,6 +42,8 @@ export interface FieldConfig {
   };
   colSpan?: 1 | 2;
   section?: string;
+  /** Show this field only when another field's value is one of these. */
+  showWhen?: { field: string; in: string[] };
   folder?: string; // image upload folder
   defaultValue?: unknown;
   min?: number;

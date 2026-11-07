@@ -214,6 +214,11 @@ export interface Assignment extends BaseDoc {
   place_name?: string | null;
   address?: string | null;
   shift: ShiftType;
+  /** Custom shift window as "HH:MM" (24h), used when shift === "custom". */
+  start_time?: string | null;
+  end_time?: string | null;
+  /** Readable shift, e.g. "6:00 AM - 6:00 PM" (server-computed). */
+  shift_label?: string;
   start_date: string;
   end_date?: string | null;
   /** Write-only convenience input — the backend turns it into end_date. */
@@ -226,6 +231,8 @@ export interface Assignment extends BaseDoc {
   decline_reason?: string | null;
   dest_lat?: number | null;
   dest_lng?: number | null;
+  customer_daily_rate?: number | null;
+  employee_daily_rate?: number | null;
   customer_rate?: number | null;
   employee_payout?: number | null;
   other_expense?: number | null;

@@ -19,6 +19,26 @@ const SHIFT_LABEL: Record<string, string> = {
   custom: "Custom",
 };
 
+/** "18:00" -> "6:00 PM". */
+function fmtTime(t?: string | null): string {
+  if (!t) return "?";
+  const [h, m] = t.split(":");
+  const hi = Number(h);
+  const mi = Number(m);
+  if (Number.isNaN(hi) || Number.isNaN(mi)) return t;
+  const suffix = hi < 12 ? "AM" : "PM";
+  const h12 = hi % 12 || 12;
+  return `${h12}:${String(mi).padStart(2, "0")} ${suffix}`;
+}
+
+/** Shift label, showing the custom time window when set. */
+function shiftText(r: Assignment): string {
+  if (r.shift === "custom" && (r.start_time || r.end_time)) {
+    return `${fmtTime(r.start_time)} – ${fmtTime(r.end_time)}`;
+  }
+  return SHIFT_LABEL[r.shift] ?? r.shift;
+}
+
 const STATUS_VARIANT: Record<string, "success" | "secondary" | "warning" | "danger"> = {
   active: "success",
   scheduled: "secondary",
@@ -67,7 +87,7 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
     },
     {
       header: "Shift",
-      cell: (r) => <Badge variant="outline">{SHIFT_LABEL[r.shift] ?? r.shift}</Badge>,
+      cell: (r) => <Badge variant="outline">{shiftText(r)}</Badge>,
     },
     {
       header: "Posted At",
@@ -253,6 +273,22 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
       section: "Assignment",
     },
     {
+      name: "start_time",
+      label: "Shift Start Time",
+      type: "time",
+      section: "Assignment",
+      showWhen: { field: "shift", in: ["custom"] },
+      helper: "e.g. 6:00 AM start.",
+    },
+    {
+      name: "end_time",
+      label: "Shift End Time",
+      type: "time",
+      section: "Assignment",
+      showWhen: { field: "shift", in: ["custom"] },
+      helper: "Overnight is fine — e.g. 8:00 PM to 6:00 AM.",
+    },
+    {
       name: "status",
       label: "Status",
       type: "select",
@@ -335,8 +371,8 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
       ],
       section: "Billing",
     },
-    { name: "customer_rate", label: "Contract Amount (₹)", type: "number", min: 0, helper: "What the customer pays — counts as revenue.", section: "Billing" },
-    { name: "employee_payout", label: "Staff Payout (₹)", type: "number", min: 0, helper: "What the nurse is paid — an expense.", section: "Billing" },
+    { name: "customer_daily_rate", label: "Daily Rate — Customer (₹/day)", type: "number", min: 0, helper: "Charged to the customer per day. Total = rate × days.", section: "Billing" },
+    { name: "employee_daily_rate", label: "Daily Payout — Staff (₹/day)", type: "number", min: 0, helper: "Paid to the nurse per day — an expense.", section: "Billing" },
     { name: "other_expense", label: "Other Expense (₹)", type: "number", min: 0, helper: "Travel, kit, etc. for this engagement — an expense.", section: "Billing" },
     { name: "notes", label: "Notes", type: "textarea", section: "Billing", colSpan: 2 },
   ],

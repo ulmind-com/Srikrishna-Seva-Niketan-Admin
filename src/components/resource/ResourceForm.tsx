@@ -50,8 +50,12 @@ export function ResourceForm<T>({
     register,
     handleSubmit,
     control,
+    watch,
     formState: { errors },
   } = useForm<Record<string, unknown>>({ defaultValues });
+
+  // Watch everything so conditional (`showWhen`) fields appear/hide live.
+  const watchedValues = watch();
 
   const sections = useMemo(() => groupSections(fields), [fields]);
 
@@ -99,6 +103,10 @@ export function ResourceForm<T>({
             )}
             <div className="grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-2">
               {section.fields.map((field) => {
+                if (field.showWhen) {
+                  const current = String(watchedValues[field.showWhen.field] ?? "");
+                  if (!field.showWhen.in.includes(current)) return null;
+                }
                 const error = getError(errors, field.name);
                 return (
                   <div
@@ -340,6 +348,16 @@ function renderControl(
         <Input
           id={field.name}
           type="date"
+          {...register(field.name, { required: field.required })}
+        />
+      );
+
+    case "time":
+      return (
+        <Input
+          id={field.name}
+          type="time"
+          placeholder={field.placeholder}
           {...register(field.name, { required: field.required })}
         />
       );

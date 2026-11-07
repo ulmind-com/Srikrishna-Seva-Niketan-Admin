@@ -26,9 +26,15 @@ export function CustomerBillForm({
   branch?: Location | null;
   authorizedSignatureUrl?: string | null;
 }) {
-  const amount = assignment.customer_rate ?? null;
   const days = assignment.total_days ?? assignment.duration_days ?? null;
-  const rate = amount != null && days ? Math.round(amount / days) : null;
+  // Prefer the stored per-day rate; fall back to back-computing it from the total.
+  const rate =
+    assignment.customer_daily_rate ??
+    (assignment.customer_rate != null && days
+      ? Math.round(assignment.customer_rate / days)
+      : null);
+  const amount =
+    assignment.customer_rate ?? (rate != null && days ? rate * days : null);
 
   const headerLine = branch?.city
     ? `${branch.city.toUpperCase()}${branch.pincode ? ` ★ ${branch.pincode}` : ""}`
