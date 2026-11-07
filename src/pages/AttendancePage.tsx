@@ -102,7 +102,6 @@ export function AttendancePage() {
     queryFn: () =>
       http.list<Employee>(endpoints.employees.root, {
         page_size: 500,
-        is_active: true,
       }),
     staleTime: 60_000,
   });

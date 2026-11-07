@@ -96,6 +96,39 @@ export function DashboardPage() {
     stats?.is_scoped || (!user?.is_superuser && (user?.location_ids?.length ?? 0) > 0)
   );
 
+  // Today's shift breakdown as a compact hint, e.g. "Day 2 · Night 1 · Custom 1".
+  const SHIFT_LABEL: Record<string, string> = {
+    day: "Day",
+    night: "Night",
+    full_24h: "24h",
+    custom: "Custom",
+  };
+  const shiftBreakdown = Object.entries(stats?.today?.by_shift ?? {})
+    .map(([k, v]) => `${SHIFT_LABEL[k] ?? k} ${v}`)
+    .join(" · ");
+
+  // Two duty/payroll cards shared by both role views.
+  const dutyCards = stats
+    ? [
+        {
+          label: "On Duty Today",
+          value: stats.today?.on_duty ?? 0,
+          icon: <Activity className="h-5 w-5" />,
+          tone: "primary" as const,
+          hint: shiftBreakdown || "No staff on duty today",
+          to: "/staff-deployment",
+        },
+        {
+          label: "This Month Payout",
+          value: formatCurrency(stats.payroll?.total_payout ?? 0),
+          icon: <IndianRupee className="h-5 w-5" />,
+          tone: "accent" as const,
+          hint: "Staff pay for the current month",
+          to: "/payslips",
+        },
+      ]
+    : [];
+
   // Cards for Branch Manager: focus on Staff, Working Staff, Revenue, Active Shifts
   const managerCards = stats
     ? [
@@ -236,7 +269,7 @@ export function DashboardPage() {
       ]
     : [];
 
-  const activeCards = isManagerScoped ? managerCards : adminCards;
+  const activeCards = [...(isManagerScoped ? managerCards : adminCards), ...dutyCards];
   const activeQuickActions = isManagerScoped ? MANAGER_QUICK_ACTIONS : GENERAL_QUICK_ACTIONS;
 
   return (

@@ -847,6 +847,14 @@ export interface DashboardStats {
   assignments?: {
     active: number;
   };
+  today?: {
+    on_duty: number;
+    by_shift: Record<string, number>;
+  };
+  payroll?: {
+    month: string;
+    total_payout: number;
+  };
   customers?: {
     active: number;
   };

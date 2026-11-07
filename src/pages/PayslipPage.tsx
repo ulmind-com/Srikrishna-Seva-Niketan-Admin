@@ -140,6 +140,9 @@ export function PayslipPage() {
             Monthly payroll run — pay is payable days (present + half) × daily rate.
             Leave and off days are unpaid.
           </p>
+          <p className="mt-1 text-xs text-muted-foreground/80">
+            Auto-filled from duties — mark Absent / Leave in Attendance to adjust a day.
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Input type="month" value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} className="w-auto" />
