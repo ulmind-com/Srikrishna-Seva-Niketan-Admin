@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
-import { Loader2, Printer, ReceiptText, Wallet, X } from "lucide-react";
+import { FileDown, Loader2, Printer, ReceiptText, Wallet, X } from "lucide-react";
+import { downloadPayslipPdf } from "@/lib/payslip-export";
 import { useAuth } from "@/contexts/AuthContext";
 import { http } from "@/services/api/http";
 import { endpoints } from "@/services/api/endpoints";
@@ -238,6 +239,14 @@ export function PayslipPage() {
           <div className="no-print flex items-center justify-between border-b border-border p-3">
             <p className="text-sm font-medium">Payslip</p>
             <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => slip && downloadPayslipPdf(slip)}
+                disabled={!slip}
+              >
+                <FileDown className="mr-1 h-3.5 w-3.5" /> PDF
+              </Button>
               <Button variant="outline" size="sm" onClick={() => window.print()} disabled={!slip}>
                 <Printer className="mr-1 h-3.5 w-3.5" /> Print
               </Button>
