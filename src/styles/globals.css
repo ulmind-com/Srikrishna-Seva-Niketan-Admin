@@ -203,9 +203,21 @@
   }
   /* Keep brand colours on paper instead of letting the browser strip them. */
   .id-card,
-  .doc-sheet {
+  .doc-sheet,
+  .bill-sheet {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+  /* Customer bill prints on its own 6 × 10 inch pad sheet (portrait), not A4. */
+  .bill-sheet {
+    width: 152mm !important;
+    min-height: 254mm !important;
+    padding: 9mm 10mm !important;
+    page: billpad;
+  }
+  @page billpad {
+    size: 152mm 254mm;
+    margin: 0;
   }
   .doc-sheet {
     width: 210mm !important;

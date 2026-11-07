@@ -733,7 +733,7 @@ export function ReportsPage() {
                           </TableCell>
                           <TableCell className="text-right">
                             <Link
-                              to={`/assignments/${r.id}/bill`}
+                              to={`/assignments/${r.id}/bill?print=1`}
                               className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
                             >
                               <Receipt className="h-3.5 w-3.5" /> Bill

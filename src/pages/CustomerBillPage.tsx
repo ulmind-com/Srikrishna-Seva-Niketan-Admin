@@ -1,4 +1,5 @@
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useRef } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import { ArrowLeft, Loader2, Printer } from "lucide-react";
@@ -16,6 +17,9 @@ import { Button } from "@/components/ui/button";
  */
 export function CustomerBillPage() {
   const { id = "" } = useParams();
+  const [searchParams] = useSearchParams();
+  const autoPrint = searchParams.get("print") === "1";
+  const printedRef = useRef(false);
 
   const { data: assignment, isLoading } = useQuery({
     queryKey: ["assignments", "detail", id],
@@ -48,6 +52,17 @@ export function CustomerBillPage() {
     queryFn: () => http.post<{ bill_no: number }>(endpoints.assignments.issueBill(id)),
     enabled: Boolean(id),
   });
+
+  // When reached via the "Bill" link in Reports (?print=1), open the print
+  // dialog automatically once the bill content + number are ready.
+  useEffect(() => {
+    if (!autoPrint || printedRef.current) return;
+    if (!assignment || !customer || !billData) return;
+    printedRef.current = true;
+    // Small delay so the signature image / layout settle before printing.
+    const t = setTimeout(() => window.print(), 500);
+    return () => clearTimeout(t);
+  }, [autoPrint, assignment, customer, billData]);
 
   if (isLoading) {
     return (

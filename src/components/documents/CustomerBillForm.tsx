@@ -36,7 +36,7 @@ export function CustomerBillForm({
   const mob = branch?.phone || FALLBACK_MOB;
 
   return (
-    <div className="bill-sheet mx-auto w-[150mm] bg-white px-[10mm] py-[8mm] font-sans text-[#111]">
+    <div className="bill-sheet mx-auto flex min-h-[254mm] w-[152mm] flex-col bg-white px-[10mm] py-[9mm] font-sans text-[#111]">
       {/* ---- Header ---- */}
       <div className="relative text-center">
         <img
@@ -92,7 +92,7 @@ export function CustomerBillForm({
         </thead>
         <tbody>
           <tr>
-            <td className="h-[110px] border border-black px-2 py-1 align-top">
+            <td className="h-[140mm] border border-black px-2 py-1 align-top">
               <p>Date</p>
               <p className="mt-1">
                 From{" "}
@@ -129,7 +129,7 @@ export function CustomerBillForm({
       </table>
 
       {/* ---- Signatures ---- */}
-      <div className="mt-6 flex items-end justify-between text-[12px] font-semibold">
+      <div className="mt-auto flex items-end justify-between pt-6 text-[12px] font-semibold">
         <p>Signature of client</p>
         <div className="text-right">
           <p>For : {ORG_NAME.toUpperCase()}</p>
