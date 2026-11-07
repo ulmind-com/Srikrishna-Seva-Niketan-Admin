@@ -106,7 +106,6 @@ export const endpoints = {
   assignments: {
     root: "/assignments",
     deployment: "/assignments/deployment",
-    daily: "/assignments/daily",
     issueBill: (id: string) => `/assignments/${id}/issue-bill`,
   },
   expenses: { root: "/expenses" },

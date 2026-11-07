@@ -24,7 +24,6 @@ import { EmployeeDocumentsPage } from "@/pages/EmployeeDocumentsPage";
 import { StaffVerificationPage } from "@/pages/StaffVerificationPage";
 import { LocationStaffOverviewPage } from "@/pages/LocationStaffOverviewPage";
 import { StaffDeploymentPage } from "@/pages/StaffDeploymentPage";
-import { DailyShiftPage } from "@/pages/DailyShiftPage";
 import { AttendancePage } from "@/pages/AttendancePage";
 import { PayslipPage } from "@/pages/PayslipPage";
 import { CustomerAgreementPage } from "@/pages/CustomerAgreementPage";
@@ -94,7 +93,6 @@ export function AppRoutes() {
           <Route path="/assignments" element={<AssignmentsPage />} />
           <Route path="/staff-deployment" element={<StaffDeploymentPage />} />
           <Route path="/assignments/:id/bill" element={<CustomerBillPage />} />
-          <Route path="/daily-shifts" element={<DailyShiftPage />} />
           <Route path="/attendance" element={<AttendancePage />} />
           <Route path="/payslips" element={<PayslipPage />} />
           <Route path="/expenses" element={<ExpensesPage />} />
