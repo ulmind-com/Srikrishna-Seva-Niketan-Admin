@@ -229,6 +229,7 @@ export interface Assignment extends BaseDoc {
   customer_rate?: number | null;
   employee_payout?: number | null;
   other_expense?: number | null;
+  bill_no?: number | null;
   payment_type?: "prepaid" | "postpaid";
   payment_status?: string;
   payment_received_at?: string | null;

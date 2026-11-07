@@ -28,6 +28,7 @@ import { DailyShiftPage } from "@/pages/DailyShiftPage";
 import { AttendancePage } from "@/pages/AttendancePage";
 import { PayslipPage } from "@/pages/PayslipPage";
 import { CustomerAgreementPage } from "@/pages/CustomerAgreementPage";
+import { CustomerBillPage } from "@/pages/CustomerBillPage";
 import { StaffLoginPage } from "@/pages/staff/StaffLoginPage";
 import { StaffForgotPasswordPage } from "@/pages/staff/StaffForgotPasswordPage";
 import { StaffRegisterPage } from "@/pages/staff/StaffRegisterPage";
@@ -92,6 +93,7 @@ export function AppRoutes() {
           <Route path="/customers/:id/agreement" element={<CustomerAgreementPage />} />
           <Route path="/assignments" element={<AssignmentsPage />} />
           <Route path="/staff-deployment" element={<StaffDeploymentPage />} />
+          <Route path="/assignments/:id/bill" element={<CustomerBillPage />} />
           <Route path="/daily-shifts" element={<DailyShiftPage />} />
           <Route path="/attendance" element={<AttendancePage />} />
           <Route path="/payslips" element={<PayslipPage />} />

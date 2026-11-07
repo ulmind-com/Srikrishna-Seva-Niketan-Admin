@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -588,6 +589,7 @@ export function ReportsPage() {
                     <TableHead className="text-right">Expense</TableHead>
                     <TableHead className="text-right">Net Profit</TableHead>
                     <TableHead>Duty Status</TableHead>
+                    <TableHead className="text-right">Bill</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -608,7 +610,7 @@ export function ReportsPage() {
                     if (!filtered.length) {
                       return (
                         <TableRow>
-                          <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                          <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                             No duty engagements found for the selected period.
                           </TableCell>
                         </TableRow>
@@ -728,6 +730,14 @@ export function ReportsPage() {
                                 </span>
                               )}
                             </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Link
+                              to={`/assignments/${r.id}/bill`}
+                              className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                            >
+                              <Receipt className="h-3.5 w-3.5" /> Bill
+                            </Link>
                           </TableCell>
                         </TableRow>
                       );
