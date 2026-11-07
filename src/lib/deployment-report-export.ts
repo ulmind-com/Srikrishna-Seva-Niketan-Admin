@@ -2,8 +2,10 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { DeploymentBranch, DeploymentOverview } from "@/types/models";
 
-/** Customer contact fields joined onto each deployed site. */
-export interface DeploymentCustomerInfo {
+/** Employee contact fields joined onto each available staff row. */
+export interface EmployeeContactInfo {
+  code?: string | null;
+  category?: string | null;
   phone?: string | null;
   alt_phone?: string | null;
   address?: string | null;
@@ -14,46 +16,30 @@ export interface DeploymentCustomerInfo {
 export interface DeploymentReportInput {
   branches: DeploymentBranch[];
   totals: DeploymentOverview["totals"];
-  /** customer_id -> contact info, joined from the customers list. */
-  customerMap: Map<string, DeploymentCustomerInfo>;
+  /** employee_id -> contact info, joined from the employees list. */
+  employeeMap: Map<string, EmployeeContactInfo>;
 }
 
 const EMERALD: [number, number, number] = [15, 118, 110];
 const SLATE: [number, number, number] = [30, 41, 59];
 const MUTED: [number, number, number] = [100, 116, 139];
 
-function shiftLabel(s: string): string {
-  if (s === "full_24h") return "24 Hours";
-  if (s === "day") return "Day";
-  if (s === "night") return "Night";
-  if (s === "custom") return "Custom";
-  return s;
-}
-
-/** Full address for a deployed site — posting address first, else the customer's. */
-function siteAddress(
-  assignmentAddress: string | null | undefined,
-  placeName: string | null | undefined,
-  info?: DeploymentCustomerInfo
-): string {
-  const parts = [
-    assignmentAddress || info?.address || placeName || "",
-    info?.city || "",
-    info?.pincode || "",
-  ].filter(Boolean);
+/** Full address — employee address + city + pincode. */
+function fullAddress(info?: EmployeeContactInfo): string {
+  const parts = [info?.address || "", info?.city || "", info?.pincode || ""].filter(Boolean);
   return parts.length ? parts.join(", ") : "—";
 }
 
 type AutoTableDoc = jsPDF & { lastAutoTable: { finalY: number } };
 
 /**
- * Branch-wise Staff Deployment report as a premium PDF: a grand-total table
- * across branches, then one section per branch listing every deployed site with
- * the client's name, address and both phone numbers, the nurse on duty, the
- * shift, plus a per-branch subtotal.
+ * Branch-wise Available Staff report as a premium PDF: a grand-total table
+ * across branches, then one section per branch listing every staff member who
+ * is free (ready to assign) with their name, employee ID, category, address and
+ * both phone numbers, plus a per-branch available count.
  */
 export function downloadDeploymentReportPdf(input: DeploymentReportInput) {
-  const { branches, totals, customerMap } = input;
+  const { branches, totals, employeeMap } = input;
   const doc = new jsPDF({ unit: "pt", format: "a4", orientation: "landscape" });
   const marginX = 24;
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -83,7 +69,7 @@ export function downloadDeploymentReportPdf(input: DeploymentReportInput) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(220, 245, 240);
-  doc.text("Branch-wise Staff Deployment Report", pageWidth - marginX, 26, {
+  doc.text("Branch-wise Available Staff Report", pageWidth - marginX, 26, {
     align: "right",
   });
 
@@ -92,7 +78,7 @@ export function downloadDeploymentReportPdf(input: DeploymentReportInput) {
   doc.setFontSize(10);
   doc.setTextColor(...SLATE);
   doc.text(
-    `Total Branches: ${totals.branches}   |   Staff Deployed: ${totals.assigned_count}   |   Available: ${totals.available_count}   |   Total Staff: ${totals.total_staff}`,
+    `Total Branches: ${totals.branches}   |   Available Staff: ${totals.available_count}   |   On Duty: ${totals.assigned_count}   |   Total Staff: ${totals.total_staff}`,
     marginX,
     60
   );
@@ -110,14 +96,13 @@ export function downloadDeploymentReportPdf(input: DeploymentReportInput) {
   // ---- Grand-Total Summary (one row per branch) ----
   autoTable(doc, {
     startY: 76,
-    head: [["Branch", "City", "Total Staff", "On Duty", "Available", "Sites"]],
+    head: [["Branch", "City", "Total Staff", "On Duty", "Available"]],
     body: branches.map((b) => [
       `${b.location_name}\n${b.location_code}`,
       b.city || "—",
       String(b.total_staff),
       String(b.assigned_count),
       String(b.available_count),
-      String(b.assignments.length),
     ]),
     foot: [
       [
@@ -126,7 +111,6 @@ export function downloadDeploymentReportPdf(input: DeploymentReportInput) {
         String(totals.total_staff),
         String(totals.assigned_count),
         String(totals.available_count),
-        String(branches.reduce((n, b) => n + b.assignments.length, 0)),
       ],
     ],
     theme: "grid",
@@ -134,12 +118,11 @@ export function downloadDeploymentReportPdf(input: DeploymentReportInput) {
     headStyles: { fillColor: EMERALD, textColor: 255, fontSize: 8.5, fontStyle: "bold", halign: "center" },
     footStyles: { fillColor: [241, 245, 249], textColor: SLATE, fontStyle: "bold", halign: "center" },
     columnStyles: {
-      0: { cellWidth: 200, fontStyle: "bold", halign: "left" },
+      0: { cellWidth: 220, fontStyle: "bold", halign: "left" },
       1: { halign: "left" },
       2: { halign: "center" },
       3: { halign: "center", textColor: [217, 119, 6] },
       4: { halign: "center", textColor: [16, 149, 90] },
-      5: { halign: "center" },
     },
     margin: { left: marginX, right: marginX },
     didDrawPage: (data) => footer(data.pageNumber),
@@ -147,9 +130,8 @@ export function downloadDeploymentReportPdf(input: DeploymentReportInput) {
 
   let startY = (doc as AutoTableDoc).lastAutoTable.finalY + 18;
 
-  // ---- Per-branch sections ----
+  // ---- Per-branch sections (available staff) ----
   for (const branch of branches) {
-    // Keep a branch's title bar with at least its first rows on the same page.
     if (startY > pageHeight - 120) {
       doc.addPage();
       startY = 48;
@@ -167,36 +149,36 @@ export function downloadDeploymentReportPdf(input: DeploymentReportInput) {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8.5);
     doc.text(
-      `On Duty: ${branch.assigned_count}   ·   Available: ${branch.available_count}   ·   Total Staff: ${branch.total_staff}`,
+      `Available: ${branch.available_count}   ·   On Duty: ${branch.assigned_count}   ·   Total Staff: ${branch.total_staff}`,
       pageWidth - marginX - 8,
       startY + 15,
       { align: "right" }
     );
 
     const body =
-      branch.assignments.length > 0
-        ? branch.assignments.map((a, idx) => {
-            const info = customerMap.get(a.customer_id);
+      branch.available_staff.length > 0
+        ? branch.available_staff.map((s, idx) => {
+            const info = employeeMap.get(s.id);
             return [
               String(idx + 1),
-              a.customer_name,
-              siteAddress(a.address, a.place_name, info),
+              s.name,
+              s.code || info?.code || "—",
+              s.category || info?.category || "—",
+              fullAddress(info),
               info?.phone || "—",
               info?.alt_phone || "—",
-              a.employee_name,
-              shiftLabel(a.shift),
             ];
           })
-        : [["—", "No staff currently deployed at this branch.", "", "", "", "", ""]];
+        : [["—", "No staff available at this branch.", "", "", "", "", ""]];
 
     autoTable(doc, {
       startY: startY + barHeight,
-      head: [["Sl", "Client Name", "Address", "Phone", "Alt Phone", "Staff Deployed", "Shift"]],
+      head: [["Sl", "Name", "Emp ID", "Category", "Address", "Phone", "Alt Phone"]],
       body,
       foot: [
         [
           {
-            content: `Sites: ${branch.assignments.length}      Staff Deployed: ${branch.assigned_count}`,
+            content: `Available Staff: ${branch.available_staff.length}`,
             colSpan: 7,
             styles: { halign: "left" as const },
           },
@@ -209,11 +191,11 @@ export function downloadDeploymentReportPdf(input: DeploymentReportInput) {
       columnStyles: {
         0: { cellWidth: 26, halign: "center" },
         1: { cellWidth: 150, fontStyle: "bold" },
-        2: { cellWidth: 218 },
-        3: { cellWidth: 92 },
-        4: { cellWidth: 92 },
-        5: { cellWidth: 150 },
-        6: { cellWidth: 66, halign: "center" },
+        2: { cellWidth: 90 },
+        3: { cellWidth: 80 },
+        4: { cellWidth: 220 },
+        5: { cellWidth: 92 },
+        6: { cellWidth: 92 },
       },
       margin: { left: marginX, right: marginX },
       didDrawPage: (data) => footer(data.pageNumber),
@@ -223,5 +205,5 @@ export function downloadDeploymentReportPdf(input: DeploymentReportInput) {
   }
 
   const stamp = new Date().toISOString().slice(0, 10);
-  doc.save(`staff_deployment_report_${stamp}.pdf`);
+  doc.save(`available_staff_report_${stamp}.pdf`);
 }

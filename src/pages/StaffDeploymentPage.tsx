@@ -28,7 +28,7 @@ import {
 import { PushDispatchModal } from "@/components/notifications/PushDispatchModal";
 import {
   downloadDeploymentReportPdf,
-  type DeploymentCustomerInfo,
+  type EmployeeContactInfo,
 } from "@/lib/deployment-report-export";
 import type { Assignment, DeploymentBranch } from "@/types/models";
 
@@ -57,34 +57,36 @@ export function StaffDeploymentPage() {
     staleTime: 30_000,
   });
 
-  // Customers carry phone / alt_phone / address — joined into the PDF report,
-  // because the deployment payload itself does not include contact details.
-  const { data: customersData } = useQuery({
-    queryKey: ["customers", "for-deployment-report"],
-    queryFn: () => resourceServices.customers.list({ page_size: 1000 }),
+  // Employees carry address / phone / alt_phone — joined into the PDF report,
+  // because the deployment payload's available_staff omits these contact fields.
+  const { data: employeesData } = useQuery({
+    queryKey: ["employees", "for-deployment-report"],
+    queryFn: () => resourceServices.employees.list({ page_size: 1000 }),
     staleTime: 60_000,
   });
 
-  const customerMap = useMemo(() => {
-    const map = new Map<string, DeploymentCustomerInfo>();
-    for (const c of customersData?.items ?? []) {
-      map.set(c.id, {
-        phone: c.phone,
-        alt_phone: c.alt_phone,
-        address: c.address,
-        city: c.city,
-        pincode: c.pincode,
+  const employeeMap = useMemo(() => {
+    const map = new Map<string, EmployeeContactInfo>();
+    for (const e of employeesData?.items ?? []) {
+      map.set(e.id, {
+        code: e.code,
+        category: e.category,
+        phone: e.phone,
+        alt_phone: e.alt_phone,
+        address: e.address,
+        city: e.city,
+        pincode: e.pincode,
       });
     }
     return map;
-  }, [customersData]);
+  }, [employeesData]);
 
   const totals = data?.totals;
   const branches = data?.branches ?? [];
 
   const downloadReport = () => {
     if (!data?.totals) return;
-    downloadDeploymentReportPdf({ branches: data.branches, totals: data.totals, customerMap });
+    downloadDeploymentReportPdf({ branches: data.branches, totals: data.totals, employeeMap });
   };
 
   const deployedPct = totals?.total_staff
