@@ -53,11 +53,19 @@ function fmtTime(t?: string | null): string {
   return `${h12}:${String(mi).padStart(2, "0")} ${suffix}`;
 }
 
-/** Shift cell for a payslip day — time window for custom shifts. */
-function dayShiftText(d: { shift: string | null; start_time?: string | null; end_time?: string | null }): string {
+/** Shift cell for a payslip day — time window(s) for custom shifts. */
+function dayShiftText(d: {
+  shift: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  shift_windows?: { start?: string | null; end?: string | null }[] | null;
+}): string {
   if (!d.shift) return "—";
-  if (d.shift === "custom" && (d.start_time || d.end_time)) {
-    return `${fmtTime(d.start_time)} – ${fmtTime(d.end_time)}`;
+  if (d.shift === "custom") {
+    if (d.shift_windows && d.shift_windows.length) {
+      return d.shift_windows.map((w) => `${fmtTime(w.start)}–${fmtTime(w.end)}`).join(", ");
+    }
+    if (d.start_time || d.end_time) return `${fmtTime(d.start_time)} – ${fmtTime(d.end_time)}`;
   }
   return SHIFT_LABEL[d.shift] ?? d.shift;
 }

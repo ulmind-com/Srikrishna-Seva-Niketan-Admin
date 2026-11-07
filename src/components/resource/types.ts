@@ -15,6 +15,7 @@ export type FieldType =
   | "tags"
   | "date"
   | "time"
+  | "shift_windows"
   | "geopoint"
   | "divider";
 

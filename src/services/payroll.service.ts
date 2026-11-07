@@ -14,6 +14,7 @@ export interface AttendanceRecord {
   shift: ShiftKind;
   start_time?: string | null;
   end_time?: string | null;
+  shift_windows?: { start?: string | null; end?: string | null }[] | null;
   assignment_id?: string | null;
   customer_name?: string | null;
   pay_rate?: number | null;
@@ -51,6 +52,7 @@ export interface PayslipDay {
   shift: ShiftKind | null;
   start_time?: string | null;
   end_time?: string | null;
+  shift_windows?: { start?: string | null; end?: string | null }[] | null;
   customer_name?: string | null;
   pay_rate?: number | null;
   amount: number;

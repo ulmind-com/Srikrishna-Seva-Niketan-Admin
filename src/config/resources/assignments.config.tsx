@@ -19,23 +19,9 @@ const SHIFT_LABEL: Record<string, string> = {
   custom: "Custom",
 };
 
-/** "18:00" -> "6:00 PM". */
-function fmtTime(t?: string | null): string {
-  if (!t) return "?";
-  const [h, m] = t.split(":");
-  const hi = Number(h);
-  const mi = Number(m);
-  if (Number.isNaN(hi) || Number.isNaN(mi)) return t;
-  const suffix = hi < 12 ? "AM" : "PM";
-  const h12 = hi % 12 || 12;
-  return `${h12}:${String(mi).padStart(2, "0")} ${suffix}`;
-}
-
-/** Shift label, showing the custom time window when set. */
+/** Shift label — the server-computed window(s) for custom shifts, else label. */
 function shiftText(r: Assignment): string {
-  if (r.shift === "custom" && (r.start_time || r.end_time)) {
-    return `${fmtTime(r.start_time)} – ${fmtTime(r.end_time)}`;
-  }
+  if (r.shift === "custom" && r.shift_label) return r.shift_label;
   return SHIFT_LABEL[r.shift] ?? r.shift;
 }
 
@@ -273,20 +259,13 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
       section: "Assignment",
     },
     {
-      name: "start_time",
-      label: "Shift Start Time",
-      type: "time",
+      name: "shift_windows",
+      label: "Shift Times",
+      type: "shift_windows",
       section: "Assignment",
+      colSpan: 2,
       showWhen: { field: "shift", in: ["custom"] },
-      helper: "e.g. 6:00 AM start.",
-    },
-    {
-      name: "end_time",
-      label: "Shift End Time",
-      type: "time",
-      section: "Assignment",
-      showWhen: { field: "shift", in: ["custom"] },
-      helper: "Overnight is fine — e.g. 8:00 PM to 6:00 AM.",
+      helper: "Add a window per shift — e.g. 6:00 AM–2:00 PM and 6:00 PM–10:00 PM. Overnight is fine.",
     },
     {
       name: "status",

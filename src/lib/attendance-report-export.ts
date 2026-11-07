@@ -36,8 +36,11 @@ function fmtTime(t?: string | null): string {
 
 function shiftText(d: Payslip["days"][number]): string {
   if (!d.shift) return "";
-  if (d.shift === "custom" && (d.start_time || d.end_time)) {
-    return `${fmtTime(d.start_time)}-${fmtTime(d.end_time)}`;
+  if (d.shift === "custom") {
+    if (d.shift_windows && d.shift_windows.length) {
+      return d.shift_windows.map((w) => `${fmtTime(w.start)}-${fmtTime(w.end)}`).join(", ");
+    }
+    if (d.start_time || d.end_time) return `${fmtTime(d.start_time)}-${fmtTime(d.end_time)}`;
   }
   const map: Record<string, string> = { day: "Day", night: "Night", full_24h: "24h", custom: "Custom" };
   return map[d.shift] ?? d.shift;

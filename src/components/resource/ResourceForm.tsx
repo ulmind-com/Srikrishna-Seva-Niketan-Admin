@@ -16,6 +16,7 @@ import {
 import { AsyncSelect } from "@/components/common/AsyncSelect";
 import { CustomerField } from "@/components/common/CustomerField";
 import { LocationPinField } from "@/components/resource/fields/LocationPinField";
+import { ShiftWindowsField, type ShiftWindow } from "@/components/resource/fields/ShiftWindowsField";
 import { ImageUpload } from "@/components/common/ImageUpload";
 import { VideoUpload } from "@/components/common/VideoUpload";
 import { TagsInput } from "@/components/common/TagsInput";
@@ -359,6 +360,20 @@ function renderControl(
           type="time"
           placeholder={field.placeholder}
           {...register(field.name, { required: field.required })}
+        />
+      );
+
+    case "shift_windows":
+      return (
+        <Controller
+          control={control}
+          name={field.name}
+          render={({ field: f }) => (
+            <ShiftWindowsField
+              value={(f.value as ShiftWindow[]) ?? []}
+              onChange={f.onChange}
+            />
+          )}
         />
       );
 

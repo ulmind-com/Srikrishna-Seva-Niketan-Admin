@@ -35,6 +35,8 @@ function fallbackForType(field: FieldConfig): unknown {
       return false;
     case "tags":
       return [];
+    case "shift_windows":
+      return [];
     case "number":
     case "geopoint":
       return undefined;

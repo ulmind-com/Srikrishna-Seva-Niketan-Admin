@@ -217,7 +217,9 @@ export interface Assignment extends BaseDoc {
   /** Custom shift window as "HH:MM" (24h), used when shift === "custom". */
   start_time?: string | null;
   end_time?: string | null;
-  /** Readable shift, e.g. "6:00 AM - 6:00 PM" (server-computed). */
+  /** One custom shift can span several windows. */
+  shift_windows?: { start?: string | null; end?: string | null }[] | null;
+  /** Readable shift, e.g. "6:00 AM - 2:00 PM, 6:00 PM - 10:00 PM" (server-computed). */
   shift_label?: string;
   start_date: string;
   end_date?: string | null;
