@@ -222,8 +222,9 @@ export function ResourceView<T extends { id: string }>({
           )}
         </div>
 
-        {/* Table */}
-        <Table>
+        {/* Table — wide column sets get a min width so the overflow-x wrapper
+            scrolls horizontally instead of crushing / clipping columns. */}
+        <Table style={colCount > 7 ? { minWidth: `${colCount * 118}px` } : undefined}>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               {config.columns.map((col, i) => (

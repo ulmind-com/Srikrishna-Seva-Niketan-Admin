@@ -59,21 +59,44 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
   columns: [
     {
       header: "Staff → Customer",
+      headClassName: "min-w-[150px]",
       cell: (r) => (
         <div className="flex flex-col">
-          <span className="font-medium flex items-center gap-1.5">
+          <span className="flex items-center gap-1.5 whitespace-nowrap font-medium">
             <span>{r.employee_name}</span>
             {r.acceptance_status === "accepted" && (
               <VerifiedBadge size={15} title="Verified Staff" />
             )}
           </span>
-          <span className="text-xs text-muted-foreground">→ {r.customer_name}</span>
+          <span className="whitespace-nowrap text-xs text-muted-foreground">→ {r.customer_name}</span>
         </div>
       ),
     },
     {
       header: "Shift",
-      cell: (r) => <Badge variant="outline">{shiftText(r)}</Badge>,
+      headClassName: "min-w-[130px]",
+      cell: (r) => {
+        if (r.shift === "custom" && r.shift_label) {
+          const windows = r.shift_label.split(", ");
+          return (
+            <div className="flex flex-col gap-1">
+              {windows.map((w, i) => (
+                <span
+                  key={i}
+                  className="inline-flex w-fit items-center whitespace-nowrap rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-primary"
+                >
+                  {w}
+                </span>
+              ))}
+            </div>
+          );
+        }
+        return (
+          <Badge variant="outline" className="whitespace-nowrap">
+            {shiftText(r)}
+          </Badge>
+        );
+      },
     },
     {
       header: "Posted At",
@@ -88,10 +111,13 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
     },
     {
       header: "Period",
+      headClassName: "min-w-[120px]",
       cell: (r) => (
-        <div className="text-xs text-muted-foreground">
-          <DateCell value={r.start_date} />
-          {r.end_date ? <> → <DateCell value={r.end_date} /></> : " → ongoing"}
+        <div className="flex flex-col gap-0.5 whitespace-nowrap text-xs tabular-nums text-muted-foreground">
+          <span><DateCell value={r.start_date} /></span>
+          <span className="text-muted-foreground/70">
+            {r.end_date ? <>→ <DateCell value={r.end_date} /></> : "→ ongoing"}
+          </span>
         </div>
       ),
     },
@@ -101,13 +127,14 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
     },
     {
       header: "Rates & Profit (₹)",
+      headClassName: "min-w-[112px]",
       cell: (r) => {
         const bill = r.customer_rate ?? 0;
         const pay = r.employee_payout ?? 0;
         const exp = r.other_expense ?? 0;
         const profit = bill - pay - exp;
         return (
-          <div className="text-xs text-muted-foreground flex flex-col gap-0.5">
+          <div className="flex flex-col gap-0.5 whitespace-nowrap text-xs tabular-nums text-muted-foreground">
             {r.customer_rate != null && <div>Bill: <span className="font-semibold text-foreground">₹{r.customer_rate.toLocaleString()}</span></div>}
             {r.employee_payout != null && <div>Pay: ₹{r.employee_payout.toLocaleString()}</div>}
             {r.other_expense != null && r.other_expense > 0 && <div>Exp: ₹{r.other_expense.toLocaleString()}</div>}
