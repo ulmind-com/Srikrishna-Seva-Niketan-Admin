@@ -190,7 +190,7 @@ export function ReportsPage() {
 
     const rows = items.map((r) => [
       `"${r.start_date} ${r.end_date ? '→ ' + r.end_date : '(ongoing)'}"`,
-      `"${r.shift}"`,
+      `"${r.shift_label || r.shift}"`,
       r.duration_days ?? 1,
       `"${r.customer_name}"`,
       `"${r.customer_phone || ''}"`,
@@ -639,7 +639,7 @@ export function ReportsPage() {
                               </span>
                               <span className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
                                 <Clock className="h-3 w-3" />
-                                {r.shift === "full_24h" ? "24 Hours" : r.shift === "day" ? "Day" : r.shift === "night" ? "Night" : r.shift}
+                                {r.shift_label || (r.shift === "full_24h" ? "24 Hours" : r.shift === "day" ? "Day" : r.shift === "night" ? "Night" : r.shift)}
                                 {r.duration_days ? ` · ${r.duration_days} day(s)` : ""}
                               </span>
                             </div>

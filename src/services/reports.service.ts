@@ -82,6 +82,8 @@ export interface DutyReportItem {
   employee_name: string;
   employee_code?: string | null;
   shift: string;
+  shift_label?: string;
+  shift_windows?: { start?: string | null; end?: string | null }[] | null;
   place_type: string;
   place_name?: string | null;
   address?: string | null;

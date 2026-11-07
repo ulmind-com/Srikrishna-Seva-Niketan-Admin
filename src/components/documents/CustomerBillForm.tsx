@@ -7,6 +7,24 @@ const FALLBACK_MOB = "9239701265";
 
 const inr = (n?: number | null) => (n != null ? n.toLocaleString("en-IN") : "");
 
+const SHIFT_NAME: Record<string, string> = {
+  day: "Day",
+  night: "Night",
+  full_24h: "24 Hours",
+  custom: "Custom",
+};
+
+/** "18:00" -> "6:00 PM". */
+function fmtTime(t?: string | null): string {
+  if (!t) return "?";
+  const [h, m] = t.split(":");
+  const hi = Number(h);
+  const mi = Number(m);
+  if (Number.isNaN(hi) || Number.isNaN(mi)) return t;
+  const suffix = hi < 12 ? "AM" : "PM";
+  return `${hi % 12 || 12}:${String(mi).padStart(2, "0")} ${suffix}`;
+}
+
 /**
  * Customer bill — a faithful digital copy of the agency's printed bill pad:
  * BILL header with logo, auto bill number, name, address, a From/To duty row
@@ -35,6 +53,17 @@ export function CustomerBillForm({
       : null);
   const amount =
     assignment.customer_rate ?? (rate != null && days ? rate * days : null);
+
+  // Custom shift timings, written out window by window for the bill.
+  const shiftWindows =
+    assignment.shift === "custom"
+      ? assignment.shift_windows && assignment.shift_windows.length
+        ? assignment.shift_windows
+        : assignment.start_time || assignment.end_time
+          ? [{ start: assignment.start_time, end: assignment.end_time }]
+          : []
+      : [];
+  const shiftLines = shiftWindows.map((w) => `${fmtTime(w.start)} – ${fmtTime(w.end)}`);
 
   const headerLine = branch?.city
     ? `${branch.city.toUpperCase()}${branch.pincode ? ` ★ ${branch.pincode}` : ""}`
@@ -112,6 +141,28 @@ export function CustomerBillForm({
                   {assignment.end_date ? formatDate(assignment.end_date) : "—"}
                 </span>
               </p>
+              {shiftLines.length > 0 ? (
+                <div className="mt-2">
+                  <p className="font-semibold">
+                    Shift Timing{shiftLines.length > 1 ? "s" : ""}:
+                  </p>
+                  {shiftLines.map((l, i) => (
+                    <p key={i} className="ml-1">
+                      {shiftLines.length > 1 ? `${i + 1}. ` : ""}
+                      {l}
+                    </p>
+                  ))}
+                </div>
+              ) : (
+                assignment.shift && (
+                  <p className="mt-2">
+                    Shift:{" "}
+                    <span className="font-semibold">
+                      {SHIFT_NAME[assignment.shift] ?? assignment.shift}
+                    </span>
+                  </p>
+                )
+              )}
             </td>
             <td className="border border-black px-1 text-center align-middle text-[15px] font-semibold">
               {days ?? ""}

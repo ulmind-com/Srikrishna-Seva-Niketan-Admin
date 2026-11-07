@@ -131,9 +131,9 @@ export function downloadDutyReportPdf(input: DutyExportInput) {
       ? "Postpaid · Collected"
       : "Postpaid · Pending";
 
-    const periodStr = `${r.start_date}${r.end_date ? "\n→ " + r.end_date : "\n(ongoing)"}\n${shiftLabel(
-      r.shift
-    )} (${r.duration_days ?? 1}d)`;
+    const periodStr = `${r.start_date}${r.end_date ? "\n→ " + r.end_date : "\n(ongoing)"}\n${
+      r.shift_label || shiftLabel(r.shift)
+    } (${r.duration_days ?? 1}d)`;
 
     const patientStr = `${r.customer_name}\n${r.customer_phone || ""}${
       r.place_name || r.address ? "\n" + (r.place_name || r.address) : ""
@@ -243,7 +243,7 @@ export function downloadDutyReportXlsx(input: DutyExportInput) {
     "Start Date": r.start_date,
     "End Date": r.end_date || "(ongoing)",
     "Duration (Days)": r.duration_days ?? 1,
-    Shift: shiftLabel(r.shift),
+    Shift: r.shift_label || shiftLabel(r.shift),
     "Patient (Client) Name": r.customer_name,
     "Patient Phone": r.customer_phone || "",
     "Patient Address / Posted At": r.place_name || r.address || r.place_type,
