@@ -7,6 +7,7 @@ import {
   Building2,
   CalendarClock,
   ChevronDown,
+  FileDown,
   Inbox,
   Loader2,
   MapPin,
@@ -16,13 +17,19 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { staffAdminService } from "@/services/staff-portal.service";
+import { resourceServices } from "@/services/resources";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   AssignmentProgress,
   PLACE_LABEL,
 } from "@/components/common/AssignmentProgress";
 import { PushDispatchModal } from "@/components/notifications/PushDispatchModal";
+import {
+  downloadDeploymentReportPdf,
+  type DeploymentCustomerInfo,
+} from "@/lib/deployment-report-export";
 import type { Assignment, DeploymentBranch } from "@/types/models";
 
 const SHIFT_LABEL: Record<string, string> = {
@@ -50,8 +57,35 @@ export function StaffDeploymentPage() {
     staleTime: 30_000,
   });
 
+  // Customers carry phone / alt_phone / address — joined into the PDF report,
+  // because the deployment payload itself does not include contact details.
+  const { data: customersData } = useQuery({
+    queryKey: ["customers", "for-deployment-report"],
+    queryFn: () => resourceServices.customers.list({ page_size: 1000 }),
+    staleTime: 60_000,
+  });
+
+  const customerMap = useMemo(() => {
+    const map = new Map<string, DeploymentCustomerInfo>();
+    for (const c of customersData?.items ?? []) {
+      map.set(c.id, {
+        phone: c.phone,
+        alt_phone: c.alt_phone,
+        address: c.address,
+        city: c.city,
+        pincode: c.pincode,
+      });
+    }
+    return map;
+  }, [customersData]);
+
   const totals = data?.totals;
   const branches = data?.branches ?? [];
+
+  const downloadReport = () => {
+    if (!data?.totals) return;
+    downloadDeploymentReportPdf({ branches: data.branches, totals: data.totals, customerMap });
+  };
 
   const deployedPct = totals?.total_staff
     ? Math.round((totals.assigned_count / totals.total_staff) * 100)
@@ -90,6 +124,15 @@ export function StaffDeploymentPage() {
               className="pl-9"
             />
           </div>
+          <Button
+            variant="outline"
+            onClick={downloadReport}
+            disabled={!branches.length}
+            title="Branch-wise deployment report (PDF)"
+          >
+            <FileDown className="mr-2 h-4 w-4" />
+            Download PDF
+          </Button>
           <PushDispatchModal />
         </div>
       </div>
