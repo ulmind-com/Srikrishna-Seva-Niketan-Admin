@@ -435,6 +435,22 @@ export function ReportsPage() {
             />
           </div>
 
+          {/* Collection received + distinct patients served for the period. */}
+          <div className="grid grid-cols-2 gap-3">
+            <Stat
+              label="Collection Received"
+              value={rupee(
+                (duties.data?.summary.prepaid_total ?? 0) +
+                  (duties.data?.summary.postpaid_collected ?? 0)
+              )}
+              tone="text-success"
+            />
+            <Stat
+              label="Patients Served"
+              value={new Set((duties.data?.items ?? []).map((i) => i.customer_id)).size}
+            />
+          </div>
+
           {/* Prepaid vs Postpaid sub-breakdown with crystal-clear settlement explanations */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Card className="border-cyan-500/30 bg-cyan-500/5">
