@@ -35,7 +35,7 @@ interface RegisterForm {
 }
 
 export function StaffRegisterPage() {
-  const { register: createAccount, isAuthenticated } = useStaffAuth();
+  const { register: createAccount, isAuthenticated, staff } = useStaffAuth();
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
 
@@ -83,7 +83,12 @@ export function StaffRegisterPage() {
     }
   }, [emailValue, isEmailVerified, verifiedEmail]);
 
-  if (isAuthenticated) return <Navigate to="/staff-portal" replace />;
+  // A freshly-registered (unverified) staff goes straight to the verify steps,
+  // not the status page — the verification flow is the next step after signup.
+  if (isAuthenticated) {
+    const verified = staff?.verification_status === "verified";
+    return <Navigate to={verified ? "/staff-portal" : "/staff/onboarding"} replace />;
+  }
 
   /** Send 6-digit OTP via Resend */
   const handleSendOtp = async () => {
