@@ -88,6 +88,25 @@ const KIND_CLS: Record<DayKind, string> = {
   off: "bg-slate-500/10 text-slate-500 border-slate-500/20",
   unmarked: "bg-muted/30 text-muted-foreground/50 border-transparent",
 };
+const SHIFT_NAME: Record<string, string> = {
+  morning: "Morning",
+  day: "Day",
+  night: "Night",
+  full_24h: "24h",
+  custom: "Custom",
+};
+
+/** Unique shift names worked on a day, e.g. "Morning + Night". */
+function dayShiftLabels(entries: PayslipDay[]): string {
+  const labels = new Set<string>();
+  for (const e of entries) {
+    if ((e.status === "present" || e.status === "half_day") && e.shift) {
+      labels.add(SHIFT_NAME[e.shift] ?? e.shift);
+    }
+  }
+  return [...labels].join(" + ");
+}
+
 const KIND_LABEL: Record<DayKind, string> = {
   worked: "Worked",
   absent: "Absent",
@@ -217,6 +236,24 @@ export function AttendanceReportPanel() {
             <Stat label="Gross Pay" value={inr(s?.gross_pay)} tone="text-primary" />
           </div>
 
+          {/* Shift-wise breakdown */}
+          {s && Object.keys(s.by_shift).length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-card p-4">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Shifts worked
+              </span>
+              {Object.entries(s.by_shift).map(([k, v]) => (
+                <span
+                  key={k}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary"
+                >
+                  {SHIFT_NAME[k] ?? k}
+                  <span className="rounded bg-primary/20 px-1.5 font-bold">{v}</span>
+                </span>
+              ))}
+            </div>
+          )}
+
           {/* Calendar */}
           <div className="rounded-2xl border border-border bg-card p-4">
             <div className="mb-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
@@ -237,9 +274,6 @@ export function AttendanceReportPanel() {
                 if (!cell) return <div key={`b-${i}`} />;
                 const entries = byDate.get(cell.iso) ?? [];
                 const kind = dayKind(entries);
-                const shiftCount = entries.filter(
-                  (e) => e.status === "present" || e.status === "half_day"
-                ).length;
                 const clickable = entries.length > 0;
                 return (
                   <div
@@ -257,9 +291,8 @@ export function AttendanceReportPanel() {
                   >
                     <div className="font-medium">{cell.day}</div>
                     {kind !== "unmarked" && (
-                      <div className="mt-0.5 text-[10px] leading-tight">
-                        {KIND_LABEL[kind]}
-                        {shiftCount > 1 ? ` ×${shiftCount}` : ""}
+                      <div className="mt-0.5 text-[10px] font-medium leading-tight">
+                        {kind === "worked" ? dayShiftLabels(entries) || "Worked" : KIND_LABEL[kind]}
                       </div>
                     )}
                   </div>
