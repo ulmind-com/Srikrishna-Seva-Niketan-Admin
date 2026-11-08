@@ -61,7 +61,7 @@ export function AttendanceReportPage() {
 
   const { data: employees } = useQuery({
     queryKey: ["employees", "for-attendance-report"],
-    queryFn: () => resourceServices.employees.list({ page_size: 1000 }),
+    queryFn: () => resourceServices.employees.list({ page_size: 100 }),
     staleTime: 60_000,
   });
 

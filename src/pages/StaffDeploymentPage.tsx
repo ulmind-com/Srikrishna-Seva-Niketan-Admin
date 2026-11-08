@@ -61,7 +61,7 @@ export function StaffDeploymentPage() {
   // because the deployment payload's available_staff omits these contact fields.
   const { data: employeesData } = useQuery({
     queryKey: ["employees", "for-deployment-report"],
-    queryFn: () => resourceServices.employees.list({ page_size: 1000 }),
+    queryFn: () => resourceServices.employees.list({ page_size: 100 }),
     staleTime: 60_000,
   });
 

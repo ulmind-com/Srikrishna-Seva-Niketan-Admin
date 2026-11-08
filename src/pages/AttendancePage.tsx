@@ -101,7 +101,7 @@ export function AttendancePage() {
     queryKey: ["payroll-employees"],
     queryFn: () =>
       http.list<Employee>(endpoints.employees.root, {
-        page_size: 500,
+        page_size: 100,
       }),
     staleTime: 60_000,
   });
