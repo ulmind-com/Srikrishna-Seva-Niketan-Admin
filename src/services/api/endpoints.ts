@@ -81,7 +81,7 @@ export const endpoints = {
     me: "/staff-portal/me",
     upload: "/staff-portal/me/upload",
     submit: "/staff-portal/me/submit",
-    payslip: "/staff-portal/me/payslip",
+    attendance: "/staff-portal/me/attendance",
     notifications: "/staff-portal/me/notifications",
     notificationsUnread: "/staff-portal/me/notifications/unread-count",
     notificationRead: (id: string) => `/staff-portal/me/notifications/${id}/read`,

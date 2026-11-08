@@ -244,7 +244,7 @@ export function StaffStatusPage() {
                 }`}
               >
                 <Wallet className="h-4 w-4" />
-                <span>বেতন ও হাজিরা (Pay & Attendance)</span>
+                <span>হাজিরা (Attendance)</span>
               </button>
 
               <button
@@ -356,7 +356,7 @@ export function StaffStatusPage() {
               >
                 <Wallet className="h-5 w-5" />
               </div>
-              <span className="text-[10px] font-bold mt-1 tracking-tight">বেতন</span>
+              <span className="text-[10px] font-bold mt-1 tracking-tight">হাজিরা</span>
             </button>
 
             <button

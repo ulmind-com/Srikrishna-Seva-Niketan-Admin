@@ -111,10 +111,10 @@ export const staffPortalService = {
 
   me: () => staffRequest<Employee>({ method: "GET", url: endpoints.staffPortal.me }),
 
-  myPayslip: (month: string) =>
+  myAttendance: (month: string) =>
     staffRequest<Payslip>({
       method: "GET",
-      url: endpoints.staffPortal.payslip,
+      url: endpoints.staffPortal.attendance,
       params: { month },
     }),
 
