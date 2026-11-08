@@ -38,7 +38,7 @@ const STEPS = [
   { id: 1, label: "Work details", icon: Briefcase },
   { id: 2, label: "Government ID", icon: ShieldCheck },
   { id: 3, label: "Current photo", icon: Camera },
-  { id: 4, label: "Signature", icon: FileSignature },
+  { id: 4, label: "Verify & Submit", icon: FileSignature },
 ] as const;
 
 const CATEGORIES = [
@@ -298,9 +298,12 @@ function OnboardingForm({ staff }: { staff: Employee }) {
 
       <div className="mx-auto w-full max-w-2xl">
         <div className="mb-6 text-center">
-          <h1 className="text-2xl font-bold tracking-tight">Complete your profile</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Verify your account</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Step {step + 1} of {STEPS.length} — {STEPS[step].label}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Fill each step, then tap <span className="font-semibold">Submit for Verification</span> at the end.
           </p>
         </div>
 
@@ -682,10 +685,12 @@ function OnboardingForm({ staff }: { staff: Employee }) {
             ) : (
               <Button
                 type="submit"
+                size="lg"
                 loading={submitting}
                 disabled={!hasSignature && !staff.signature?.url}
+                className="bg-emerald-600 font-semibold hover:bg-emerald-700"
               >
-                <Send className="mr-2 h-4 w-4" /> Submit for verification
+                <Send className="mr-2 h-4 w-4" /> Submit for Verification
               </Button>
             )}
           </div>

@@ -143,7 +143,7 @@ export function StaffRegisterPage() {
         location_id: values.location_id,
         otp: otpCode.trim() || undefined,
       });
-      toast.success("Account created — let's complete your profile");
+      toast.success("Account created — next step: verify your account");
       navigate("/staff/onboarding", { replace: true });
     } catch (err) {
       const msg = describeError(err);

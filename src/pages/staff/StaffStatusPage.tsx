@@ -165,11 +165,11 @@ export function StaffStatusPage() {
               <StatusPanel
                 tone="primary"
                 icon={FilePenLine}
-                title="Finish your profile"
-                text="Add your details, work history, photo and signature, then submit for verification."
+                title="Verify your account"
+                text="One step left — add your details, ID, photo and signature, then submit for verification."
               >
-                <Button asChild size="sm" className="rounded-xl font-bold">
-                  <Link to="/staff/onboarding">Continue my profile</Link>
+                <Button asChild size="lg" className="rounded-xl bg-emerald-600 font-bold hover:bg-emerald-700">
+                  <Link to="/staff/onboarding">Verify my account</Link>
                 </Button>
               </StatusPanel>
             )}
