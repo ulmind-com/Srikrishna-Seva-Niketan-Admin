@@ -268,6 +268,10 @@ export interface DeploymentBranch {
     code: string;
     category: string;
     phone?: string | null;
+    alt_phone?: string | null;
+    address?: string | null;
+    city?: string | null;
+    pincode?: string | null;
     photo?: ImageAsset | null;
   }[];
 }

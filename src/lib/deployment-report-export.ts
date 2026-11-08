@@ -158,15 +158,21 @@ export function downloadDeploymentReportPdf(input: DeploymentReportInput) {
     const body =
       branch.available_staff.length > 0
         ? branch.available_staff.map((s, idx) => {
+            // Prefer the fields now sent in the deployment payload itself; fall
+            // back to the joined employee map only if they are missing.
             const info = employeeMap.get(s.id);
             return [
               String(idx + 1),
               s.name,
               s.code || info?.code || "—",
               s.category || info?.category || "—",
-              fullAddress(info),
-              info?.phone || "—",
-              info?.alt_phone || "—",
+              fullAddress({
+                address: s.address ?? info?.address,
+                city: s.city ?? info?.city,
+                pincode: s.pincode ?? info?.pincode,
+              }),
+              s.phone || info?.phone || "—",
+              s.alt_phone || info?.alt_phone || "—",
             ];
           })
         : [["—", "No staff available at this branch.", "", "", "", "", ""]];
