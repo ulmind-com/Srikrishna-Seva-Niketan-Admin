@@ -13,10 +13,56 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { downloadAttendanceReportPdf } from "@/lib/attendance-report-export";
 
 const inr = (n?: number | null) => `₹${(n ?? 0).toLocaleString("en-IN")}`;
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const SHIFT_LABEL: Record<string, string> = { day: "Day", night: "Night", full_24h: "24 Hours", custom: "Custom" };
+const STATUS_LABEL: Record<string, string> = {
+  present: "Present",
+  half_day: "Half day",
+  absent: "Absent",
+  leave: "Leave",
+  off: "Off",
+  unmarked: "Not marked",
+};
+
+/** "18:00" -> "6:00 PM". */
+function fmtTime(t?: string | null): string {
+  if (!t) return "?";
+  const [h, m] = t.split(":");
+  const hi = Number(h);
+  const mi = Number(m);
+  if (Number.isNaN(hi) || Number.isNaN(mi)) return t;
+  return `${hi % 12 || 12}:${String(mi).padStart(2, "0")} ${hi < 12 ? "AM" : "PM"}`;
+}
+
+/** Shift time window(s) for a day entry. */
+function dayShiftText(d: PayslipDay): string {
+  if (!d.shift) return "—";
+  if (d.shift === "custom") {
+    if (d.shift_windows && d.shift_windows.length) {
+      return d.shift_windows.map((w) => `${fmtTime(w.start)}–${fmtTime(w.end)}`).join(", ");
+    }
+    if (d.start_time || d.end_time) return `${fmtTime(d.start_time)} – ${fmtTime(d.end_time)}`;
+  }
+  return SHIFT_LABEL[d.shift] ?? d.shift;
+}
+
+function prettyDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-IN", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
 
 function currentMonth(): string {
   const d = new Date();
@@ -58,6 +104,7 @@ const KIND_LABEL: Record<DayKind, string> = {
 export function AttendanceReportPanel() {
   const [month, setMonth] = useState(currentMonth());
   const [employeeId, setEmployeeId] = useState<string>("");
+  const [selected, setSelected] = useState<string | null>(null);
 
   const { data: employees } = useQuery({
     queryKey: ["employees", "for-attendance-report"],
@@ -95,6 +142,26 @@ export function AttendanceReportPanel() {
   }, [month]);
 
   const s = slip?.summary;
+
+  const selectedEntries = selected ? byDate.get(selected) ?? [] : [];
+
+  /** Distinct days this staff worked at a given client across the month. */
+  function clientMonthDays(customer?: string | null): number {
+    if (!customer) return 0;
+    const dates = new Set<string>();
+    for (const [iso, entries] of byDate) {
+      if (
+        entries.some(
+          (e) =>
+            e.customer_name === customer &&
+            (e.status === "present" || e.status === "half_day")
+        )
+      ) {
+        dates.add(iso);
+      }
+    }
+    return dates.size;
+  }
 
   return (
     <div className="space-y-6">
@@ -173,11 +240,20 @@ export function AttendanceReportPanel() {
                 const shiftCount = entries.filter(
                   (e) => e.status === "present" || e.status === "half_day"
                 ).length;
+                const clickable = entries.length > 0;
                 return (
                   <div
                     key={cell.iso}
-                    className={`min-h-[56px] rounded-lg border p-1.5 text-xs ${KIND_CLS[kind]}`}
-                    title={entries.map((e) => e.status).join(", ")}
+                    role={clickable ? "button" : undefined}
+                    tabIndex={clickable ? 0 : undefined}
+                    onClick={() => clickable && setSelected(cell.iso)}
+                    onKeyDown={(e) => {
+                      if (clickable && (e.key === "Enter" || e.key === " ")) setSelected(cell.iso);
+                    }}
+                    className={`min-h-[56px] rounded-lg border p-1.5 text-xs transition ${KIND_CLS[kind]} ${
+                      clickable ? "cursor-pointer hover:ring-2 hover:ring-primary/40" : ""
+                    }`}
+                    title={clickable ? "Click for details" : undefined}
                   >
                     <div className="font-medium">{cell.day}</div>
                     {kind !== "unmarked" && (
@@ -193,6 +269,60 @@ export function AttendanceReportPanel() {
           </div>
         </>
       ) : null}
+
+      {/* Day detail — client, shift time(s), status for the clicked date. */}
+      <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{selected ? prettyDate(selected) : ""}</DialogTitle>
+          </DialogHeader>
+          {selectedEntries.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nothing recorded for this day.</p>
+          ) : (
+            <div className="space-y-3">
+              {selectedEntries.map((e, i) => (
+                <div key={i} className="rounded-lg border border-border bg-muted/20 p-3">
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={`text-xs font-semibold ${
+                        e.status === "present" || e.status === "half_day"
+                          ? "text-emerald-600"
+                          : e.status === "absent"
+                          ? "text-rose-600"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      {STATUS_LABEL[e.status] ?? e.status}
+                    </span>
+                    {e.amount ? <span className="text-sm font-semibold">{inr(e.amount)}</span> : null}
+                  </div>
+                  {(e.status === "present" || e.status === "half_day") && (
+                    <div className="mt-1.5 space-y-0.5 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Client: </span>
+                        <span className="font-medium">{e.customer_name || "—"}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Shift: </span>
+                        <span className="font-medium">{dayShiftText(e)}</span>
+                      </div>
+                      {e.customer_name && (
+                        <div className="text-xs text-muted-foreground">
+                          This month at {e.customer_name}: {clientMonthDays(e.customer_name)} day(s)
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+              <p className="text-xs text-muted-foreground">
+                {selectedEntries.filter((e) => e.status === "present" || e.status === "half_day").length}{" "}
+                shift(s) worked this day.
+              </p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

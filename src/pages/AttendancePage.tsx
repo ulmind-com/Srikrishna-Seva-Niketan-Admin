@@ -124,7 +124,14 @@ export function AttendancePage() {
   useEffect(() => {
     const seed: Record<string, Mark> = {};
     for (const r of roster?.records ?? []) {
-      seed[r.employee_id] = { status: r.status, shift: r.shift, rate: r.pay_rate };
+      // A staff member can have several rows that day (two shifts, or an
+      // auto-present row + a manual one). Prefer a payable status so the mark
+      // shows correctly instead of letting the last row win.
+      const existing = seed[r.employee_id];
+      const isPayable = r.status === "present" || r.status === "half_day";
+      if (!existing || isPayable) {
+        seed[r.employee_id] = { status: r.status, shift: r.shift, rate: r.pay_rate };
+      }
     }
     setMarks(seed);
   }, [roster, date]);
