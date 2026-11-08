@@ -79,11 +79,11 @@ export const staffPortalService = {
       data: payload,
     }),
 
-  login: (email: string, password: string) =>
+  login: (identifier: string, password: string) =>
     staffRequest<StaffSession>({
       method: "POST",
       url: endpoints.staffPortal.login,
-      data: { email, password },
+      data: { identifier, password },
     }),
 
   /** Email a password-reset OTP to a registered staff member. */

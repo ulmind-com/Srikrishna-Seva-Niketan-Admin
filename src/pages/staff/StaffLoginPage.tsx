@@ -45,16 +45,16 @@ export function StaffLoginPage() {
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         <div className="space-y-1.5">
-          <Label htmlFor="email">Email address</Label>
+          <Label htmlFor="email">Email or Mobile number</Label>
           <div className="relative">
             <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               id="email"
-              type="email"
-              autoComplete="email"
-              placeholder="you@example.com"
+              type="text"
+              autoComplete="username"
+              placeholder="you@example.com  or  9876543210"
               className="pl-9"
-              {...register("email", { required: "Email is required" })}
+              {...register("email", { required: "Email or mobile number is required" })}
             />
           </div>
           {errors.email && (
