@@ -1,6 +1,7 @@
 import { endpoints } from "./api/endpoints";
 import { staffRequest, getStoredStaffRefresh } from "./api/staff-client";
 import { http } from "./api/http";
+import type { Payslip } from "./payroll.service";
 import type {
   DeploymentOverview,
   Employee,
@@ -109,6 +110,13 @@ export const staffPortalService = {
     }),
 
   me: () => staffRequest<Employee>({ method: "GET", url: endpoints.staffPortal.me }),
+
+  myPayslip: (month: string) =>
+    staffRequest<Payslip>({
+      method: "GET",
+      url: endpoints.staffPortal.payslip,
+      params: { month },
+    }),
 
   saveProfile: (payload: StaffOnboardingPayload) =>
     staffRequest<Employee>({

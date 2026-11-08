@@ -20,6 +20,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { StaffDocuments } from "@/components/documents/StaffDocuments";
 import { StaffDuties } from "@/components/staff/StaffDuties";
 import { StaffDutyHistory } from "@/components/staff/StaffDutyHistory";
+import { StaffPayslip } from "@/components/staff/StaffPayslip";
+import { Wallet } from "lucide-react";
 import { VerifiedBadge } from "@/components/common/VerifiedBadge";
 import {
   VERIFICATION_LABEL,
@@ -29,7 +31,7 @@ import { ORG_NAME } from "./StaffAuthShell";
 import { StaffNotifications, useStaffNotificationCount } from "./StaffNotifications";
 import { StaffPushBanner } from "@/components/staff/StaffPushBanner";
 
-type TabType = "duty" | "history" | "documents";
+type TabType = "duty" | "history" | "pay" | "documents";
 
 /** The staff member's ultra-premium home screen with native app styling. */
 export function StaffStatusPage() {
@@ -234,6 +236,19 @@ export function StaffStatusPage() {
 
               <button
                 type="button"
+                onClick={() => setActiveTab("pay")}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                  activeTab === "pay"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                }`}
+              >
+                <Wallet className="h-4 w-4" />
+                <span>বেতন ও হাজিরা (Pay & Attendance)</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setActiveTab("documents")}
                 className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all ${
                   activeTab === "documents"
@@ -257,6 +272,13 @@ export function StaffStatusPage() {
             {activeTab === "history" && (
               <div className="space-y-4 sm:space-y-6">
                 <StaffDutyHistory />
+              </div>
+            )}
+
+            {/* Tab: Pay & Attendance */}
+            {activeTab === "pay" && (
+              <div className="rounded-2xl border border-border bg-card p-4 sm:p-5">
+                <StaffPayslip />
               </div>
             )}
 
@@ -316,6 +338,25 @@ export function StaffStatusPage() {
                 <FolderClock className="h-5 w-5" />
               </div>
               <span className="text-[10px] font-bold mt-1 tracking-tight">ইতিহাস</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("pay")}
+              className={`flex flex-col items-center justify-center py-1.5 rounded-2xl transition-all cursor-pointer ${
+                activeTab === "pay"
+                  ? "text-primary font-black scale-105"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <div
+                className={`grid h-8 w-8 place-items-center rounded-xl transition-all ${
+                  activeTab === "pay" ? "bg-primary/15 text-primary" : ""
+                }`}
+              >
+                <Wallet className="h-5 w-5" />
+              </div>
+              <span className="text-[10px] font-bold mt-1 tracking-tight">বেতন</span>
             </button>
 
             <button
