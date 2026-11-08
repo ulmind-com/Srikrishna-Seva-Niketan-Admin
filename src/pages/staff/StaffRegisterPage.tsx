@@ -102,9 +102,7 @@ export function StaffRegisterPage() {
         setVerifiedEmail(emailValue);
         toast.success("Email verified! You can now create your account.");
       } else {
-        if (res?.dev_otp) {
-          setOtpCode(res.dev_otp);
-        }
+        // Never auto-fill the code — the staff must enter it from their email.
         toast.success(`Verification code sent to ${emailValue}`);
       }
     } catch (err) {
