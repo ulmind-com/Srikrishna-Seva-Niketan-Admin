@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Helmet } from "react-helmet-async";
 import { CalendarDays, FileDown, Loader2 } from "lucide-react";
 import { payrollService, type PayslipDay } from "@/services/payroll.service";
 import { resourceServices } from "@/services/resources";
@@ -54,8 +53,9 @@ const KIND_LABEL: Record<DayKind, string> = {
 /**
  * Per-staff monthly attendance — a colour-coded calendar of worked / absent /
  * leave / off days for a chosen staff member and month, with a premium PDF.
+ * Embedded as a tab inside the Attendance page.
  */
-export function AttendanceReportPage() {
+export function AttendanceReportPanel() {
   const [month, setMonth] = useState(currentMonth());
   const [employeeId, setEmployeeId] = useState<string>("");
 
@@ -71,7 +71,6 @@ export function AttendanceReportPage() {
     enabled: Boolean(employeeId && month),
   });
 
-  // Group day rows by ISO date.
   const byDate = useMemo(() => {
     const map = new Map<string, PayslipDay[]>();
     for (const d of slip?.days ?? []) {
@@ -82,7 +81,6 @@ export function AttendanceReportPage() {
     return map;
   }, [slip]);
 
-  // Build the month grid.
   const cells = useMemo(() => {
     const [y, m] = month.split("-").map(Number);
     if (!y || !m) return [];
@@ -100,22 +98,6 @@ export function AttendanceReportPage() {
 
   return (
     <div className="space-y-6">
-      <Helmet>
-        <title>Attendance Report</title>
-      </Helmet>
-
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Attendance Report</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            A staff member's month at a glance — worked, absent, leave and off days.
-          </p>
-        </div>
-        <Button onClick={() => slip && downloadAttendanceReportPdf(slip)} disabled={!slip}>
-          <FileDown className="mr-2 h-4 w-4" /> Download PDF
-        </Button>
-      </div>
-
       {/* Controls */}
       <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-card p-4">
         <Select value={employeeId} onValueChange={setEmployeeId}>
@@ -139,6 +121,13 @@ export function AttendanceReportPage() {
             className="h-9 w-44"
           />
         </div>
+        <Button
+          className="ml-auto"
+          onClick={() => slip && downloadAttendanceReportPdf(slip)}
+          disabled={!slip}
+        >
+          <FileDown className="mr-2 h-4 w-4" /> Download PDF
+        </Button>
       </div>
 
       {!employeeId ? (

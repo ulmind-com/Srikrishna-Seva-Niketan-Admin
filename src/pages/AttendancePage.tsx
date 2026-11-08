@@ -25,6 +25,7 @@ import {
 } from "@/services/payroll.service";
 import type { Employee, Location } from "@/types/models";
 import { describeError } from "@/services/api/client";
+import { AttendanceReportPanel } from "@/components/attendance/AttendanceReportPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -210,6 +211,8 @@ export function AttendancePage() {
     onError: (e) => toast.error(describeError(e)),
   });
 
+  const [view, setView] = useState<"daily" | "report">("daily");
+
   return (
     <div className="space-y-6">
       <Helmet>
@@ -224,29 +227,57 @@ export function AttendancePage() {
             Leave and off days are unpaid on the payslip.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => syncMut.mutate()}
-            disabled={syncMut.isPending}
-          >
-            {syncMut.isPending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="mr-2 h-4 w-4" />
-            )}
-            Auto-fill from duties
-          </Button>
-          <Button onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
-            {saveMut.isPending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="mr-2 h-4 w-4" />
-            )}
-            Save attendance
-          </Button>
-        </div>
+        {view === "daily" && (
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => syncMut.mutate()}
+              disabled={syncMut.isPending}
+            >
+              {syncMut.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              Auto-fill from duties
+            </Button>
+            <Button onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
+              {saveMut.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="mr-2 h-4 w-4" />
+              )}
+              Save attendance
+            </Button>
+          </div>
+        )}
       </div>
+
+      {/* Tabs: daily register vs per-staff monthly report */}
+      <div className="flex w-fit gap-1 rounded-xl border border-border bg-card p-1">
+        {([
+          { key: "daily", label: "Mark Attendance" },
+          { key: "report", label: "Monthly Report" },
+        ] as const).map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setView(t.key)}
+            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+              view === t.key
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-muted/50"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {view === "report" ? (
+        <AttendanceReportPanel />
+      ) : (
+        <div className="space-y-6">
 
       {/* Date bar */}
       <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-card p-3">
@@ -377,6 +408,8 @@ export function AttendancePage() {
               <div className="p-8 text-center text-sm text-muted-foreground">No staff match.</div>
             )}
           </div>
+        </div>
+      )}
         </div>
       )}
     </div>
