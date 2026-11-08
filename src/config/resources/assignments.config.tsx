@@ -58,29 +58,36 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
   ],
   columns: [
     {
+      // Staff, customer and branch — the "who / where" of the row, stacked.
       header: "Staff → Customer",
-      headClassName: "min-w-[150px]",
+      headClassName: "min-w-[170px]",
       cell: (r) => (
-        <div className="flex flex-col">
+        <div className="flex flex-col gap-0.5">
           <span className="flex items-center gap-1.5 whitespace-nowrap font-medium">
             <span>{r.employee_name}</span>
             {r.acceptance_status === "accepted" && (
               <VerifiedBadge size={15} title="Verified Staff" />
             )}
           </span>
-          <span className="whitespace-nowrap text-xs text-muted-foreground">→ {r.customer_name}</span>
+          <span className="whitespace-nowrap text-xs text-muted-foreground">
+            → {r.customer_name}
+          </span>
+          <BranchName
+            id={r.location_id}
+            className="whitespace-nowrap text-[11px] text-muted-foreground/70"
+          />
         </div>
       ),
     },
     {
-      header: "Shift",
-      headClassName: "min-w-[130px]",
-      cell: (r) => {
-        if (r.shift === "custom" && r.shift_label) {
-          const windows = r.shift_label.split(", ");
-          return (
+      // Shift window(s) + the date range they run over.
+      header: "Shift & Period",
+      headClassName: "min-w-[150px]",
+      cell: (r) => (
+        <div className="flex flex-col gap-1.5">
+          {r.shift === "custom" && r.shift_label ? (
             <div className="flex flex-col gap-1">
-              {windows.map((w, i) => (
+              {r.shift_label.split(", ").map((w, i) => (
                 <span
                   key={i}
                   className="inline-flex w-fit items-center whitespace-nowrap rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-primary"
@@ -89,20 +96,26 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
                 </span>
               ))}
             </div>
-          );
-        }
-        return (
-          <Badge variant="outline" className="whitespace-nowrap">
-            {shiftText(r)}
-          </Badge>
-        );
-      },
+          ) : (
+            <Badge variant="outline" className="w-fit whitespace-nowrap">
+              {shiftText(r)}
+            </Badge>
+          )}
+          <span className="flex flex-col gap-0.5 whitespace-nowrap text-[11px] tabular-nums text-muted-foreground">
+            <span><DateCell value={r.start_date} /></span>
+            <span className="text-muted-foreground/70">
+              {r.end_date ? <>→ <DateCell value={r.end_date} /></> : "→ ongoing"}
+            </span>
+          </span>
+        </div>
+      ),
     },
     {
       header: "Posted At",
+      headClassName: "min-w-[120px]",
       cell: (r) => (
         <div className="flex flex-col">
-          <span className="text-sm">{PLACE_LABEL[r.place_type] ?? "—"}</span>
+          <span className="whitespace-nowrap text-sm">{PLACE_LABEL[r.place_type] ?? "—"}</span>
           {r.place_name && (
             <span className="text-xs text-muted-foreground">{r.place_name}</span>
           )}
@@ -110,46 +123,19 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
       ),
     },
     {
-      header: "Period",
-      headClassName: "min-w-[120px]",
-      cell: (r) => (
-        <div className="flex flex-col gap-0.5 whitespace-nowrap text-xs tabular-nums text-muted-foreground">
-          <span><DateCell value={r.start_date} /></span>
-          <span className="text-muted-foreground/70">
-            {r.end_date ? <>→ <DateCell value={r.end_date} /></> : "→ ongoing"}
-          </span>
-        </div>
-      ),
-    },
-    {
       header: "Progress",
+      headClassName: "min-w-[120px]",
       cell: (r) => <AssignmentProgress row={r} />,
     },
     {
-      header: "Rates & Profit (₹)",
-      headClassName: "min-w-[112px]",
+      // Rates, profit and how the money is collected — the full billing picture.
+      header: "Billing (₹)",
+      headClassName: "min-w-[150px]",
       cell: (r) => {
         const bill = r.customer_rate ?? 0;
         const pay = r.employee_payout ?? 0;
         const exp = r.other_expense ?? 0;
         const profit = bill - pay - exp;
-        return (
-          <div className="flex flex-col gap-0.5 whitespace-nowrap text-xs tabular-nums text-muted-foreground">
-            {r.customer_rate != null && <div>Bill: <span className="font-semibold text-foreground">₹{r.customer_rate.toLocaleString()}</span></div>}
-            {r.employee_payout != null && <div>Pay: ₹{r.employee_payout.toLocaleString()}</div>}
-            {r.other_expense != null && r.other_expense > 0 && <div>Exp: ₹{r.other_expense.toLocaleString()}</div>}
-            {bill > 0 && (
-              <div className={`font-semibold ${profit >= 0 ? "text-success" : "text-destructive"}`}>
-                Profit: ₹{profit.toLocaleString()}
-              </div>
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      header: "Payment",
-      cell: (r) => {
         const isPostpaid = r.payment_type === "postpaid";
         const collected = r.payment_status === "paid" || r.payment_status === "received";
         // Prepaid is collected in advance by the office — always settled; only
@@ -161,33 +147,40 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
           ? "✓ Cash Collected"
           : "⏳ Pending Collection";
         return (
-          <div className="flex flex-col gap-1 items-start">
-            <Badge
-              variant={isPostpaid ? "secondary" : "default"}
-              className={isPostpaid ? "bg-amber-500/10 text-amber-400 border-amber-500/30 text-[10px]" : "bg-cyan-500/10 text-cyan-400 border-cyan-500/30 text-[10px]"}
-            >
-              {isPostpaid ? "Postpaid (Cash)" : "Prepaid"}
-            </Badge>
-            <span className={`text-[11px] font-medium ${settled ? "text-success" : "text-amber-400"}`}>
-              {payLabel}
-            </span>
+          <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-0.5 whitespace-nowrap text-xs tabular-nums text-muted-foreground">
+              {r.customer_rate != null && <div>Bill: <span className="font-semibold text-foreground">₹{r.customer_rate.toLocaleString()}</span></div>}
+              {r.employee_payout != null && <div>Pay: ₹{r.employee_payout.toLocaleString()}</div>}
+              {r.other_expense != null && r.other_expense > 0 && <div>Exp: ₹{r.other_expense.toLocaleString()}</div>}
+              {bill > 0 && (
+                <div className={`font-semibold ${profit >= 0 ? "text-success" : "text-destructive"}`}>
+                  Profit: ₹{profit.toLocaleString()}
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col gap-0.5 items-start">
+              <Badge
+                variant={isPostpaid ? "secondary" : "default"}
+                className={isPostpaid ? "bg-amber-500/10 text-amber-400 border-amber-500/30 text-[10px]" : "bg-cyan-500/10 text-cyan-400 border-cyan-500/30 text-[10px]"}
+              >
+                {isPostpaid ? "Postpaid (Cash)" : "Prepaid"}
+              </Badge>
+              <span className={`text-[11px] font-medium ${settled ? "text-success" : "text-amber-400"}`}>
+                {payLabel}
+              </span>
+            </div>
           </div>
         );
       },
     },
     {
-      header: "Status",
-      cell: (r) => (
-        <Badge variant={STATUS_VARIANT[r.status] ?? "outline"} className="capitalize">
-          {r.status}
-        </Badge>
-      ),
-    },
-    {
-      header: "Staff Response",
+      // Lifecycle status + the nurse's acceptance response, together.
+      header: "Status & Response",
+      headClassName: "min-w-[160px]",
       cell: (r) => {
+        let response;
         if (r.acceptance_status === "accepted") {
-          return (
+          response = (
             <div className="flex flex-col gap-0.5 items-start">
               <Badge variant="success" className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 gap-1 text-[11px] font-semibold">
                 <CheckCircle2 className="h-3 w-3" /> Accepted
@@ -205,11 +198,9 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
               )}
             </div>
           );
-        }
-
-        if (r.acceptance_status === "declined") {
-          return (
-            <div className="flex flex-col gap-1 items-start max-w-[240px]">
+        } else if (r.acceptance_status === "declined") {
+          response = (
+            <div className="flex flex-col gap-1 items-start max-w-[220px]">
               <Badge variant="danger" className="bg-rose-500/15 text-rose-400 border-rose-500/30 gap-1 text-[11px] font-semibold">
                 <XCircle className="h-3 w-3" /> Declined
               </Badge>
@@ -234,21 +225,25 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
               )}
             </div>
           );
+        } else {
+          response = (
+            <div className="flex flex-col gap-0.5 items-start">
+              <Badge variant="warning" className="bg-amber-500/15 text-amber-400 border-amber-500/30 gap-1 text-[11px] font-semibold animate-pulse">
+                <Clock className="h-3 w-3" /> Awaiting Response
+              </Badge>
+              <span className="text-[10px] text-muted-foreground">Push sent to nurse</span>
+            </div>
+          );
         }
-
         return (
-          <div className="flex flex-col gap-0.5 items-start">
-            <Badge variant="warning" className="bg-amber-500/15 text-amber-400 border-amber-500/30 gap-1 text-[11px] font-semibold animate-pulse">
-              <Clock className="h-3 w-3" /> Awaiting Response
+          <div className="flex flex-col gap-2 items-start">
+            <Badge variant={STATUS_VARIANT[r.status] ?? "outline"} className="capitalize">
+              {r.status}
             </Badge>
-            <span className="text-[10px] text-muted-foreground">Push sent to nurse</span>
+            {response}
           </div>
         );
       },
-    },
-    {
-      header: "Branch",
-      cell: (r) => <BranchName id={r.location_id} className="text-sm" />,
     },
   ],
   fields: [
