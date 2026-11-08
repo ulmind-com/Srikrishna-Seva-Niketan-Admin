@@ -36,6 +36,7 @@ const STATUS_CLS: Record<string, string> = {
   unmarked: "text-muted-foreground/50",
 };
 const SHIFT_LABEL: Record<string, string> = {
+  morning: "Morning",
   day: "Day",
   night: "Night",
   full_24h: "24h",
@@ -282,6 +283,8 @@ export function PayslipPage() {
                   { label: "Leave", value: slip.summary.leave_days },
                   { label: "Off", value: slip.summary.off_days },
                   { label: "Payable days", value: slip.summary.payable_days },
+                  { label: "Per Day Salary", value: inr(slip.employee.daily_rate ?? 0) },
+                  { label: "Leave Deduction", value: inr(slip.summary.leave_deduction) },
                   { label: "Days in month", value: slip.period.days_in_month },
                 ].map((s) => (
                   <div key={s.label} className="rounded-xl border border-border p-3">
@@ -290,8 +293,13 @@ export function PayslipPage() {
                   </div>
                 ))}
                 <div className="col-span-2 rounded-xl border border-primary bg-primary/5 p-3 sm:col-span-2">
-                  <p className="text-xs text-muted-foreground">Gross pay</p>
-                  <p className="text-2xl font-bold text-primary">{inr(slip.summary.gross_pay)}</p>
+                  <p className="text-xs text-muted-foreground">Net Payable Salary</p>
+                  <p className="text-2xl font-bold text-primary">{inr(slip.summary.net_payable)}</p>
+                  {slip.summary.leave_deduction > 0 && (
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      after {inr(slip.summary.leave_deduction)} leave deduction
+                    </p>
+                  )}
                 </div>
               </div>
 

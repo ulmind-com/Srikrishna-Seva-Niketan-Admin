@@ -8,6 +8,7 @@ const FALLBACK_MOB = "9239701265";
 const inr = (n?: number | null) => (n != null ? n.toLocaleString("en-IN") : "");
 
 const SHIFT_NAME: Record<string, string> = {
+  morning: "Morning",
   day: "Day",
   night: "Night",
   full_24h: "24 Hours",

@@ -23,7 +23,7 @@ import { downloadAttendanceReportPdf } from "@/lib/attendance-report-export";
 
 const inr = (n?: number | null) => `₹${(n ?? 0).toLocaleString("en-IN")}`;
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const SHIFT_LABEL: Record<string, string> = { day: "Day", night: "Night", full_24h: "24 Hours", custom: "Custom" };
+const SHIFT_LABEL: Record<string, string> = { morning: "Morning", day: "Day", night: "Night", full_24h: "24 Hours", custom: "Custom" };
 const STATUS_LABEL: Record<string, string> = {
   present: "Present",
   half_day: "Half day",

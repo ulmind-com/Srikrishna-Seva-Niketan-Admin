@@ -43,7 +43,7 @@ function shiftText(d: PayslipDay): string {
     }
     if (d.start_time || d.end_time) return `${fmtTime(d.start_time)}-${fmtTime(d.end_time)}`;
   }
-  const map: Record<string, string> = { day: "Day", night: "Night", full_24h: "24h", custom: "Custom" };
+  const map: Record<string, string> = { morning: "Morning", day: "Day", night: "Night", full_24h: "24h", custom: "Custom" };
   return map[d.shift] ?? d.shift;
 }
 
@@ -120,18 +120,42 @@ export function downloadPayslipPdf(slip: Payslip) {
     margin: { left: marginX, right: marginX },
   });
 
-  let startY = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 14;
+  let startY = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
 
-  // Net pay banner
+  // Shift breakdown + pay details
+  const bs = s.by_shift || {};
+  autoTable(doc, {
+    startY,
+    head: [["Morning", "Day", "Night", "24h", "Custom", "Per Day Salary", "Leave Deduction"]],
+    body: [
+      [
+        String(bs.morning || 0),
+        String(bs.day || 0),
+        String(bs.night || 0),
+        String(bs.full_24h || 0),
+        String(bs.custom || 0),
+        slip.employee.daily_rate ? rupee(slip.employee.daily_rate) : "—",
+        rupee(s.leave_deduction),
+      ],
+    ],
+    theme: "grid",
+    styles: { fontSize: 8.5, cellPadding: 5, halign: "center", textColor: SLATE },
+    headStyles: { fillColor: SLATE, textColor: 255, fontSize: 7.5, fontStyle: "bold" },
+    columnStyles: { 6: { textColor: ROSE } },
+    margin: { left: marginX, right: marginX },
+  });
+  startY = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 14;
+
+  // Net payable banner
   doc.setFillColor(236, 253, 245);
   doc.rect(marginX, startY, pageWidth - marginX * 2, 34, "F");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.setTextColor(...SLATE);
-  doc.text("NET PAY", marginX + 10, startY + 21);
+  doc.text("NET PAYABLE", marginX + 10, startY + 21);
   doc.setFontSize(16);
   doc.setTextColor(...EMERALD);
-  doc.text(rupee(s.gross_pay), pageWidth - marginX - 10, startY + 22, { align: "right" });
+  doc.text(rupee(s.net_payable), pageWidth - marginX - 10, startY + 22, { align: "right" });
   startY += 34 + 14;
 
   // Day-by-day breakdown

@@ -40,6 +40,7 @@ const PLACE_LABEL: Record<string, string> = {
   other: "Other",
 };
 const SHIFT_LABEL: Record<string, string> = {
+  morning: "Morning",
   day: "Day",
   night: "Night",
   full_24h: "24 Hours",

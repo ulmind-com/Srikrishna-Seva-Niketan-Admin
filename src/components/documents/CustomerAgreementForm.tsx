@@ -8,6 +8,7 @@ const CARE_LABEL: Record<string, string> = {
   hospital: "Hospital",
 };
 const SHIFT_LABEL: Record<string, string> = {
+  morning: "Morning",
   day: "Day",
   night: "Night",
   full_24h: "24 Hours",

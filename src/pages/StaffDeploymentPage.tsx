@@ -33,6 +33,7 @@ import {
 import type { Assignment, DeploymentBranch } from "@/types/models";
 
 const SHIFT_LABEL: Record<string, string> = {
+  morning: "Morning",
   day: "Day",
   night: "Night",
   full_24h: "24 Hours",

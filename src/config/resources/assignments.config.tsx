@@ -13,6 +13,7 @@ import { DateCell } from "./cells";
 import { loadEmployeeOptions } from "./branch-field";
 
 const SHIFT_LABEL: Record<string, string> = {
+  morning: "Morning",
   day: "Day",
   night: "Night",
   full_24h: "24 Hours",
@@ -273,6 +274,7 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
       required: true,
       defaultValue: "full_24h",
       options: [
+        { label: "Morning", value: "morning" },
         { label: "Day", value: "day" },
         { label: "Night", value: "night" },
         { label: "24 Hours", value: "full_24h" },

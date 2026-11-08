@@ -2,7 +2,7 @@ import { endpoints } from "./api/endpoints";
 import { http } from "./api/http";
 
 export type AttendanceStatus = "present" | "half_day" | "leave" | "off" | "absent";
-export type ShiftKind = "day" | "night" | "full_24h" | "custom";
+export type ShiftKind = "morning" | "day" | "night" | "full_24h" | "custom";
 
 export interface AttendanceRecord {
   id: string;
@@ -69,6 +69,8 @@ export interface PayslipSummary {
   unmarked_days: number;
   payable_days: number;
   gross_pay: number;
+  leave_deduction: number;
+  net_payable: number;
   by_shift: Record<string, number>;
   off_dates: string[];
   absent_dates: string[];
@@ -106,6 +108,8 @@ export interface PayrollRunRow {
   worked_days: number;
   payable_days: number;
   gross_pay: number;
+  leave_deduction: number;
+  net_payable: number;
   by_shift: Record<string, number>;
 }
 

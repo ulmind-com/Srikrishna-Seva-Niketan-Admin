@@ -98,6 +98,7 @@ export function DashboardPage() {
 
   // Today's shift breakdown as a compact hint, e.g. "Day 2 · Night 1 · Custom 1".
   const SHIFT_LABEL: Record<string, string> = {
+    morning: "Morning",
     day: "Day",
     night: "Night",
     full_24h: "24h",

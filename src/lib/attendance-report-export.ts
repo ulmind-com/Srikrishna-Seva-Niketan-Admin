@@ -42,7 +42,7 @@ function shiftText(d: Payslip["days"][number]): string {
     }
     if (d.start_time || d.end_time) return `${fmtTime(d.start_time)}-${fmtTime(d.end_time)}`;
   }
-  const map: Record<string, string> = { day: "Day", night: "Night", full_24h: "24h", custom: "Custom" };
+  const map: Record<string, string> = { morning: "Morning", day: "Day", night: "Night", full_24h: "24h", custom: "Custom" };
   return map[d.shift] ?? d.shift;
 }
 

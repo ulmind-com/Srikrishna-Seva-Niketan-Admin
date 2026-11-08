@@ -45,6 +45,7 @@ const STATUSES: { key: AttendanceStatus; label: string; cls: string }[] = [
 ];
 
 const SHIFTS: { key: ShiftKind; label: string; icon: typeof Sun }[] = [
+  { key: "morning", label: "Morning", icon: Sun },
   { key: "day", label: "Day", icon: Sun },
   { key: "night", label: "Night", icon: Moon },
   { key: "full_24h", label: "24h", icon: Clock },
