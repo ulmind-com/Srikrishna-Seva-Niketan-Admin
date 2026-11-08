@@ -17,8 +17,8 @@ import {
   CustomersPage,
   AssignmentsPage,
   ExpensesPage,
-  PaymentsPage,
 } from "@/pages/resource-pages";
+import { PaymentsPage } from "@/pages/PaymentsPage";
 import { EmployeeIdCardPage } from "@/pages/EmployeeIdCardPage";
 import { EmployeeDocumentsPage } from "@/pages/EmployeeDocumentsPage";
 import { StaffVerificationPage } from "@/pages/StaffVerificationPage";
