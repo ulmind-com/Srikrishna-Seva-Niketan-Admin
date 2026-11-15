@@ -3,6 +3,9 @@ import { endpoints } from "./api/endpoints";
 
 export interface MonthlyBillLineItem {
   assignment_id: string;
+  employee_id?: string;
+  employee_name?: string;
+  employee_code?: string | null;
   from: string;
   to: string;
   shift: string;
@@ -19,6 +22,7 @@ export interface MonthlyBillGroup {
   employee_id: string;
   employee_name: string;
   employee_code?: string | null;
+  employee_names?: string[];
   customer_id: string;
   customer_name: string;
   customer_phone?: string | null;
@@ -45,10 +49,10 @@ export const billingService = {
       ...(location_id ? { location_id } : {}),
     }),
 
-  issueMonthly: (month: string, employee_id: string, customer_id: string) =>
+  issueMonthly: (month: string, customer_id: string, employee_id?: string) =>
     http.post<{ bill_no: number }>(endpoints.billing.issueMonthly, {
       month,
-      employee_id,
       customer_id,
+      employee_id,
     }),
 };

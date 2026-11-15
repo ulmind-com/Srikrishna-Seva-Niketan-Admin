@@ -2,7 +2,17 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import { toast } from "sonner";
-import { CalendarDays, FileDown, Loader2, Receipt } from "lucide-react";
+import {
+  CalendarDays,
+  FileDown,
+  FileSpreadsheet,
+  Loader2,
+  Receipt,
+  ChevronDown,
+  ChevronUp,
+  UserCheck,
+  Stethoscope,
+} from "lucide-react";
 import { billingService, type MonthlyBillGroup } from "@/services/billing.service";
 import { resourceServices } from "@/services/resources";
 import { Button } from "@/components/ui/button";
@@ -24,7 +34,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { downloadMonthlyBillsPdf } from "@/lib/monthly-bill-export";
+import {
+  downloadMonthlyBillsPdf,
+  downloadMonthlyBillsXlsx,
+} from "@/lib/monthly-bill-export";
 
 const rupee = (n?: number | null) => `₹${(n ?? 0).toLocaleString("en-IN")}`;
 
@@ -34,15 +47,16 @@ function currentMonth(): string {
 }
 
 /**
- * Monthly billing — one bill per (nurse + customer) for a calendar month.
- * The admin picks a month, sees every billable nurse→customer pairing with its
- * days and amount, and generates a premium PDF (one invoice, or all at once).
+ * Monthly billing — one consolidated bill per customer for a calendar month.
+ * If multiple attendants served the client (e.g. staff replacement or shifts),
+ * both attendants are itemized under the single client invoice.
  */
 export function MonthlyBillsPage() {
   const qc = useQueryClient();
   const [month, setMonth] = useState(currentMonth());
   const [branch, setBranch] = useState("all");
   const [busy, setBusy] = useState(false);
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
   const { data: locations } = useQuery({
     queryKey: ["locations", "all"],
@@ -62,7 +76,7 @@ export function MonthlyBillsPage() {
   /** Make sure a bill has a number (idempotent), returning the numbered copy. */
   async function ensureIssued(b: MonthlyBillGroup): Promise<MonthlyBillGroup> {
     if (b.bill_no != null) return b;
-    const res = await billingService.issueMonthly(month, b.employee_id, b.customer_id);
+    const res = await billingService.issueMonthly(month, b.customer_id, b.employee_id);
     return { ...b, bill_no: res.bill_no };
   }
 
@@ -93,6 +107,19 @@ export function MonthlyBillsPage() {
     }
   }
 
+  function handleDownloadExcel() {
+    if (!bills.length) {
+      toast.error("No bill records to export for this month");
+      return;
+    }
+    try {
+      downloadMonthlyBillsXlsx(month, bills);
+      toast.success("Monthly bills exported to Excel (.xlsx)");
+    } catch (err) {
+      toast.error("Failed to export Excel file");
+    }
+  }
+
   return (
     <div className="space-y-6">
       <Helmet>
@@ -103,13 +130,28 @@ export function MonthlyBillsPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Monthly Bills</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            One bill per nurse &amp; customer for a calendar month — pick a month and generate.
+            One consolidated bill per customer for a calendar month — includes all assigned attendants &amp; replacements.
           </p>
         </div>
-        <Button onClick={handleAll} disabled={busy || !bills.length}>
-          {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
-          Download All (PDF)
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={handleDownloadExcel}
+            disabled={busy || !bills.length}
+            className="border-emerald-600/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+          >
+            <FileSpreadsheet className="mr-2 h-4 w-4" />
+            Download Excel (.xlsx)
+          </Button>
+          <Button onClick={handleAll} disabled={busy || !bills.length}>
+            {busy ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <FileDown className="mr-2 h-4 w-4" />
+            )}
+            Download All (PDF)
+          </Button>
+        </div>
       </div>
 
       {/* Controls */}
@@ -140,13 +182,13 @@ export function MonthlyBillsPage() {
 
       {/* Summary */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <Stat label="Bills" value={String(totals?.bills ?? 0)} />
-        <Stat label="Total Days" value={String(totals?.total_days ?? 0)} />
-        <Stat label="Total Amount" value={rupee(totals?.total_amount)} tone="text-emerald-500" />
+        <Stat label="Customers Billed" value={String(totals?.bills ?? 0)} />
+        <Stat label="Total Duty Days" value={String(totals?.total_days ?? 0)} />
+        <Stat label="Total Revenue Amount" value={rupee(totals?.total_amount)} tone="text-emerald-500" />
       </div>
 
       {/* Table */}
-      <div className="rounded-2xl border border-border bg-card">
+      <div className="rounded-2xl border border-border bg-card overflow-hidden">
         {isLoading ? (
           <div className="grid h-40 place-items-center">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -159,8 +201,10 @@ export function MonthlyBillsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Nurse</TableHead>
-                <TableHead>Customer</TableHead>
+                <TableHead className="w-10"></TableHead>
+                <TableHead>Customer (Patient)</TableHead>
+                <TableHead>Assigned Attendant(s)</TableHead>
+                <TableHead>Branch</TableHead>
                 <TableHead>Phone</TableHead>
                 <TableHead className="text-center">Days</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
@@ -169,44 +213,163 @@ export function MonthlyBillsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {bills.map((b) => (
-                <TableRow key={b.key}>
-                  <TableCell>
-                    <div className="font-medium">{b.employee_name}</div>
-                    {b.employee_code && (
-                      <div className="text-xs text-muted-foreground">{b.employee_code}</div>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="font-medium">{b.customer_name}</div>
-                    {b.location_name && (
-                      <div className="text-xs text-muted-foreground">{b.location_name}</div>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {[b.customer_phone, b.customer_alt_phone].filter(Boolean).join(" / ") || "—"}
-                  </TableCell>
-                  <TableCell className="text-center">{b.total_days}</TableCell>
-                  <TableCell className="text-right font-semibold">{rupee(b.total_amount)}</TableCell>
-                  <TableCell className="text-center">
-                    {b.bill_no != null ? (
-                      <Badge variant="outline">{b.bill_no}</Badge>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={busy}
-                      onClick={() => handleOne(b)}
+              {bills.map((b) => {
+                const isExpanded = expandedKey === b.key;
+                const hasMultipleStaff = (b.line_items?.length ?? 0) > 1;
+
+                return (
+                  <>
+                    <TableRow
+                      key={b.key}
+                      className="cursor-pointer hover:bg-muted/40 transition"
+                      onClick={() => setExpandedKey(isExpanded ? null : b.key)}
                     >
-                      <Receipt className="mr-1.5 h-3.5 w-3.5" /> Bill PDF
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+                      <TableCell className="w-10 pr-0 text-muted-foreground">
+                        {isExpanded ? (
+                          <ChevronUp className="h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4" />
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-semibold text-foreground">
+                          {b.customer_name}
+                        </div>
+                        {b.customer_address && (
+                          <div className="text-xs text-muted-foreground truncate max-w-[220px]">
+                            {b.customer_address}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <Stethoscope className="h-3.5 w-3.5 text-primary shrink-0" />
+                            <span className="font-medium text-xs">
+                              {b.employee_name}
+                            </span>
+                            {hasMultipleStaff && (
+                              <Badge
+                                variant="secondary"
+                                className="text-[10px] px-1.5 py-0 bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                              >
+                                Multiple Staff
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {b.location_name || "—"}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {[b.customer_phone, b.customer_alt_phone].filter(Boolean).join(" / ") || "—"}
+                      </TableCell>
+                      <TableCell className="text-center font-medium">
+                        {b.total_days}
+                      </TableCell>
+                      <TableCell className="text-right font-bold text-foreground">
+                        {rupee(b.total_amount)}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {b.bill_no != null ? (
+                          <Badge variant="outline" className="font-mono">
+                            #{b.bill_no}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busy}
+                          onClick={() => handleOne(b)}
+                          className="h-8 gap-1.5"
+                        >
+                          <Receipt className="h-3.5 w-3.5 text-primary" />
+                          <span>Bill PDF</span>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+
+                    {/* Expanded Staff Breakdown Row */}
+                    {isExpanded && (
+                      <TableRow className="bg-muted/20 hover:bg-muted/20">
+                        <TableCell colSpan={9} className="p-4 pt-1 pb-4">
+                          <div className="rounded-xl border border-border bg-card p-3 shadow-xs space-y-2">
+                            <div className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 uppercase tracking-wide">
+                              <UserCheck className="h-3.5 w-3.5 text-primary" />
+                              Itemized Duty &amp; Staff Breakdown ({b.customer_name})
+                            </div>
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-xs">
+                                <thead>
+                                  <tr className="border-b border-border/70 text-muted-foreground">
+                                    <th className="text-left py-1.5 font-semibold">Staff / Attendant</th>
+                                    <th className="text-left py-1.5 font-semibold">Shift</th>
+                                    <th className="text-left py-1.5 font-semibold">Duty Span (From → To)</th>
+                                    <th className="text-center py-1.5 font-semibold">Days</th>
+                                    <th className="text-right py-1.5 font-semibold">Daily Rate</th>
+                                    <th className="text-right py-1.5 font-semibold">Amount</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {b.line_items.map((li, idx) => (
+                                    <tr
+                                      key={li.assignment_id || idx}
+                                      className="border-b border-border/40 last:border-none"
+                                    >
+                                      <td className="py-2 font-medium">
+                                        <div className="flex items-center gap-1.5">
+                                          <span>{li.employee_name || b.employee_name}</span>
+                                          {li.employee_code && (
+                                            <span className="font-mono text-[10px] text-muted-foreground">
+                                              ({li.employee_code})
+                                            </span>
+                                          )}
+                                        </div>
+                                      </td>
+                                      <td className="py-2 text-muted-foreground">
+                                        {li.shift_label}
+                                      </td>
+                                      <td className="py-2 font-mono text-[11px]">
+                                        {li.from} → {li.to}
+                                      </td>
+                                      <td className="py-2 text-center font-semibold">
+                                        {li.days}
+                                      </td>
+                                      <td className="py-2 text-right text-muted-foreground">
+                                        {rupee(li.daily_rate)}
+                                      </td>
+                                      <td className="py-2 text-right font-bold text-foreground">
+                                        {rupee(li.amount)}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                  <tr className="bg-muted/40 font-bold border-t border-border">
+                                    <td colSpan={3} className="py-2 text-right">
+                                      Total for this month:
+                                    </td>
+                                    <td className="py-2 text-center">
+                                      {b.total_days} days
+                                    </td>
+                                    <td></td>
+                                    <td className="py-2 text-right text-emerald-500">
+                                      {rupee(b.total_amount)}
+                                    </td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </>
+                );
+              })}
             </TableBody>
           </Table>
         )}

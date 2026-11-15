@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { UserPlus, BellRing, Loader2 } from "lucide-react";
+import { UserPlus, BellRing, Loader2, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { CustomerAssignmentDrawer } from "@/components/customers/CustomerAssignmentDrawer";
+import { ReplaceStaffDialog } from "@/components/assignments/ReplaceStaffDialog";
 import type { Customer, Assignment } from "@/types/models";
 import { pushNotificationService } from "@/services/push-notification.service";
 import { ResourceView } from "@/components/resource/ResourceView";
@@ -77,6 +78,7 @@ export const CustomersPage = () => {
 
 export const AssignmentsPage = () => {
   const [pushingId, setPushingId] = useState<string | null>(null);
+  const [replaceAssignment, setReplaceAssignment] = useState<Assignment | null>(null);
 
   const handleSendPush = async (assignment: Assignment) => {
     setPushingId(assignment.id);
@@ -102,37 +104,67 @@ export const AssignmentsPage = () => {
   };
 
   return (
-    <ResourceView
-      config={assignmentsConfig}
-      extraRowAction={(assignment) => (
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-7 px-2.5 text-xs font-semibold gap-1.5 border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300 transition-all shadow-xs"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleSendPush(assignment);
-          }}
-          disabled={pushingId === assignment.id}
-          title={`Send push notification with sound to ${assignment.employee_name}`}
-        >
-          {pushingId === assignment.id ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <BellRing className="h-3.5 w-3.5 text-emerald-400" />
-          )}
-          <span>Push to Nurse</span>
-        </Button>
-      )}
-      extraDropdownItems={(assignment) => (
-        <DropdownMenuItem
-          onClick={() => handleSendPush(assignment)}
-          className="gap-2 cursor-pointer font-medium text-emerald-400 focus:text-emerald-300"
-        >
-          <BellRing className="h-4 w-4 text-emerald-400" /> Send Push Alert to Nurse
-        </DropdownMenuItem>
-      )}
-    />
+    <>
+      <ResourceView
+        config={assignmentsConfig}
+        extraRowAction={(assignment) => (
+          <div className="flex items-center gap-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 px-2 text-xs font-semibold gap-1 border-blue-500/40 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300 transition-all shadow-xs"
+              onClick={(e) => {
+                e.stopPropagation();
+                setReplaceAssignment(assignment);
+              }}
+              title={`Replace staff or handover duty for ${assignment.customer_name}`}
+            >
+              <UserCheck className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Replace</span>
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 px-2.5 text-xs font-semibold gap-1.5 border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300 transition-all shadow-xs"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSendPush(assignment);
+              }}
+              disabled={pushingId === assignment.id}
+              title={`Send push notification with sound to ${assignment.employee_name}`}
+            >
+              {pushingId === assignment.id ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <BellRing className="h-3.5 w-3.5 text-emerald-400" />
+              )}
+              <span>Push to Nurse</span>
+            </Button>
+          </div>
+        )}
+        extraDropdownItems={(assignment) => (
+          <>
+            <DropdownMenuItem
+              onClick={() => setReplaceAssignment(assignment)}
+              className="gap-2 cursor-pointer font-medium text-blue-400 focus:text-blue-300"
+            >
+              <UserCheck className="h-4 w-4 text-blue-400" /> Replace Staff (স্টাফ পরিবর্তন)
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => handleSendPush(assignment)}
+              className="gap-2 cursor-pointer font-medium text-emerald-400 focus:text-emerald-300"
+            >
+              <BellRing className="h-4 w-4 text-emerald-400" /> Send Push Alert to Nurse
+            </DropdownMenuItem>
+          </>
+        )}
+      />
+
+      <ReplaceStaffDialog
+        assignment={replaceAssignment}
+        onClose={() => setReplaceAssignment(null)}
+      />
+    </>
   );
 };
 export const ExpensesPage = () => <ResourceView config={expensesConfig} />;

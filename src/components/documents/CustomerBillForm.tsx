@@ -36,24 +36,44 @@ export function CustomerBillForm({
   billNo,
   customer,
   assignment,
+  assignments,
   branch,
   authorizedSignatureUrl,
 }: {
   billNo?: number | null;
   customer: Customer;
   assignment: Assignment;
+  assignments?: Assignment[];
   branch?: Location | null;
   authorizedSignatureUrl?: string | null;
 }) {
-  const days = assignment.total_days ?? assignment.duration_days ?? null;
+  const allAssignments = assignments && assignments.length > 0 ? assignments : [assignment];
+  const isMulti = allAssignments.length > 1;
+
+  const totalDays = allAssignments.reduce(
+    (acc, a) => acc + (a.total_days ?? a.duration_days ?? 0),
+    0
+  );
+
+  const totalAmount = allAssignments.reduce((acc, a) => {
+    const d = a.total_days ?? a.duration_days ?? 0;
+    const r =
+      a.customer_daily_rate ??
+      (a.customer_rate != null && d ? Math.round(a.customer_rate / d) : 0);
+    return acc + (a.customer_rate ?? (r * d));
+  }, 0);
+
+  const days = isMulti ? totalDays : (assignment.total_days ?? assignment.duration_days ?? null);
   // Prefer the stored per-day rate; fall back to back-computing it from the total.
-  const rate =
-    assignment.customer_daily_rate ??
-    (assignment.customer_rate != null && days
-      ? Math.round(assignment.customer_rate / days)
-      : null);
-  const amount =
-    assignment.customer_rate ?? (rate != null && days ? rate * days : null);
+  const rate = isMulti
+    ? null
+    : (assignment.customer_daily_rate ??
+      (assignment.customer_rate != null && days
+        ? Math.round(assignment.customer_rate / days)
+        : null));
+  const amount = isMulti
+    ? totalAmount
+    : (assignment.customer_rate ?? (rate != null && days ? rate * days : null));
 
   // Custom shift timings, written out window by window for the bill.
   const shiftWindows =
@@ -129,47 +149,73 @@ export function CustomerBillForm({
         <tbody>
           <tr>
             <td className="h-[140mm] border border-black px-2 py-1 align-top">
-              <p>Date</p>
-              <p className="mt-1">
-                From{" "}
-                <span className="border-b border-dotted border-black">
-                  {formatDate(assignment.start_date)}
-                </span>
-              </p>
-              <p className="mt-1">
-                To{" "}
-                <span className="border-b border-dotted border-black">
-                  {assignment.end_date ? formatDate(assignment.end_date) : "—"}
-                </span>
-              </p>
-              {shiftLines.length > 0 ? (
-                <div className="mt-2">
-                  <p className="font-semibold">
-                    Shift Timing{shiftLines.length > 1 ? "s" : ""}:
-                  </p>
-                  {shiftLines.map((l, i) => (
-                    <p key={i} className="ml-1">
-                      {shiftLines.length > 1 ? `${i + 1}. ` : ""}
-                      {l}
-                    </p>
-                  ))}
+              {isMulti ? (
+                <div className="space-y-3">
+                  <p className="font-bold underline">Attendant Care Duty Breakdown:</p>
+                  {allAssignments.map((a, idx) => {
+                    const aDays = a.total_days ?? a.duration_days ?? 0;
+                    const aRate = a.customer_daily_rate ?? (aDays && a.customer_rate ? Math.round(a.customer_rate / aDays) : 0);
+                    const aAmt = a.customer_rate ?? (aRate * aDays);
+                    return (
+                      <div key={a.id || idx} className="border-b border-dashed border-gray-400 pb-2">
+                        <p className="font-bold text-[13px]">
+                          {idx + 1}. {a.employee_name}
+                        </p>
+                        <p className="text-[11px] text-gray-700">
+                          {formatDate(a.start_date)} → {a.end_date ? formatDate(a.end_date) : "Ongoing"} ({aDays} days @ ₹{inr(aRate)})
+                        </p>
+                        <p className="text-[11px] font-semibold text-gray-800">
+                          Shift: {SHIFT_NAME[a.shift] ?? a.shift} | Amt: ₹{inr(aAmt)}
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
-                assignment.shift && (
-                  <p className="mt-2">
-                    Shift:{" "}
-                    <span className="font-semibold">
-                      {SHIFT_NAME[assignment.shift] ?? assignment.shift}
+                <>
+                  <p className="font-bold">Attendant: {assignment.employee_name}</p>
+                  <p className="mt-1">
+                    From{" "}
+                    <span className="border-b border-dotted border-black">
+                      {formatDate(assignment.start_date)}
                     </span>
                   </p>
-                )
+                  <p className="mt-1">
+                    To{" "}
+                    <span className="border-b border-dotted border-black">
+                      {assignment.end_date ? formatDate(assignment.end_date) : "—"}
+                    </span>
+                  </p>
+                  {shiftLines.length > 0 ? (
+                    <div className="mt-2">
+                      <p className="font-semibold">
+                        Shift Timing{shiftLines.length > 1 ? "s" : ""}:
+                      </p>
+                      {shiftLines.map((l, i) => (
+                        <p key={i} className="ml-1">
+                          {shiftLines.length > 1 ? `${i + 1}. ` : ""}
+                          {l}
+                        </p>
+                      ))}
+                    </div>
+                  ) : (
+                    assignment.shift && (
+                      <p className="mt-2">
+                        Shift:{" "}
+                        <span className="font-semibold">
+                          {SHIFT_NAME[assignment.shift] ?? assignment.shift}
+                        </span>
+                      </p>
+                    )
+                  )}
+                </>
               )}
             </td>
             <td className="border border-black px-1 text-center align-middle text-[15px] font-semibold">
               {days ?? ""}
             </td>
             <td className="border border-black px-1 text-center align-middle font-semibold">
-              {rate != null ? inr(rate) : ""}
+              {rate != null ? inr(rate) : (isMulti ? "—" : "")}
             </td>
             <td className="border border-black px-1 text-center align-middle text-[15px] font-semibold">
               {inr(amount)}

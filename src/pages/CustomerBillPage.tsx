@@ -34,6 +34,16 @@ export function CustomerBillPage() {
     enabled: Boolean(customerId),
   });
 
+  const { data: allCustAssignments } = useQuery({
+    queryKey: ["assignments", "by-customer", customerId],
+    queryFn: () =>
+      resourceServices.assignments.list({
+        customer_id: customerId as string,
+        page_size: 50,
+      }),
+    enabled: Boolean(customerId),
+  });
+
   const { data: locations } = useQuery({
     queryKey: ["locations", "all"],
     queryFn: () => resourceServices.locations.list({ page_size: 100 }),
@@ -86,6 +96,15 @@ export function CustomerBillPage() {
   const branch = locations?.items.find((b) => b.id === assignment.location_id) ?? null;
   const authorizedSignatureUrl = settings?.authorized_signature?.url ?? null;
 
+  const targetMonth = String(assignment.start_date).slice(0, 7);
+  const matchingAssignments = (allCustAssignments?.items ?? []).filter(
+    (a) =>
+      a.customer_id === assignment.customer_id &&
+      (String(a.start_date).slice(0, 7) === targetMonth ||
+        (a.end_date && String(a.end_date).slice(0, 7) === targetMonth))
+  );
+  matchingAssignments.sort((a, b) => (a.start_date > b.start_date ? 1 : -1));
+
   return (
     <div className="space-y-5">
       <Helmet>
@@ -107,6 +126,7 @@ export function CustomerBillPage() {
               billNo={billData?.bill_no ?? assignment.bill_no}
               customer={customer}
               assignment={assignment}
+              assignments={matchingAssignments.length > 0 ? matchingAssignments : [assignment]}
               branch={branch}
               authorizedSignatureUrl={authorizedSignatureUrl}
             />

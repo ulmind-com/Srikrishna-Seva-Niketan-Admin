@@ -1,5 +1,6 @@
 import { createCrudService } from "./crud.factory";
 import { endpoints } from "./api/endpoints";
+import { http } from "./api/http";
 import type {
   Assignment,
   Blog,
@@ -17,6 +18,26 @@ import type {
   Video,
 } from "@/types/models";
 
+const baseAssignments = createCrudService<Assignment>(endpoints.assignments.root);
+
+export interface ReplaceStaffPayload {
+  new_employee_id: string;
+  effective_date: string;
+  reason?: string;
+  customer_daily_rate?: number;
+  employee_daily_rate?: number;
+  notes?: string;
+}
+
+export const assignmentService = {
+  ...baseAssignments,
+  replaceStaff: (id: string, payload: ReplaceStaffPayload) =>
+    http.post<{ previous_assignment: Assignment; new_assignment: Assignment }>(
+      endpoints.assignments.replaceStaff(id),
+      payload
+    ),
+};
+
 /** CRUD services for the config-driven resource modules. */
 export const resourceServices = {
   services: createCrudService<Service>(endpoints.services.root),
@@ -32,7 +53,7 @@ export const resourceServices = {
   locations: createCrudService<Location>(endpoints.locations.root),
   employees: createCrudService<Employee>(endpoints.employees.root),
   customers: createCrudService<Customer>(endpoints.customers.root),
-  assignments: createCrudService<Assignment>(endpoints.assignments.root),
+  assignments: assignmentService,
   expenses: createCrudService<Expense>(endpoints.expenses.root),
   payments: createCrudService<Payment>(endpoints.payments.root),
 };
