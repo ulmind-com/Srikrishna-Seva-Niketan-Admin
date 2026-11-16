@@ -50,6 +50,19 @@ export function CustomerBillPage() {
     staleTime: 60_000,
   });
 
+  const { data: employees } = useQuery({
+    queryKey: ["employees", "all"],
+    queryFn: () => resourceServices.employees.list({ page_size: 100 }),
+    staleTime: 60_000,
+  });
+
+  const employeeMap = (employees?.items ?? []).reduce<
+    Record<string, { name: string; category?: string; code?: string }>
+  >((acc, emp) => {
+    acc[emp.id] = { name: emp.name, category: emp.category, code: emp.code };
+    return acc;
+  }, {});
+
   const { data: settings } = useQuery({
     queryKey: ["settings", "website"],
     queryFn: () => settingsService.getWebsite(),
@@ -100,8 +113,10 @@ export function CustomerBillPage() {
   const matchingAssignments = (allCustAssignments?.items ?? []).filter(
     (a) =>
       a.customer_id === assignment.customer_id &&
+      a.status !== "cancelled" &&
       (String(a.start_date).slice(0, 7) === targetMonth ||
-        (a.end_date && String(a.end_date).slice(0, 7) === targetMonth))
+        (a.end_date && String(a.end_date).slice(0, 7) === targetMonth) ||
+        (!a.end_date && String(a.start_date).slice(0, 7) <= targetMonth))
   );
   matchingAssignments.sort((a, b) => (a.start_date > b.start_date ? 1 : -1));
 
@@ -129,6 +144,7 @@ export function CustomerBillPage() {
               assignments={matchingAssignments.length > 0 ? matchingAssignments : [assignment]}
               branch={branch}
               authorizedSignatureUrl={authorizedSignatureUrl}
+              employeeMap={employeeMap}
             />
           </div>
         </div>
