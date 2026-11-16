@@ -13,7 +13,7 @@ const STATUS_LABEL: Record<string, string> = {
   present: "Present",
   half_day: "Half day",
   absent: "Absent",
-  leave: "Leave",
+  leave: "Off",
   off: "Off",
   unmarked: "—",
 };
@@ -101,15 +101,14 @@ export function downloadPayslipPdf(slip: Payslip) {
   const s = slip.summary;
   autoTable(doc, {
     startY: y + 26,
-    head: [["Days Worked", "Present (shifts)", "Half", "Absent", "Leave", "Off", "Payable Days"]],
+    head: [["Days Worked", "Present (shifts)", "Half", "Absent", "Off Days", "Payable Days"]],
     body: [
       [
         String(s.worked_days),
         String(s.present_days),
         String(s.half_days),
         String(s.absent_days),
-        String(s.leave_days),
-        String(s.off_days),
+        String((s.off_days ?? 0) + (s.leave_days ?? 0)),
         String(s.payable_days),
       ],
     ],
@@ -126,7 +125,7 @@ export function downloadPayslipPdf(slip: Payslip) {
   const bs = s.by_shift || {};
   autoTable(doc, {
     startY,
-    head: [["Morning", "Day", "Night", "24h", "Custom", "Per Day Salary", "Leave Deduction"]],
+    head: [["Morning", "Day", "Night", "24h", "Custom", "Per Day Salary", "Deduction"]],
     body: [
       [
         String(bs.morning || 0),

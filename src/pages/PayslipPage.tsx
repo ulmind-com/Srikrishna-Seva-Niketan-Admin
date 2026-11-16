@@ -22,7 +22,7 @@ import {
 const STATUS_LABEL: Record<string, string> = {
   present: "Present",
   half_day: "Half day",
-  leave: "Leave",
+  leave: "Off",
   off: "Off",
   absent: "Absent",
   unmarked: "—",
@@ -30,7 +30,7 @@ const STATUS_LABEL: Record<string, string> = {
 const STATUS_CLS: Record<string, string> = {
   present: "text-emerald-600",
   half_day: "text-amber-600",
-  leave: "text-rose-600",
+  leave: "text-slate-500",
   off: "text-slate-500",
   absent: "text-rose-700 font-semibold",
   unmarked: "text-muted-foreground/50",
@@ -194,7 +194,7 @@ export function PayslipPage() {
                 <th className="px-4 py-3 font-medium">Staff</th>
                 <th className="px-3 py-3 text-center font-medium">Present</th>
                 <th className="px-3 py-3 text-center font-medium">Half</th>
-                <th className="px-3 py-3 text-center font-medium">Leave</th>
+                <th className="px-3 py-3 text-center font-medium">Absent</th>
                 <th className="px-3 py-3 text-center font-medium">Off</th>
                 <th className="px-3 py-3 text-center font-medium">Payable</th>
                 <th className="px-3 py-3 text-right font-medium">Rate</th>
@@ -216,8 +216,8 @@ export function PayslipPage() {
                     </td>
                     <td className="px-3 py-3 text-center">{r.present_days}</td>
                     <td className="px-3 py-3 text-center">{r.half_days}</td>
-                    <td className="px-3 py-3 text-center text-rose-600">{r.leave_days}</td>
-                    <td className="px-3 py-3 text-center text-slate-500">{r.off_days}</td>
+                    <td className="px-3 py-3 text-center text-rose-600">{r.absent_days}</td>
+                    <td className="px-3 py-3 text-center text-slate-500">{(r.off_days ?? 0) + (r.leave_days ?? 0)}</td>
                     <td className="px-3 py-3 text-center font-medium">{r.payable_days}</td>
                     <td className="px-3 py-3 text-right text-muted-foreground">{r.daily_rate ? inr(r.daily_rate) : "—"}</td>
                     <td className="px-4 py-3 text-right font-semibold">{inr(r.gross_pay)}</td>
@@ -280,11 +280,10 @@ export function PayslipPage() {
                   { label: "Present (shifts)", value: slip.summary.present_days },
                   { label: "Half days", value: slip.summary.half_days },
                   { label: "Absent", value: slip.summary.absent_days },
-                  { label: "Leave", value: slip.summary.leave_days },
-                  { label: "Off", value: slip.summary.off_days },
+                  { label: "Off days", value: (slip.summary.off_days ?? 0) + (slip.summary.leave_days ?? 0) },
                   { label: "Payable days", value: slip.summary.payable_days },
                   { label: "Per Day Salary", value: inr(slip.employee.daily_rate ?? 0) },
-                  { label: "Leave Deduction", value: inr(slip.summary.leave_deduction) },
+                  { label: "Deduction", value: inr(slip.summary.leave_deduction) },
                   { label: "Days in month", value: slip.period.days_in_month },
                 ].map((s) => (
                   <div key={s.label} className="rounded-xl border border-border p-3">
@@ -297,7 +296,7 @@ export function PayslipPage() {
                   <p className="text-2xl font-bold text-primary">{inr(slip.summary.net_payable)}</p>
                   {slip.summary.leave_deduction > 0 && (
                     <p className="mt-0.5 text-[11px] text-muted-foreground">
-                      after {inr(slip.summary.leave_deduction)} leave deduction
+                      after {inr(slip.summary.leave_deduction)} deduction
                     </p>
                   )}
                 </div>
@@ -313,7 +312,7 @@ export function PayslipPage() {
 
               {slip.off_dates.length > 0 && (
                 <div className="mb-4 rounded-xl border border-dashed border-border p-3">
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">Unpaid off / leave dates</p>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">Unpaid off dates</p>
                   <div className="flex flex-wrap gap-1.5">
                     {slip.off_dates.map((d) => (
                       <span key={d} className="rounded-md bg-muted px-2 py-0.5 text-xs">{d}</span>

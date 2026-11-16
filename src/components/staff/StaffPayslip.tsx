@@ -23,7 +23,7 @@ const STATUS: Record<string, { label: string; dot: string; text: string }> = {
   present: { label: "On Duty", dot: "bg-emerald-500", text: "text-emerald-600" },
   half_day: { label: "Half day", dot: "bg-amber-500", text: "text-amber-600" },
   absent: { label: "Absent", dot: "bg-rose-500", text: "text-rose-600" },
-  leave: { label: "On Leave", dot: "bg-rose-400", text: "text-rose-500" },
+  leave: { label: "Off", dot: "bg-slate-400", text: "text-slate-500" },
   off: { label: "Off", dot: "bg-slate-400", text: "text-slate-500" },
   unmarked: { label: "—", dot: "bg-muted", text: "text-muted-foreground" },
 };
@@ -110,9 +110,9 @@ export function StaffPayslip() {
 
           {/* Secondary stats */}
           <div className="grid grid-cols-3 gap-2">
-            <MiniStat label="On Leave" value={s?.leave_days ?? 0} tone="text-rose-500" />
-            <MiniStat label="Off Days" value={s?.off_days ?? 0} tone="text-slate-500" />
             <MiniStat label="Present Shifts" value={s?.present_days ?? 0} tone="text-emerald-600" />
+            <MiniStat label="Absent" value={s?.absent_days ?? 0} tone="text-rose-500" />
+            <MiniStat label="Off Days" value={(s?.off_days ?? 0) + (s?.leave_days ?? 0)} tone="text-slate-500" />
           </div>
 
           {/* Shift breakdown */}

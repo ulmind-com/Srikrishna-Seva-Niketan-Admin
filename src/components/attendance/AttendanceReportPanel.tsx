@@ -28,7 +28,7 @@ const STATUS_LABEL: Record<string, string> = {
   present: "Present",
   half_day: "Half day",
   absent: "Absent",
-  leave: "Leave",
+  leave: "Off",
   off: "Off",
   unmarked: "Not marked",
 };
@@ -69,22 +69,20 @@ function currentMonth(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-type DayKind = "worked" | "absent" | "leave" | "off" | "unmarked";
+type DayKind = "worked" | "absent" | "off" | "unmarked";
 
 /** Reduce the (possibly multiple) shift rows of a date to one cell colour. */
 function dayKind(entries: PayslipDay[]): DayKind {
   if (!entries.length || entries.every((e) => e.status === "unmarked")) return "unmarked";
   if (entries.some((e) => e.status === "present" || e.status === "half_day")) return "worked";
   if (entries.some((e) => e.status === "absent")) return "absent";
-  if (entries.some((e) => e.status === "leave")) return "leave";
-  if (entries.some((e) => e.status === "off")) return "off";
+  if (entries.some((e) => e.status === "off" || e.status === "leave")) return "off";
   return "unmarked";
 }
 
 const KIND_CLS: Record<DayKind, string> = {
   worked: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30",
   absent: "bg-rose-500/15 text-rose-600 border-rose-500/40 font-semibold",
-  leave: "bg-amber-500/15 text-amber-600 border-amber-500/30",
   off: "bg-slate-500/10 text-slate-500 border-slate-500/20",
   unmarked: "bg-muted/30 text-muted-foreground/50 border-transparent",
 };
@@ -110,7 +108,6 @@ function dayShiftLabels(entries: PayslipDay[]): string {
 const KIND_LABEL: Record<DayKind, string> = {
   worked: "Worked",
   absent: "Absent",
-  leave: "Leave",
   off: "Off",
   unmarked: "Unmarked",
 };
@@ -227,12 +224,11 @@ export function AttendanceReportPanel() {
       ) : slip ? (
         <>
           {/* Summary */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             <Stat label="Days Worked" value={String(s?.worked_days ?? 0)} tone="text-emerald-500" />
             <Stat label="Absent" value={String(s?.absent_days ?? 0)} tone="text-rose-500" />
             <Stat label="Present (shifts)" value={String(s?.present_days ?? 0)} />
-            <Stat label="Leave" value={String(s?.leave_days ?? 0)} />
-            <Stat label="Off" value={String(s?.off_days ?? 0)} />
+            <Stat label="Off Days" value={String((s?.off_days ?? 0) + (s?.leave_days ?? 0))} />
             <Stat label="Gross Pay" value={inr(s?.gross_pay)} tone="text-primary" />
           </div>
 

@@ -13,7 +13,7 @@ const STATUS_LABEL: Record<string, string> = {
   present: "Present",
   half_day: "Half day",
   absent: "Absent",
-  leave: "Leave",
+  leave: "Off",
   off: "Off",
   unmarked: "—",
 };
@@ -101,15 +101,14 @@ export function downloadAttendanceReportPdf(slip: Payslip) {
   const s = slip.summary;
   autoTable(doc, {
     startY: y + 26,
-    head: [["Days Worked", "Present (shifts)", "Absent", "Half", "Leave", "Off", "Gross Pay"]],
+    head: [["Days Worked", "Present (shifts)", "Absent", "Half", "Off Days", "Gross Pay"]],
     body: [
       [
         String(s.worked_days),
         String(s.present_days),
         String(s.absent_days),
         String(s.half_days),
-        String(s.leave_days),
-        String(s.off_days),
+        String((s.off_days ?? 0) + (s.leave_days ?? 0)),
         rupee(s.gross_pay),
       ],
     ],
@@ -118,7 +117,7 @@ export function downloadAttendanceReportPdf(slip: Payslip) {
     headStyles: { fillColor: EMERALD, textColor: 255, fontSize: 8.5, fontStyle: "bold" },
     columnStyles: {
       2: { textColor: ROSE, fontStyle: "bold" },
-      6: { halign: "right", fontStyle: "bold" },
+      5: { halign: "right", fontStyle: "bold" },
     },
     margin: { left: marginX, right: marginX },
   });

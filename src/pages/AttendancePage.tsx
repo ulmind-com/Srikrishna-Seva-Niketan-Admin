@@ -40,7 +40,6 @@ const STATUSES: { key: AttendanceStatus; label: string; cls: string }[] = [
   { key: "present", label: "Present", cls: "bg-emerald-500 text-white border-emerald-500" },
   { key: "half_day", label: "Half", cls: "bg-amber-500 text-white border-amber-500" },
   { key: "absent", label: "Absent", cls: "bg-rose-600 text-white border-rose-600" },
-  { key: "leave", label: "Leave", cls: "bg-rose-400 text-white border-rose-400" },
   { key: "off", label: "Off", cls: "bg-slate-500 text-white border-slate-500" },
 ];
 
@@ -130,8 +129,9 @@ export function AttendancePage() {
       // shows correctly instead of letting the last row win.
       const existing = seed[r.employee_id];
       const isPayable = r.status === "present" || r.status === "half_day";
+      const rawStatus = r.status === "leave" ? "off" : r.status;
       if (!existing || isPayable) {
-        seed[r.employee_id] = { status: r.status, shift: r.shift, rate: r.pay_rate };
+        seed[r.employee_id] = { status: rawStatus as AttendanceStatus, shift: r.shift, rate: r.pay_rate };
       }
     }
     setMarks(seed);
@@ -156,11 +156,13 @@ export function AttendancePage() {
 
   // Live counts from the current (unsaved) marks across visible staff.
   const counts = useMemo(() => {
-    const c = { present: 0, half_day: 0, absent: 0, leave: 0, off: 0, unmarked: 0 };
+    const c: Record<string, number> = { present: 0, half_day: 0, absent: 0, off: 0, unmarked: 0 };
     for (const e of visible) {
       const s = marks[e.id]?.status;
       if (!s) c.unmarked += 1;
-      else c[s] += 1;
+      else if (s === "leave") c.off += 1;
+      else if (s in c) c[s] += 1;
+      else c.off += 1;
     }
     return c;
   }, [visible, marks]);
@@ -231,8 +233,8 @@ export function AttendancePage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Attendance</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Mark each staff member present, half-day, on leave or off for the day.
-            Leave and off days are unpaid on the payslip.
+            Mark each staff member present, half-day, absent or off for the day.
+            Off days are unpaid on the payslip.
           </p>
         </div>
         {view === "daily" && (
