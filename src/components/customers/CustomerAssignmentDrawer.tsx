@@ -20,6 +20,7 @@ import { assignmentsConfig } from "@/config/resources/assignments.config";
 import { resourceServices } from "@/services/resources";
 import { normalizeError, describeError } from "@/services/api/client";
 import { BranchName } from "@/components/common/BranchName";
+import { SearchableStaffSelect } from "@/components/common/SearchableStaffSelect";
 import { ResourceForm } from "@/components/resource/ResourceForm";
 import { ReplaceStaffDialog } from "@/components/assignments/ReplaceStaffDialog";
 import { BatchReplaceStaffDialog } from "@/components/assignments/BatchReplaceStaffDialog";
@@ -34,13 +35,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { formatDate } from "@/lib/utils";
 import type { Customer, Assignment } from "@/types/models";
 
@@ -687,86 +681,42 @@ export function CustomerAssignmentDrawer({
                             {idx + 1}
                           </span>
 
-                          <div className="flex-1">
-                            <Select
+                          <div className="flex-1 min-w-[200px]">
+                            <SearchableStaffSelect
+                              staffList={allStaff}
                               value={row.employee_id}
-                              onValueChange={(empId) => {
+                              onChange={(empId) => {
                                 setMultiNurseRows((prev) =>
                                   prev.map((r) =>
                                     r.id === row.id ? { ...r, employee_id: empId } : r
                                   )
                                 );
                               }}
-                            >
-                              <SelectTrigger className="h-9 w-full bg-card">
-                                <SelectValue placeholder={`Select Nurse #${idx + 1}...`} />
-                              </SelectTrigger>
-                              <SelectContent className="z-[100] max-h-80 overflow-y-auto">
-                                {allStaff.map((emp) => {
-                                  const branch = branchMap[emp.location_id] || "";
-                                  const isSameBranch = emp.location_id === customer.location_id;
-                                  return (
-                                    <SelectItem key={emp.id} value={emp.id}>
-                                      <div className="flex items-center gap-2 py-0.5">
-                                        <span className="font-medium text-foreground">
-                                          {emp.name}
-                                        </span>
-                                        {emp.code && (
-                                          <span className="font-mono text-xs text-muted-foreground">
-                                            ({emp.code})
-                                          </span>
-                                        )}
-                                        {emp.category && (
-                                          <Badge
-                                            variant="secondary"
-                                            className="text-[10px] py-0 px-1.5 capitalize"
-                                          >
-                                            {emp.category}
-                                          </Badge>
-                                        )}
-                                        {branch && (
-                                          <span className="text-[10px] text-muted-foreground/80">
-                                            • {branch}
-                                          </span>
-                                        )}
-                                        {isSameBranch && (
-                                          <Badge
-                                            variant="outline"
-                                            className="text-[9px] py-0 px-1 text-emerald-400 border-emerald-500/30"
-                                          >
-                                            Same Branch
-                                          </Badge>
-                                        )}
-                                      </div>
-                                    </SelectItem>
-                                  );
-                                })}
-                              </SelectContent>
-                            </Select>
+                              branchMap={branchMap}
+                              targetLocationId={customer.location_id}
+                              placeholder={`Select Nurse #${idx + 1}...`}
+                            />
                           </div>
 
                           <div className="w-full sm:w-44">
-                            <Select
+                            <select
                               value={row.shift}
-                              onValueChange={(shiftVal) => {
+                              onChange={(e) => {
+                                const shiftVal = e.target.value;
                                 setMultiNurseRows((prev) =>
                                   prev.map((r) =>
                                     r.id === row.id ? { ...r, shift: shiftVal } : r
                                   )
                                 );
                               }}
+                              className="h-10 w-full rounded-xl border border-border bg-card px-2.5 text-xs focus:ring-1 focus:ring-primary"
                             >
-                              <SelectTrigger className="h-9 w-full bg-card">
-                                <SelectValue placeholder="Select shift..." />
-                              </SelectTrigger>
-                              <SelectContent className="z-[100]">
-                                <SelectItem value="full_24h">24 Hours Shift</SelectItem>
-                                <SelectItem value="day">Day Shift (8 AM - 8 PM)</SelectItem>
-                                <SelectItem value="night">Night Shift (8 PM - 8 AM)</SelectItem>
-                                <SelectItem value="morning">Morning Shift</SelectItem>
-                                <SelectItem value="custom">Custom Shift</SelectItem>
-                              </SelectContent>
-                            </Select>
+                              <option value="full_24h">24 Hours Shift</option>
+                              <option value="day">Day Shift (8 AM - 8 PM)</option>
+                              <option value="night">Night Shift (8 PM - 8 AM)</option>
+                              <option value="morning">Morning Shift</option>
+                              <option value="custom">Custom Shift</option>
+                            </select>
                           </div>
 
                           {multiNurseRows.length > 1 && (
