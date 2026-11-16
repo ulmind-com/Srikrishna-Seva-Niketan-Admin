@@ -57,20 +57,28 @@ export function ReplaceStaffDialog({
   const [newEmployeeId, setNewEmployeeId] = useState("");
   const [effectiveDate, setEffectiveDate] = useState(() => getTodayIST());
   const [reason, setReason] = useState("");
-  const [customRate, setCustomRate] = useState<string>("");
-  const [payoutRate, setPayoutRate] = useState<string>("");
 
-  // Load available staff in the same branch
+  // Load ALL active staff across the entire agency (never restricted by branch)
   const { data: staffData, isLoading: loadingStaff } = useQuery({
-    queryKey: ["employees", "branch", assignment?.location_id],
-    queryFn: () =>
-      resourceServices.employees.list({
-        location_id: assignment?.location_id,
-        page_size: 150,
-      }),
-    enabled: Boolean(assignment?.location_id),
+    queryKey: ["employees", "all-for-replace"],
+    queryFn: () => resourceServices.employees.list({ page_size: 200 }),
     staleTime: 30_000,
   });
+
+  // Load branches to show location tag for each staff
+  const { data: locationsData } = useQuery({
+    queryKey: ["locations", "lookup"],
+    queryFn: () => resourceServices.locations.list({ page_size: 100 }),
+    staleTime: 60_000,
+  });
+
+  const branchMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    (locationsData?.items ?? []).forEach((loc) => {
+      map[loc.id] = loc.name;
+    });
+    return map;
+  }, [locationsData]);
 
   const availableStaff = useMemo(() => {
     const list = staffData?.items ?? [];
@@ -109,8 +117,6 @@ export function ReplaceStaffDialog({
         new_employee_id: newEmployeeId,
         effective_date: effectiveDate,
         reason: reason.trim() || undefined,
-        customer_daily_rate: customRate ? Number(customRate) : undefined,
-        employee_daily_rate: payoutRate ? Number(payoutRate) : undefined,
       });
     },
     onSuccess: () => {
@@ -187,15 +193,9 @@ export function ReplaceStaffDialog({
             </Label>
             <Select
               value={newEmployeeId}
-              onValueChange={(id) => {
-                setNewEmployeeId(id);
-                const emp = availableStaff.find((e) => e.id === id);
-                if (emp?.daily_rate && !payoutRate) {
-                  setPayoutRate(String(emp.daily_rate));
-                }
-              }}
+              onValueChange={(id) => setNewEmployeeId(id)}
             >
-              <SelectTrigger className="h-10">
+              <SelectTrigger className="h-10 w-full bg-card">
                 <SelectValue
                   placeholder={
                     loadingStaff
@@ -204,24 +204,41 @@ export function ReplaceStaffDialog({
                   }
                 />
               </SelectTrigger>
-              <SelectContent>
-                {availableStaff.map((emp) => (
-                  <SelectItem key={emp.id} value={emp.id}>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{emp.name}</span>
-                      {emp.code && (
-                        <span className="font-mono text-xs text-muted-foreground">
-                          ({emp.code})
-                        </span>
-                      )}
-                      {emp.category && (
-                        <Badge variant="secondary" className="text-[10px] py-0 px-1.5 capitalize">
-                          {emp.category}
-                        </Badge>
-                      )}
-                    </div>
-                  </SelectItem>
-                ))}
+              <SelectContent className="z-[100] max-h-80 overflow-y-auto">
+                {availableStaff.map((emp) => {
+                  const branch = branchMap[emp.location_id] || "";
+                  const isSameBranch = emp.location_id === assignment.location_id;
+                  return (
+                    <SelectItem key={emp.id} value={emp.id}>
+                      <div className="flex items-center gap-2 py-0.5">
+                        <span className="font-medium text-foreground">{emp.name}</span>
+                        {emp.code && (
+                          <span className="font-mono text-xs text-muted-foreground">
+                            ({emp.code})
+                          </span>
+                        )}
+                        {emp.category && (
+                          <Badge variant="secondary" className="text-[10px] py-0 px-1.5 capitalize">
+                            {emp.category}
+                          </Badge>
+                        )}
+                        {branch && (
+                          <span className="text-[10px] text-muted-foreground/80">
+                            • {branch}
+                          </span>
+                        )}
+                        {isSameBranch && (
+                          <Badge
+                            variant="outline"
+                            className="text-[9px] py-0 px-1 text-emerald-400 border-emerald-500/30"
+                          >
+                            Same Branch
+                          </Badge>
+                        )}
+                      </div>
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>
@@ -253,34 +270,6 @@ export function ReplaceStaffDialog({
                 placeholder="e.g. Family emergency, sick leave"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                className="h-9"
-              />
-            </div>
-          </div>
-
-          {/* Daily Rate overrides if needed */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">
-                Client Daily Rate (₹/day)
-              </Label>
-              <Input
-                type="number"
-                placeholder={String(assignment.customer_daily_rate ?? "1200")}
-                value={customRate}
-                onChange={(e) => setCustomRate(e.target.value)}
-                className="h-9"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">
-                New Staff Payout Rate (₹/day)
-              </Label>
-              <Input
-                type="number"
-                placeholder={String(selectedNewEmp?.daily_rate ?? assignment.employee_daily_rate ?? "700")}
-                value={payoutRate}
-                onChange={(e) => setPayoutRate(e.target.value)}
                 className="h-9"
               />
             </div>
@@ -319,7 +308,7 @@ export function ReplaceStaffDialog({
           <Button
             onClick={() => replaceMutation.mutate()}
             disabled={replaceMutation.isPending || !newEmployeeId || !effectiveDate}
-            className="gap-2"
+            className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
           >
             {replaceMutation.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />

@@ -1,5 +1,4 @@
 import { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   CalendarClock,
@@ -11,14 +10,19 @@ import {
   ArrowLeft,
   Loader2,
   Stethoscope,
+  Users,
+  Trash2,
+  CheckSquare,
+  Square,
 } from "lucide-react";
 import { toast } from "sonner";
 import { assignmentsConfig } from "@/config/resources/assignments.config";
 import { resourceServices } from "@/services/resources";
-import { normalizeError } from "@/services/api/client";
+import { normalizeError, describeError } from "@/services/api/client";
 import { BranchName } from "@/components/common/BranchName";
 import { ResourceForm } from "@/components/resource/ResourceForm";
 import { ReplaceStaffDialog } from "@/components/assignments/ReplaceStaffDialog";
+import { BatchReplaceStaffDialog } from "@/components/assignments/BatchReplaceStaffDialog";
 import {
   Sheet,
   SheetContent,
@@ -28,6 +32,15 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { formatDate } from "@/lib/utils";
 import type { Customer, Assignment } from "@/types/models";
 
@@ -45,17 +58,33 @@ function getTodayIST(): string {
   }).format(new Date());
 }
 
+interface MultiNurseRow {
+  id: string;
+  employee_id: string;
+  shift: string;
+}
+
 export function CustomerAssignmentDrawer({
   customer,
   onClose,
 }: CustomerAssignmentDrawerProps) {
   const qc = useQueryClient();
-  const navigate = useNavigate();
 
-  const [userWantsNew, setUserWantsNew] = useState(false);
+  // Mode: "list" | "single_new" | "multi_new"
+  const [viewMode, setViewMode] = useState<"list" | "single_new" | "multi_new">("list");
   const [replacingAssignment, setReplacingAssignment] = useState<Assignment | null>(null);
+  const [batchReplacingAssignments, setBatchReplacingAssignments] = useState<Assignment[]>([]);
+  const [selectedAssignmentIds, setSelectedAssignmentIds] = useState<Set<string>>(new Set());
 
-  // Fetch all assignments for this customer to display active and past staff
+  // Multi-nurse builder state
+  const [multiStartDate, setMultiStartDate] = useState(() => getTodayIST());
+  const [multiDurationDays, setMultiDurationDays] = useState(10);
+  const [multiNurseRows, setMultiNurseRows] = useState<MultiNurseRow[]>([
+    { id: "row-1", employee_id: "", shift: "day" },
+    { id: "row-2", employee_id: "", shift: "night" },
+  ]);
+
+  // 1. Fetch all assignments for this customer
   const {
     data: assignmentsData,
     isLoading: loadingAssignments,
@@ -73,8 +102,65 @@ export function CustomerAssignmentDrawer({
     staleTime: 10_000,
   });
 
+  // 2. Fetch all employees across the agency
+  const { data: staffData } = useQuery({
+    queryKey: ["employees", "all-for-replace"],
+    queryFn: () => resourceServices.employees.list({ page_size: 200 }),
+    staleTime: 30_000,
+  });
+
+  // 3. Fetch branches
+  const { data: locationsData } = useQuery({
+    queryKey: ["locations", "lookup"],
+    queryFn: () => resourceServices.locations.list({ page_size: 100 }),
+    staleTime: 60_000,
+  });
+
+  const branchMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    (locationsData?.items ?? []).forEach((loc) => {
+      map[loc.id] = loc.name;
+    });
+    return map;
+  }, [locationsData]);
+
+  const allStaff = useMemo(() => {
+    const list = staffData?.items ?? [];
+    return list.filter((e) => (e.is_active ?? true));
+  }, [staffData]);
+
   const assignments = assignmentsData?.items ?? [];
 
+  // Active / scheduled assignments eligible for replacement
+  const activeAssignments = useMemo(
+    () =>
+      assignments.filter(
+        (a) =>
+          a.status !== "cancelled" &&
+          !a.replaced_by_employee_id &&
+          a.status !== "completed"
+      ),
+    [assignments]
+  );
+
+  const toggleSelectAssignment = (id: string) => {
+    setSelectedAssignmentIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllActive = () => {
+    if (selectedAssignmentIds.size === activeAssignments.length) {
+      setSelectedAssignmentIds(new Set());
+    } else {
+      setSelectedAssignmentIds(new Set(activeAssignments.map((a) => a.id)));
+    }
+  };
+
+  // Single assignment form initial data
   const initialAssignmentData = useMemo(() => {
     if (!customer) return null;
     return {
@@ -105,6 +191,7 @@ export function CustomerAssignmentDrawer({
     };
   }, [customer]);
 
+  // Single creation mutation
   const createMutation = useMutation({
     mutationFn: (values: Record<string, unknown>) => {
       const cleanPayload = { ...values };
@@ -162,14 +249,10 @@ export function CustomerAssignmentDrawer({
       toast.success(
         `Duty successfully assigned to ${created.employee_name || "Nurse"}!`,
         {
-          description: `Assigned for ${customer?.name ?? "Customer"}. Live push alert with sound dispatched to nurse device.`,
-          action: {
-            label: "View in Assignments",
-            onClick: () => navigate("/assignments"),
-          },
+          description: `Assigned for ${customer?.name ?? "Customer"}. Live push alert dispatched.`,
         }
       );
-      setUserWantsNew(false);
+      setViewMode("list");
       refetchAssignments();
     },
     onError: (err) => {
@@ -177,9 +260,51 @@ export function CustomerAssignmentDrawer({
     },
   });
 
-  // Determine whether to show the form or the staff overview list:
-  // If user explicitly asked for new form, or if there are no assignments registered yet.
-  const showForm = userWantsNew || (!loadingAssignments && assignments.length === 0);
+  // Multi-nurse creation mutation
+  const multiAssignMutation = useMutation({
+    mutationFn: () => {
+      if (!customer) throw new Error("No customer selected");
+      const validRows = multiNurseRows.filter((r) => Boolean(r.employee_id));
+      if (validRows.length === 0) {
+        throw new Error("Please select at least one nurse to assign");
+      }
+
+      return resourceServices.assignments.multiAssign({
+        customer_id: customer.id,
+        location_id: customer.location_id,
+        start_date: multiStartDate,
+        duration_days: multiDurationDays,
+        address: customer.address || "",
+        dest_lat: customer.lat != null ? customer.lat : undefined,
+        dest_lng: customer.lng != null ? customer.lng : undefined,
+        staff_list: validRows.map((r) => ({
+          employee_id: r.employee_id,
+          shift: r.shift,
+        })),
+      });
+    },
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["assignments"] });
+      qc.invalidateQueries({ queryKey: ["customers"] });
+      qc.invalidateQueries({ queryKey: ["daily-roster"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+
+      toast.success(`Successfully assigned ${res.count || multiNurseRows.length} nurses!`, {
+        description: `All nurses assigned to ${customer?.name}. Alerts dispatched to devices.`,
+      });
+      setViewMode("list");
+      refetchAssignments();
+    },
+    onError: (err) => {
+      toast.error(describeError(err));
+    },
+  });
+
+  // Effective mode to show
+  const currentView =
+    !loadingAssignments && assignments.length === 0 && viewMode === "list"
+      ? "multi_new"
+      : viewMode;
 
   return (
     <>
@@ -198,7 +323,7 @@ export function CustomerAssignmentDrawer({
                         Client Duty &amp; Staff Assignments
                       </SheetTitle>
                       <SheetDescription className="text-xs">
-                        Assign staff member or manage multiple nurses for{" "}
+                        Manage multi-nurse care team for{" "}
                         <span className="font-semibold text-foreground">
                           {customer.name}
                         </span>{" "}
@@ -255,28 +380,77 @@ export function CustomerAssignmentDrawer({
                 </div>
               </SheetHeader>
 
-              {/* View 1: List of Assigned Staff & Handover History */}
-              {!showForm && (
+              {/* View 1: List of Active & Past Staff with Multi-Replace */}
+              {currentView === "list" && (
                 <div className="space-y-3 pt-1">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
                         <Stethoscope className="h-4 w-4 text-primary" />
                         Assigned Staff ({assignments.length} জন নার্স / স্টাফ)
                       </h3>
                       <p className="text-xs text-muted-foreground">
-                        এই ক্লায়েন্টের জন্য ডিউটিপ্রাপ্ত নার্সদের তালিকা ও বদলির ইতিহাস
+                        বর্তমানে কর্মরত নার্সগণ ও বদলির সম্পূর্ণ ইতিহাস
                       </p>
                     </div>
-                    <Button
-                      size="sm"
-                      onClick={() => setUserWantsNew(true)}
-                      className="gap-1.5 text-xs bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-xs"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      + New Assignment
-                    </Button>
+
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => setViewMode("multi_new")}
+                        className="gap-1.5 text-xs bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-xs"
+                      >
+                        <Users className="h-3.5 w-3.5" />
+                        + Add Multiple Nurses
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setViewMode("single_new")}
+                        className="gap-1 text-xs"
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Single
+                      </Button>
+                    </div>
                   </div>
+
+                  {/* Batch Replace Action Bar (When 1 or more active nurses are checked) */}
+                  {activeAssignments.length > 0 && (
+                    <div className="flex items-center justify-between rounded-xl border border-primary/30 bg-primary/5 p-2.5 px-3 text-xs">
+                      <button
+                        type="button"
+                        onClick={toggleSelectAllActive}
+                        className="flex items-center gap-2 text-foreground font-medium hover:text-primary transition"
+                      >
+                        {selectedAssignmentIds.size === activeAssignments.length ? (
+                          <CheckSquare className="h-4 w-4 text-primary" />
+                        ) : (
+                          <Square className="h-4 w-4 text-muted-foreground" />
+                        )}
+                        <span>
+                          {selectedAssignmentIds.size > 0
+                            ? `${selectedAssignmentIds.size} of ${activeAssignments.length} Selected`
+                            : "Select Active Nurses for Batch Replacement"}
+                        </span>
+                      </button>
+
+                      {selectedAssignmentIds.size > 0 && (
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            const selected = activeAssignments.filter((a) =>
+                              selectedAssignmentIds.has(a.id)
+                            );
+                            setBatchReplacingAssignments(selected);
+                          }}
+                          className="gap-1.5 text-xs bg-amber-600 hover:bg-amber-500 text-white font-semibold shadow-xs h-7 px-3"
+                        >
+                          <UserCheck className="h-3.5 w-3.5" />
+                          Replace Selected ({selectedAssignmentIds.size})
+                        </Button>
+                      )}
+                    </div>
+                  )}
 
                   {loadingAssignments ? (
                     <div className="py-8 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
@@ -288,10 +462,10 @@ export function CustomerAssignmentDrawer({
                       <p>কোনো নার্স এখনও অ্যাসাইন করা হয়নি।</p>
                       <Button
                         size="sm"
-                        onClick={() => setUserWantsNew(true)}
+                        onClick={() => setViewMode("multi_new")}
                         className="gap-1.5 text-xs"
                       >
-                        <Plus className="h-3.5 w-3.5" /> + Assign First Nurse
+                        <Users className="h-3.5 w-3.5" /> + Assign Multiple Nurses
                       </Button>
                     </div>
                   ) : (
@@ -302,46 +476,68 @@ export function CustomerAssignmentDrawer({
                           !asg.replaced_by_employee_id &&
                           asg.status !== "completed";
 
+                        const isSelected = selectedAssignmentIds.has(asg.id);
+
                         return (
                           <div
                             key={asg.id}
-                            className="rounded-xl border border-border/80 bg-card p-3.5 space-y-2.5 shadow-xs"
+                            className={`rounded-xl border p-3.5 space-y-2.5 shadow-xs transition ${
+                              isSelected
+                                ? "border-primary bg-primary/10"
+                                : "border-border/80 bg-card"
+                            }`}
                           >
                             <div className="flex flex-wrap items-start justify-between gap-2">
-                              <div>
-                                <div className="flex flex-wrap items-center gap-1.5">
-                                  <span className="font-semibold text-foreground text-sm">
-                                    {asg.employee_name}
-                                  </span>
+                              <div className="flex items-start gap-2.5">
+                                {canReplace && (
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleSelectAssignment(asg.id)}
+                                    className="mt-0.5 text-primary hover:opacity-80 transition"
+                                  >
+                                    {isSelected ? (
+                                      <CheckSquare className="h-4 w-4 text-primary" />
+                                    ) : (
+                                      <Square className="h-4 w-4 text-muted-foreground" />
+                                    )}
+                                  </button>
+                                )}
 
-                                  {asg.is_replacement && (
-                                    <Badge className="bg-cyan-500/15 text-cyan-400 border-cyan-500/30 text-[10px] py-0 px-1.5">
-                                      🔄 Replacement for {asg.replacement_for_employee_name || "staff"}
-                                    </Badge>
-                                  )}
-
-                                  {asg.replaced_by_employee_name && (
-                                    <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-[10px] py-0 px-1.5">
-                                      🛑 Replaced by {asg.replaced_by_employee_name}
-                                    </Badge>
-                                  )}
-                                </div>
-
-                                <div className="text-xs text-muted-foreground mt-1 flex flex-wrap items-center gap-2">
-                                  <span>
-                                    Shift:{" "}
-                                    <span className="text-foreground font-medium capitalize">
-                                      {asg.shift === "full_24h" ? "24 Hours" : asg.shift}
+                                <div>
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <span className="font-semibold text-foreground text-sm">
+                                      {asg.employee_name}
                                     </span>
-                                  </span>
-                                  <span>•</span>
-                                  <span>
-                                    Period:{" "}
-                                    <span className="text-foreground font-medium">
-                                      {formatDate(asg.start_date)} →{" "}
-                                      {asg.end_date ? formatDate(asg.end_date) : "Ongoing"}
+
+                                    {asg.is_replacement && (
+                                      <Badge className="bg-cyan-500/15 text-cyan-400 border-cyan-500/30 text-[10px] py-0 px-1.5">
+                                        🔄 Replacement for {asg.replacement_for_employee_name || "staff"}
+                                      </Badge>
+                                    )}
+
+                                    {asg.replaced_by_employee_name && (
+                                      <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-[10px] py-0 px-1.5">
+                                        🛑 Replaced by {asg.replaced_by_employee_name}
+                                      </Badge>
+                                    )}
+                                  </div>
+
+                                  <div className="text-xs text-muted-foreground mt-1 flex flex-wrap items-center gap-2">
+                                    <span>
+                                      Shift:{" "}
+                                      <span className="text-foreground font-medium capitalize">
+                                        {asg.shift === "full_24h" ? "24 Hours" : asg.shift}
+                                      </span>
                                     </span>
-                                  </span>
+                                    <span>•</span>
+                                    <span>
+                                      Period:{" "}
+                                      <span className="text-foreground font-medium">
+                                        {formatDate(asg.start_date)} →{" "}
+                                        {asg.end_date ? formatDate(asg.end_date) : "Ongoing"}
+                                      </span>
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
 
@@ -365,10 +561,10 @@ export function CustomerAssignmentDrawer({
                                     variant="outline"
                                     className="h-7 px-2.5 text-xs font-semibold gap-1.5 border-blue-500/40 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20"
                                     onClick={() => setReplacingAssignment(asg)}
-                                    title="Replace staff with a substitute nurse"
+                                    title="Replace this staff member"
                                   >
                                     <UserCheck className="h-3.5 w-3.5" />
-                                    Replace Staff
+                                    Replace
                                   </Button>
                                 )}
                               </div>
@@ -411,55 +607,235 @@ export function CustomerAssignmentDrawer({
                           </div>
                         );
                       })}
-
-                      <div className="pt-2">
-                        <Button
-                          variant="outline"
-                          onClick={() => setUserWantsNew(true)}
-                          className="w-full gap-2 text-xs border-dashed"
-                        >
-                          <Plus className="h-4 w-4" />
-                          + Assign Another Nurse / New Period (আরেকজন নার্স বা নতুন ডিউটি)
-                        </Button>
-                      </div>
                     </div>
                   )}
                 </div>
               )}
 
-              {/* View 2: Form to Create New Duty Assignment */}
-              {showForm && (
-                <div className="space-y-3 pt-1">
-                  {assignments.length > 0 && (
-                    <div className="flex items-center justify-between pb-2 border-b border-border/60">
+              {/* View 2: Multi-Nurse Duty Assignment Builder */}
+              {currentView === "multi_new" && (
+                <div className="space-y-4 pt-1">
+                  <div className="flex items-center justify-between pb-2 border-b border-border/60">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setViewMode("list")}
+                      className="gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      <ArrowLeft className="h-3.5 w-3.5" />
+                      Back to Staff List
+                    </Button>
+                    <Badge variant="secondary" className="text-xs">
+                      Multi-Staff Duty Builder
+                    </Badge>
+                  </div>
+
+                  {/* Shared Dates */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-muted/30 p-3 rounded-xl border border-border/70">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold">Start Date (শুরুর তারিখ) *</Label>
+                      <Input
+                        type="date"
+                        value={multiStartDate}
+                        onChange={(e) => setMultiStartDate(e.target.value)}
+                        className="h-9"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold">Duration Days (কাজের সময়কাল) *</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={multiDurationDays}
+                        onChange={(e) => setMultiDurationDays(Number(e.target.value) || 1)}
+                        className="h-9"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Multiple Nurse Rows */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                        <Users className="h-4 w-4 text-primary" />
+                        Select Nurses &amp; Assign Shifts (২, ৩ বা ৪ জন নার্স একসাথে):
+                      </Label>
                       <Button
                         type="button"
-                        variant="ghost"
                         size="sm"
-                        onClick={() => setUserWantsNew(false)}
-                        className="gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                        variant="outline"
+                        onClick={() => {
+                          setMultiNurseRows((prev) => [
+                            ...prev,
+                            { id: `row-${Date.now()}`, employee_id: "", shift: "full_24h" },
+                          ]);
+                        }}
+                        className="gap-1.5 text-xs h-7"
                       >
-                        <ArrowLeft className="h-3.5 w-3.5" />
-                        Back to Staff List ({assignments.length} assigned)
+                        <Plus className="h-3.5 w-3.5" /> + Add Another Nurse
                       </Button>
-                      <Badge variant="secondary" className="text-xs">
-                        New Duty Assignment
-                      </Badge>
                     </div>
-                  )}
+
+                    <div className="space-y-2.5">
+                      {multiNurseRows.map((row, idx) => (
+                        <div
+                          key={row.id}
+                          className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-3 rounded-xl border border-border bg-card shadow-xs"
+                        >
+                          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-primary/15 text-primary text-xs font-bold">
+                            {idx + 1}
+                          </span>
+
+                          <div className="flex-1">
+                            <Select
+                              value={row.employee_id}
+                              onValueChange={(empId) => {
+                                setMultiNurseRows((prev) =>
+                                  prev.map((r) =>
+                                    r.id === row.id ? { ...r, employee_id: empId } : r
+                                  )
+                                );
+                              }}
+                            >
+                              <SelectTrigger className="h-9 w-full bg-card">
+                                <SelectValue placeholder={`Select Nurse #${idx + 1}...`} />
+                              </SelectTrigger>
+                              <SelectContent className="z-[100] max-h-80 overflow-y-auto">
+                                {allStaff.map((emp) => {
+                                  const branch = branchMap[emp.location_id] || "";
+                                  const isSameBranch = emp.location_id === customer.location_id;
+                                  return (
+                                    <SelectItem key={emp.id} value={emp.id}>
+                                      <div className="flex items-center gap-2 py-0.5">
+                                        <span className="font-medium text-foreground">
+                                          {emp.name}
+                                        </span>
+                                        {emp.code && (
+                                          <span className="font-mono text-xs text-muted-foreground">
+                                            ({emp.code})
+                                          </span>
+                                        )}
+                                        {emp.category && (
+                                          <Badge
+                                            variant="secondary"
+                                            className="text-[10px] py-0 px-1.5 capitalize"
+                                          >
+                                            {emp.category}
+                                          </Badge>
+                                        )}
+                                        {branch && (
+                                          <span className="text-[10px] text-muted-foreground/80">
+                                            • {branch}
+                                          </span>
+                                        )}
+                                        {isSameBranch && (
+                                          <Badge
+                                            variant="outline"
+                                            className="text-[9px] py-0 px-1 text-emerald-400 border-emerald-500/30"
+                                          >
+                                            Same Branch
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    </SelectItem>
+                                  );
+                                })}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="w-full sm:w-44">
+                            <Select
+                              value={row.shift}
+                              onValueChange={(shiftVal) => {
+                                setMultiNurseRows((prev) =>
+                                  prev.map((r) =>
+                                    r.id === row.id ? { ...r, shift: shiftVal } : r
+                                  )
+                                );
+                              }}
+                            >
+                              <SelectTrigger className="h-9 w-full bg-card">
+                                <SelectValue placeholder="Select shift..." />
+                              </SelectTrigger>
+                              <SelectContent className="z-[100]">
+                                <SelectItem value="full_24h">24 Hours Shift</SelectItem>
+                                <SelectItem value="day">Day Shift (8 AM - 8 PM)</SelectItem>
+                                <SelectItem value="night">Night Shift (8 PM - 8 AM)</SelectItem>
+                                <SelectItem value="morning">Morning Shift</SelectItem>
+                                <SelectItem value="custom">Custom Shift</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {multiNurseRows.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setMultiNurseRows((prev) =>
+                                  prev.filter((r) => r.id !== row.id)
+                                );
+                              }}
+                              className="h-9 w-9 p-0 text-destructive hover:bg-destructive/10"
+                              title="Remove this nurse"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <Button
+                      type="button"
+                      onClick={() => multiAssignMutation.mutate()}
+                      disabled={
+                        multiAssignMutation.isPending ||
+                        multiNurseRows.filter((r) => Boolean(r.employee_id)).length === 0
+                      }
+                      className="w-full gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold h-10 shadow-sm"
+                    >
+                      {multiAssignMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Users className="h-4 w-4" />
+                      )}
+                      Assign All {multiNurseRows.filter((r) => Boolean(r.employee_id)).length} Nurses to Patient
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* View 3: Single Nurse Form (Classic) */}
+              {currentView === "single_new" && (
+                <div className="space-y-3 pt-1">
+                  <div className="flex items-center justify-between pb-2 border-b border-border/60">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setViewMode("list")}
+                      className="gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      <ArrowLeft className="h-3.5 w-3.5" />
+                      Back to Staff List
+                    </Button>
+                    <Badge variant="secondary" className="text-xs">
+                      Single Duty Assignment
+                    </Badge>
+                  </div>
 
                   <div className="py-1">
                     <ResourceForm
                       fields={assignmentsConfig.fields}
                       initial={initialAssignmentData}
                       submitting={createMutation.isPending}
-                      onCancel={() => {
-                        if (assignments.length > 0) {
-                          setUserWantsNew(false);
-                        } else {
-                          onClose();
-                        }
-                      }}
+                      onCancel={() => setViewMode("list")}
                       onSubmit={(values) => createMutation.mutate(values)}
                       submitLabel="Create & Assign Nurse"
                     />
@@ -471,12 +847,27 @@ export function CustomerAssignmentDrawer({
         </SheetContent>
       </Sheet>
 
-      {/* Replace Staff Modal Dialog */}
+      {/* Single Replace Staff Modal Dialog */}
       <ReplaceStaffDialog
         assignment={replacingAssignment}
         onClose={() => setReplacingAssignment(null)}
         onSuccess={() => {
           refetchAssignments();
+          qc.invalidateQueries({ queryKey: ["assignments"] });
+          qc.invalidateQueries({ queryKey: ["monthly-bills"] });
+        }}
+      />
+
+      {/* Batch Replace Multiple Staff Modal Dialog */}
+      <BatchReplaceStaffDialog
+        assignments={batchReplacingAssignments}
+        onClose={() => {
+          setBatchReplacingAssignments([]);
+          setSelectedAssignmentIds(new Set());
+        }}
+        onSuccess={() => {
+          refetchAssignments();
+          setSelectedAssignmentIds(new Set());
           qc.invalidateQueries({ queryKey: ["assignments"] });
           qc.invalidateQueries({ queryKey: ["monthly-bills"] });
         }}

@@ -29,11 +29,57 @@ export interface ReplaceStaffPayload {
   notes?: string;
 }
 
+export interface BatchReplaceItemPayload {
+  assignment_id: string;
+  new_employee_id: string;
+  effective_date: string;
+  reason?: string;
+  notes?: string;
+}
+
+export interface MultiStaffItemPayload {
+  employee_id: string;
+  shift: string;
+  start_time?: string;
+  end_time?: string;
+  customer_daily_rate?: number;
+  employee_daily_rate?: number;
+  notes?: string;
+}
+
+export interface MultiStaffAssignPayload {
+  customer_id: string;
+  location_id?: string;
+  start_date: string;
+  end_date?: string;
+  duration_days?: number;
+  customer_daily_rate?: number;
+  employee_daily_rate?: number;
+  place_type?: string;
+  place_name?: string;
+  address?: string;
+  dest_lat?: number;
+  dest_lng?: number;
+  payment_type?: string;
+  notes?: string;
+  staff_list: MultiStaffItemPayload[];
+}
+
 export const assignmentService = {
   ...baseAssignments,
   replaceStaff: (id: string, payload: ReplaceStaffPayload) =>
     http.post<{ previous_assignment: Assignment; new_assignment: Assignment }>(
       endpoints.assignments.replaceStaff(id),
+      payload
+    ),
+  batchReplace: (replacements: BatchReplaceItemPayload[]) =>
+    http.post<{ items: { previous_assignment: Assignment; new_assignment: Assignment }[]; count: number }>(
+      endpoints.assignments.batchReplace,
+      { replacements }
+    ),
+  multiAssign: (payload: MultiStaffAssignPayload) =>
+    http.post<{ items: Assignment[]; count: number }>(
+      endpoints.assignments.multiAssign,
       payload
     ),
 };

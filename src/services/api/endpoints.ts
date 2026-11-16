@@ -109,6 +109,8 @@ export const endpoints = {
     deployment: "/assignments/deployment",
     issueBill: (id: string) => `/assignments/${id}/issue-bill`,
     replaceStaff: (id: string) => `/assignments/${id}/replace-staff`,
+    batchReplace: "/assignments/batch-replace",
+    multiAssign: "/assignments/multi-assign",
   },
   billing: {
     monthly: "/billing/monthly",

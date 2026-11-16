@@ -21,6 +21,7 @@ import { normalizeError } from "@/services/api/client";
 import { BranchName } from "@/components/common/BranchName";
 import { ResourceForm } from "@/components/resource/ResourceForm";
 import { ReplaceStaffDialog } from "@/components/assignments/ReplaceStaffDialog";
+import { BatchReplaceStaffDialog } from "@/components/assignments/BatchReplaceStaffDialog";
 import {
   Sheet,
   SheetContent,
@@ -67,6 +68,7 @@ export function BookingAssignmentDrawer({
 
   const [userWantsNew, setUserWantsNew] = useState(false);
   const [replacingAssignment, setReplacingAssignment] = useState<Assignment | null>(null);
+  const [batchReplacingAssignments, setBatchReplacingAssignments] = useState<Assignment[]>([]);
 
   // Filter out customer_id since this duty is directly bound to this booking's patient
   const assignmentFields = useMemo(() => {
@@ -560,6 +562,18 @@ export function BookingAssignmentDrawer({
       <ReplaceStaffDialog
         assignment={replacingAssignment}
         onClose={() => setReplacingAssignment(null)}
+        onSuccess={() => {
+          refetchAssignments();
+          qc.invalidateQueries({ queryKey: ["assignments"] });
+          qc.invalidateQueries({ queryKey: ["monthly-bills"] });
+          qc.invalidateQueries({ queryKey: ["bookings"] });
+        }}
+      />
+
+      {/* Batch Replace Staff Modal Dialog */}
+      <BatchReplaceStaffDialog
+        assignments={batchReplacingAssignments}
+        onClose={() => setBatchReplacingAssignments([])}
         onSuccess={() => {
           refetchAssignments();
           qc.invalidateQueries({ queryKey: ["assignments"] });
