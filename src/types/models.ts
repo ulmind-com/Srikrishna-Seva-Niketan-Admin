@@ -244,6 +244,14 @@ export interface Assignment extends BaseDoc {
   payment_received_at?: string | null;
   payment_received_by?: string | null;
   work_completed_at?: string | null;
+  // Staff replacement / duty handover tracking:
+  is_replacement?: boolean;
+  replacement_for_employee_id?: string | null;
+  replacement_for_employee_name?: string | null;
+  replaced_by_employee_id?: string | null;
+  replaced_by_employee_name?: string | null;
+  replacement_reason?: string | null;
+  days_worked?: number | null;
   notes?: string | null;
   /** Server-computed progress. Null when the engagement is open-ended. */
   total_days?: number | null;

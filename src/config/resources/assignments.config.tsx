@@ -63,7 +63,7 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
       header: "Staff → Customer",
       headClassName: "min-w-[170px]",
       cell: (r) => (
-        <div className="flex flex-col gap-0.5">
+        <div className="flex flex-col gap-1">
           <span className="flex items-center gap-1.5 whitespace-nowrap font-medium">
             <span>{r.employee_name}</span>
             {r.acceptance_status === "accepted" && (
@@ -77,6 +77,16 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
             id={r.location_id}
             className="whitespace-nowrap text-[11px] text-muted-foreground/70"
           />
+          {r.is_replacement && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/20 w-fit">
+              🔄 Replacement for {r.replacement_for_employee_name || "Previous Staff"}
+            </span>
+          )}
+          {r.replaced_by_employee_name && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 w-fit">
+              🛑 Replaced by {r.replaced_by_employee_name} ({r.days_worked != null ? `${r.days_worked}d` : "Off"})
+            </span>
+          )}
         </div>
       ),
     },
