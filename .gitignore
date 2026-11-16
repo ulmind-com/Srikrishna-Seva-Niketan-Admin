@@ -42,3 +42,5 @@ secrets.json
 service-account*.json
 .claude/
 *.tsbuildinfo
+.vercel
+.env*
