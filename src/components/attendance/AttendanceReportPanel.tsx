@@ -224,10 +224,11 @@ export function AttendanceReportPanel() {
       ) : slip ? (
         <>
           {/* Summary */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             <Stat label="Days Worked" value={String(s?.worked_days ?? 0)} tone="text-emerald-500" />
+            <Stat label="Present Days" value={String(s?.present_days ?? 0)} />
+            <Stat label="Shifts Worked" value={String(s?.total_shifts ?? s?.present_days ?? 0)} />
             <Stat label="Absent" value={String(s?.absent_days ?? 0)} tone="text-rose-500" />
-            <Stat label="Present (shifts)" value={String(s?.present_days ?? 0)} />
             <Stat label="Off Days" value={String((s?.off_days ?? 0) + (s?.leave_days ?? 0))} />
             <Stat label="Gross Pay" value={inr(s?.gross_pay)} tone="text-primary" />
           </div>

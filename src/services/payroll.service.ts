@@ -60,6 +60,7 @@ export interface PayslipDay {
 
 export interface PayslipSummary {
   present_days: number;
+  total_shifts?: number;
   half_days: number;
   leave_days: number;
   off_days: number;
@@ -101,6 +102,7 @@ export interface PayrollRunRow {
   daily_rate?: number | null;
   location_id: string;
   present_days: number;
+  total_shifts?: number;
   half_days: number;
   leave_days: number;
   off_days: number;

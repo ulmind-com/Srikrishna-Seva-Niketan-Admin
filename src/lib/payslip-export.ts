@@ -77,6 +77,12 @@ export function downloadPayslipPdf(slip: Payslip) {
   // Employee block
   let y = 78;
   doc.setFont("helvetica", "bold");
+  const s = slip.summary;
+  const effectiveRate =
+    slip.employee.daily_rate ||
+    (s.payable_days > 0 && s.gross_pay > 0 ? Math.round(s.gross_pay / s.payable_days) : null);
+
+  doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
   doc.setTextColor(...SLATE);
   doc.text(slip.employee.name, marginX, y);
@@ -85,7 +91,7 @@ export function downloadPayslipPdf(slip: Payslip) {
   doc.setTextColor(...MUTED);
   doc.text(`${slip.employee.code}  ·  ${slip.employee.category}`, marginX, y + 14);
   doc.text(
-    `Daily rate: ${slip.employee.daily_rate ? rupee(slip.employee.daily_rate) : "—"}/day`,
+    `Daily rate: ${effectiveRate ? rupee(effectiveRate) : "—"}/day`,
     pageWidth - marginX,
     y + 14,
     { align: "right" }
@@ -98,14 +104,14 @@ export function downloadPayslipPdf(slip: Payslip) {
   );
 
   // Summary table
-  const s = slip.summary;
   autoTable(doc, {
     startY: y + 26,
-    head: [["Days Worked", "Present (shifts)", "Half", "Absent", "Off Days", "Payable Days"]],
+    head: [["Days Worked", "Present (days)", "Shifts", "Half", "Absent", "Off Days", "Payable Days"]],
     body: [
       [
         String(s.worked_days),
         String(s.present_days),
+        String(s.total_shifts ?? s.present_days),
         String(s.half_days),
         String(s.absent_days),
         String((s.off_days ?? 0) + (s.leave_days ?? 0)),
@@ -113,9 +119,9 @@ export function downloadPayslipPdf(slip: Payslip) {
       ],
     ],
     theme: "grid",
-    styles: { fontSize: 9, cellPadding: 5, halign: "center", textColor: SLATE },
+    styles: { fontSize: 8.5, cellPadding: 5, halign: "center", textColor: SLATE },
     headStyles: { fillColor: EMERALD, textColor: 255, fontSize: 8, fontStyle: "bold" },
-    columnStyles: { 3: { textColor: ROSE, fontStyle: "bold" } },
+    columnStyles: { 4: { textColor: ROSE, fontStyle: "bold" } },
     margin: { left: marginX, right: marginX },
   });
 
@@ -133,7 +139,7 @@ export function downloadPayslipPdf(slip: Payslip) {
         String(bs.night || 0),
         String(bs.full_24h || 0),
         String(bs.custom || 0),
-        slip.employee.daily_rate ? rupee(slip.employee.daily_rate) : "—",
+        effectiveRate ? rupee(effectiveRate) : "—",
         rupee(s.leave_deduction),
       ],
     ],

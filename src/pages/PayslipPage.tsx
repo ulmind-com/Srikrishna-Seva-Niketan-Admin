@@ -143,7 +143,7 @@ export function PayslipPage() {
             Leave and off days are unpaid.
           </p>
           <p className="mt-1 text-xs text-muted-foreground/80">
-            Auto-filled from duties — mark Absent / Leave in Attendance to adjust a day.
+            Auto-filled from duties — mark Absent / Off in Attendance to adjust a day.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -208,26 +208,34 @@ export function PayslipPage() {
               ) : rows.length === 0 ? (
                 <tr><td colSpan={9} className="py-12 text-center text-muted-foreground">No staff for this period.</td></tr>
               ) : (
-                rows.map((r) => (
-                  <tr key={r.employee_id} className="hover:bg-muted/30">
-                    <td className="px-4 py-3">
-                      <p className="font-medium">{r.name}</p>
-                      <p className="text-xs text-muted-foreground">{r.code} · {r.category}</p>
-                    </td>
-                    <td className="px-3 py-3 text-center">{r.present_days}</td>
-                    <td className="px-3 py-3 text-center">{r.half_days}</td>
-                    <td className="px-3 py-3 text-center text-rose-600">{r.absent_days}</td>
-                    <td className="px-3 py-3 text-center text-slate-500">{(r.off_days ?? 0) + (r.leave_days ?? 0)}</td>
-                    <td className="px-3 py-3 text-center font-medium">{r.payable_days}</td>
-                    <td className="px-3 py-3 text-right text-muted-foreground">{r.daily_rate ? inr(r.daily_rate) : "—"}</td>
-                    <td className="px-4 py-3 text-right font-semibold">{inr(r.gross_pay)}</td>
-                    <td className="px-3 py-3 text-right">
-                      <Button variant="outline" size="sm" onClick={() => setSelected(r.employee_id)}>
-                        <ReceiptText className="mr-1 h-3.5 w-3.5" /> Slip
-                      </Button>
-                    </td>
-                  </tr>
-                ))
+                rows.map((r) => {
+                  const effectiveRate = r.daily_rate || (r.payable_days > 0 && r.gross_pay > 0 ? Math.round(r.gross_pay / r.payable_days) : null);
+                  return (
+                    <tr key={r.employee_id} className="hover:bg-muted/30">
+                      <td className="px-4 py-3">
+                        <p className="font-medium">{r.name}</p>
+                        <p className="text-xs text-muted-foreground">{r.code} · {r.category}</p>
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        <span className="font-medium">{r.present_days}</span>
+                        {r.total_shifts && r.total_shifts > r.present_days ? (
+                          <span className="block text-[11px] text-muted-foreground">({r.total_shifts} shifts)</span>
+                        ) : null}
+                      </td>
+                      <td className="px-3 py-3 text-center">{r.half_days}</td>
+                      <td className="px-3 py-3 text-center text-rose-600">{r.absent_days}</td>
+                      <td className="px-3 py-3 text-center text-slate-500">{(r.off_days ?? 0) + (r.leave_days ?? 0)}</td>
+                      <td className="px-3 py-3 text-center font-bold text-foreground">{r.payable_days}</td>
+                      <td className="px-3 py-3 text-right text-muted-foreground">{effectiveRate ? inr(effectiveRate) : "—"}</td>
+                      <td className="px-4 py-3 text-right font-semibold">{inr(r.gross_pay)}</td>
+                      <td className="px-3 py-3 text-right">
+                        <Button variant="outline" size="sm" onClick={() => setSelected(r.employee_id)}>
+                          <ReceiptText className="mr-1 h-3.5 w-3.5" /> Slip
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -261,46 +269,54 @@ export function PayslipPage() {
             <div className="grid h-48 place-items-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
           ) : (
             <div id="payslip-print" className="p-6">
-              <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-4">
-                <div>
-                  <h2 className="text-lg font-bold">Shri Krishna Nursing</h2>
-                  <p className="text-sm text-muted-foreground">Salary slip · {prettyMonth(slip.period.month)}</p>
-                </div>
-                <div className="text-right">
-                  <p className="font-semibold">{slip.employee.name}</p>
-                  <p className="text-sm text-muted-foreground">{slip.employee.code} · {slip.employee.category}</p>
-                  <p className="text-sm text-muted-foreground">Rate: {slip.employee.daily_rate ? inr(slip.employee.daily_rate) : "—"}/day</p>
-                </div>
-              </div>
+              {(() => {
+                const slipRate = slip.employee.daily_rate || (slip.summary.payable_days > 0 && slip.summary.gross_pay > 0 ? Math.round(slip.summary.gross_pay / slip.summary.payable_days) : null);
+                return (
+                  <>
+                    <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-4">
+                      <div>
+                        <h2 className="text-lg font-bold">Shri Krishna Nursing</h2>
+                        <p className="text-sm text-muted-foreground">Salary slip · {prettyMonth(slip.period.month)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold">{slip.employee.name}</p>
+                        <p className="text-sm text-muted-foreground">{slip.employee.code} · {slip.employee.category}</p>
+                        <p className="text-sm text-muted-foreground">Rate: {slipRate ? inr(slipRate) : "—"}/day</p>
+                      </div>
+                    </div>
 
-              {/* Summary */}
-              <div className="my-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {[
-                  { label: "Days worked", value: slip.summary.worked_days },
-                  { label: "Present (shifts)", value: slip.summary.present_days },
-                  { label: "Half days", value: slip.summary.half_days },
-                  { label: "Absent", value: slip.summary.absent_days },
-                  { label: "Off days", value: (slip.summary.off_days ?? 0) + (slip.summary.leave_days ?? 0) },
-                  { label: "Payable days", value: slip.summary.payable_days },
-                  { label: "Per Day Salary", value: inr(slip.employee.daily_rate ?? 0) },
-                  { label: "Deduction", value: inr(slip.summary.leave_deduction) },
-                  { label: "Days in month", value: slip.period.days_in_month },
-                ].map((s) => (
-                  <div key={s.label} className="rounded-xl border border-border p-3">
-                    <p className="text-xs text-muted-foreground">{s.label}</p>
-                    <p className="text-xl font-bold">{s.value}</p>
-                  </div>
-                ))}
-                <div className="col-span-2 rounded-xl border border-primary bg-primary/5 p-3 sm:col-span-2">
-                  <p className="text-xs text-muted-foreground">Net Payable Salary</p>
-                  <p className="text-2xl font-bold text-primary">{inr(slip.summary.net_payable)}</p>
-                  {slip.summary.leave_deduction > 0 && (
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">
-                      after {inr(slip.summary.leave_deduction)} deduction
-                    </p>
-                  )}
-                </div>
-              </div>
+                    {/* Summary */}
+                    <div className="my-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      {[
+                        { label: "Days worked", value: slip.summary.worked_days },
+                        { label: "Present days", value: slip.summary.present_days },
+                        { label: "Shifts worked", value: slip.summary.total_shifts ?? slip.summary.present_days },
+                        { label: "Half days", value: slip.summary.half_days },
+                        { label: "Absent", value: slip.summary.absent_days },
+                        { label: "Off days", value: (slip.summary.off_days ?? 0) + (slip.summary.leave_days ?? 0) },
+                        { label: "Payable days", value: slip.summary.payable_days },
+                        { label: "Per Day Salary", value: inr(slipRate ?? 0) },
+                        { label: "Deduction", value: inr(slip.summary.leave_deduction) },
+                        { label: "Days in month", value: slip.period.days_in_month },
+                      ].map((s) => (
+                        <div key={s.label} className="rounded-xl border border-border p-3">
+                          <p className="text-xs text-muted-foreground">{s.label}</p>
+                          <p className="text-xl font-bold">{s.value}</p>
+                        </div>
+                      ))}
+                      <div className="col-span-2 rounded-xl border border-primary bg-primary/5 p-3 sm:col-span-2">
+                        <p className="text-xs text-muted-foreground">Net Payable Salary</p>
+                        <p className="text-2xl font-bold text-primary">{inr(slip.summary.net_payable)}</p>
+                        {slip.summary.leave_deduction > 0 && (
+                          <p className="mt-0.5 text-[11px] text-muted-foreground">
+                            after {inr(slip.summary.leave_deduction)} deduction
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
 
               {Object.keys(slip.summary.by_shift).length > 0 && (
                 <div className="mb-4 flex flex-wrap gap-2">

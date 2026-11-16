@@ -110,8 +110,8 @@ export function StaffPayslip() {
 
           {/* Secondary stats */}
           <div className="grid grid-cols-3 gap-2">
-            <MiniStat label="Present Shifts" value={s?.present_days ?? 0} tone="text-emerald-600" />
-            <MiniStat label="Absent" value={s?.absent_days ?? 0} tone="text-rose-500" />
+            <MiniStat label="Present Days" value={s?.present_days ?? 0} tone="text-emerald-600" />
+            <MiniStat label="Shifts Worked" value={s?.total_shifts ?? s?.present_days ?? 0} tone="text-primary" />
             <MiniStat label="Off Days" value={(s?.off_days ?? 0) + (s?.leave_days ?? 0)} tone="text-slate-500" />
           </div>
 
