@@ -27,6 +27,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { SearchableStaffSelect } from "@/components/common/SearchableStaffSelect";
+import {
+  ShiftWindowsField,
+  type ShiftWindow,
+} from "@/components/resource/fields/ShiftWindowsField";
 import type { Assignment, ShiftType } from "@/types/models";
 import { formatDate } from "@/lib/utils";
 
@@ -41,6 +45,7 @@ interface SingleReplacementState {
   shift: ShiftType;
   startTime: string;
   endTime: string;
+  shiftWindows: ShiftWindow[];
   effectiveDate: string;
   endDate: string;
   reason: string;
@@ -63,7 +68,11 @@ export function BatchReplaceStaffDialog({
   const qc = useQueryClient();
 
   const todayStr = useMemo(() => getTodayIST(), []);
-  const [globalDate, setGlobalDate] = useState(() => getTodayIST());
+  const [globalStartDate, setGlobalStartDate] = useState(() => getTodayIST());
+  const [globalEndDate, setGlobalEndDate] = useState<string>(() => {
+    const firstEnd = assignments[0]?.end_date;
+    return firstEnd ? String(firstEnd).slice(0, 10) : "";
+  });
   const [globalReason, setGlobalReason] = useState("");
 
   // Per-assignment states
@@ -76,6 +85,9 @@ export function BatchReplaceStaffDialog({
         shift: asgShift,
         startTime: asg.start_time || (asgShift === "day" ? "08:00" : asgShift === "night" ? "20:00" : "08:00"),
         endTime: asg.end_time || (asgShift === "day" ? "20:00" : asgShift === "night" ? "08:00" : "20:00"),
+        shiftWindows: asg.shift_windows?.length
+          ? asg.shift_windows.map((w) => ({ start: w.start || "", end: w.end || "" }))
+          : [{ start: "06:00", end: "18:00" }, { start: "20:00", end: "02:00" }],
         effectiveDate: todayStr,
         endDate: asg.end_date ? String(asg.end_date).slice(0, 10) : "",
         reason: "",
@@ -84,10 +96,10 @@ export function BatchReplaceStaffDialog({
     return init;
   });
 
-  // 1. Load ALL staff across all branches
+  // 1. Load ALL staff across all branches (page_size: 100 within backend limit)
   const { data: staffData, isLoading: loadingStaff } = useQuery({
     queryKey: ["employees", "all-for-replace"],
-    queryFn: () => resourceServices.employees.list({ page_size: 300 }),
+    queryFn: () => resourceServices.employees.list({ page_size: 100 }),
     staleTime: 30_000,
   });
 
@@ -110,16 +122,30 @@ export function BatchReplaceStaffDialog({
 
   const customerName = assignments[0]?.customer_name || "Customer";
 
-  const allAssigned =
+  const allValid =
     assignments.length > 0 &&
-    assignments.every((a) => Boolean(replacements[a.id]?.newEmployeeId));
+    assignments.every((a) => {
+      const item = replacements[a.id];
+      return Boolean(item?.newEmployeeId && item?.effectiveDate && (item?.endDate || globalEndDate));
+    });
 
-  const handleGlobalDateChange = (date: string) => {
-    setGlobalDate(date);
+  const handleGlobalStartDateChange = (date: string) => {
+    setGlobalStartDate(date);
     setReplacements((prev) => {
       const next = { ...prev };
       Object.keys(next).forEach((id) => {
         next[id] = { ...next[id], effectiveDate: date };
+      });
+      return next;
+    });
+  };
+
+  const handleGlobalEndDateChange = (date: string) => {
+    setGlobalEndDate(date);
+    setReplacements((prev) => {
+      const next = { ...prev };
+      Object.keys(next).forEach((id) => {
+        next[id] = { ...next[id], endDate: date };
       });
       return next;
     });
@@ -148,8 +174,9 @@ export function BatchReplaceStaffDialog({
           shift: "full_24h",
           startTime: "08:00",
           endTime: "20:00",
-          effectiveDate: globalDate,
-          endDate: "",
+          shiftWindows: [{ start: "06:00", end: "18:00" }, { start: "20:00", end: "02:00" }],
+          effectiveDate: globalStartDate,
+          endDate: globalEndDate,
           reason: globalReason,
         }),
         ...updates,
@@ -166,14 +193,25 @@ export function BatchReplaceStaffDialog({
         if (!item?.newEmployeeId) {
           throw new Error(`Please select replacement for ${asg.employee_name}`);
         }
+        const effDate = item.effectiveDate || globalStartDate;
+        const eDate = item.endDate || globalEndDate;
+        if (!effDate) throw new Error(`Please choose start date for ${asg.employee_name}`);
+        if (!eDate) throw new Error(`Please choose end date for ${asg.employee_name}`);
+
+        const isCustom = item.shift === "custom";
+        const validWindows = isCustom
+          ? item.shiftWindows.filter((w) => w.start || w.end)
+          : undefined;
+
         return {
           assignment_id: asg.id,
           new_employee_id: item.newEmployeeId,
-          effective_date: item.effectiveDate || globalDate,
-          end_date: item.endDate?.trim() || undefined,
+          effective_date: effDate,
+          end_date: eDate.trim(),
           shift: item.shift,
-          start_time: item.startTime?.trim() || undefined,
-          end_time: item.endTime?.trim() || undefined,
+          start_time: isCustom && validWindows?.length ? validWindows[0].start || item.startTime : item.startTime?.trim() || undefined,
+          end_time: isCustom && validWindows?.length ? validWindows[validWindows.length - 1].end || item.endTime : item.endTime?.trim() || undefined,
+          shift_windows: isCustom && validWindows?.length ? validWindows : undefined,
           reason: item.reason?.trim() || globalReason.trim() || undefined,
         };
       });
@@ -191,7 +229,7 @@ export function BatchReplaceStaffDialog({
       toast.success(
         `Successfully replaced ${data.count || assignments.length} staff members!`,
         {
-          description: `Handover recorded. All replacement staff have been notified on their devices. Single consolidated bill maintained.`,
+          description: `Handover recorded. All replacement staff have been notified on their devices with full shift schedule.`,
         }
       );
       onSuccess?.();
@@ -221,16 +259,30 @@ export function BatchReplaceStaffDialog({
         </DialogHeader>
 
         {/* Global Handover Settings */}
-        <div className="rounded-2xl border border-border/80 bg-muted/40 p-3.5 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+        <div className="rounded-2xl border border-border/80 bg-muted/40 p-3.5 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold flex items-center gap-1.5">
               <Calendar className="h-3.5 w-3.5 text-primary" />
-              <span>Common Effective Date (সবার শুরুর তারিখ) *</span>
+              <span>Common Start Date (শুরুর তারিখ) *</span>
             </Label>
             <Input
               type="date"
-              value={globalDate}
-              onChange={(e) => handleGlobalDateChange(e.target.value)}
+              value={globalStartDate}
+              onChange={(e) => handleGlobalStartDateChange(e.target.value)}
+              className="h-9"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5 text-primary" />
+              <span>Common End Date (শেষের তারিখ) *</span>
+            </Label>
+            <Input
+              type="date"
+              value={globalEndDate}
+              min={globalStartDate}
+              placeholder="Select common end date"
+              onChange={(e) => handleGlobalEndDateChange(e.target.value)}
               className="h-9"
             />
           </div>
@@ -239,7 +291,7 @@ export function BatchReplaceStaffDialog({
               Common Reason / Note (বদলি করার কারণ / নোট)
             </Label>
             <Input
-              placeholder="e.g. Regular monthly shift rotation / emergency"
+              placeholder="e.g. Regular shift rotation / emergency"
               value={globalReason}
               onChange={(e) => handleGlobalReasonChange(e.target.value)}
               className="h-9"
@@ -268,8 +320,9 @@ export function BatchReplaceStaffDialog({
                 shift: (asg.shift || "full_24h") as ShiftType,
                 startTime: asg.start_time || "08:00",
                 endTime: asg.end_time || "20:00",
-                effectiveDate: globalDate,
-                endDate: asg.end_date ? String(asg.end_date).slice(0, 10) : "",
+                shiftWindows: [{ start: "06:00", end: "18:00" }, { start: "20:00", end: "02:00" }],
+                effectiveDate: globalStartDate,
+                endDate: globalEndDate || (asg.end_date ? String(asg.end_date).slice(0, 10) : ""),
                 reason: globalReason,
               };
 
@@ -326,61 +379,109 @@ export function BatchReplaceStaffDialog({
                   </div>
 
                   {/* Shift & Timing Selector for this replacement */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 text-xs">
-                    <div className="space-y-1">
-                      <Label className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
-                        <Clock className="h-3 w-3" /> Shift
-                      </Label>
-                      <select
-                        value={item.shift}
-                        onChange={(e) => {
-                          const newShift = e.target.value as ShiftType;
-                          let sTime = item.startTime;
-                          let eTime = item.endTime;
-                          if (newShift === "day") {
-                            sTime = "08:00";
-                            eTime = "20:00";
-                          } else if (newShift === "night") {
-                            sTime = "20:00";
-                            eTime = "08:00";
-                          } else if (newShift === "full_24h") {
-                            sTime = "08:00";
-                            eTime = "08:00";
-                          }
-                          updateItem(asg.id, { shift: newShift, startTime: sTime, endTime: eTime });
-                        }}
-                        className="h-9 w-full rounded-xl border border-border bg-background px-2.5 text-xs focus:ring-1 focus:ring-primary"
-                      >
-                        <option value="full_24h">24 Hours Shift</option>
-                        <option value="day">Day Shift (12h)</option>
-                        <option value="night">Night Shift (12h)</option>
-                        <option value="custom">Custom Timing</option>
-                      </select>
+                  <div className="space-y-2.5 pt-1 text-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
+                          <Clock className="h-3 w-3" /> Shift
+                        </Label>
+                        <select
+                          value={item.shift}
+                          onChange={(e) => {
+                            const newShift = e.target.value as ShiftType;
+                            let sTime = item.startTime;
+                            let eTime = item.endTime;
+                            if (newShift === "day") {
+                              sTime = "08:00";
+                              eTime = "20:00";
+                            } else if (newShift === "night") {
+                              sTime = "20:00";
+                              eTime = "08:00";
+                            } else if (newShift === "full_24h") {
+                              sTime = "08:00";
+                              eTime = "08:00";
+                            }
+                            updateItem(asg.id, { shift: newShift, startTime: sTime, endTime: eTime });
+                          }}
+                          className="h-9 w-full rounded-xl border border-border bg-background px-2.5 text-xs focus:ring-1 focus:ring-primary"
+                        >
+                          <option value="full_24h">24 Hours Shift</option>
+                          <option value="day">Day Shift (12h)</option>
+                          <option value="night">Night Shift (12h)</option>
+                          <option value="custom">Custom Shift (Split / Multi-time)</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-semibold text-muted-foreground">
+                          Start Date (শুরুর তারিখ) *
+                        </Label>
+                        <Input
+                          type="date"
+                          value={item.effectiveDate}
+                          onChange={(e) => updateItem(asg.id, { effectiveDate: e.target.value })}
+                          className="h-9 text-xs"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-semibold text-muted-foreground">
+                          End Date (শেষের তারিখ) *
+                        </Label>
+                        <Input
+                          type="date"
+                          value={item.endDate}
+                          min={item.effectiveDate}
+                          required
+                          onChange={(e) => updateItem(asg.id, { endDate: e.target.value })}
+                          className="h-9 text-xs"
+                        />
+                      </div>
                     </div>
 
-                    <div className="space-y-1">
-                      <Label className="text-[11px] font-semibold text-muted-foreground">
-                        Start Time
-                      </Label>
-                      <Input
-                        type="time"
-                        value={item.startTime}
-                        onChange={(e) => updateItem(asg.id, { startTime: e.target.value })}
-                        className="h-9 text-xs"
-                      />
-                    </div>
+                    {/* If Custom Shift, render multi-window shift builder */}
+                    {item.shift === "custom" ? (
+                      <div className="space-y-2 pt-2 border-t border-border/60">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-[11px] font-semibold text-foreground">
+                            Custom Shift Windows (যেমন: সকাল ৬টা-সন্ধ্যা ৬টা, রাত ৮টা-রাত ২টো)
+                          </Label>
+                          <span className="text-[10px] text-muted-foreground">
+                            Add multiple windows
+                          </span>
+                        </div>
+                        <ShiftWindowsField
+                          value={item.shiftWindows}
+                          onChange={(windows) => updateItem(asg.id, { shiftWindows: windows })}
+                        />
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <div className="space-y-1">
+                          <Label className="text-[11px] font-semibold text-muted-foreground">
+                            Start Time
+                          </Label>
+                          <Input
+                            type="time"
+                            value={item.startTime}
+                            onChange={(e) => updateItem(asg.id, { startTime: e.target.value })}
+                            className="h-9 text-xs"
+                          />
+                        </div>
 
-                    <div className="space-y-1">
-                      <Label className="text-[11px] font-semibold text-muted-foreground">
-                        End Time
-                      </Label>
-                      <Input
-                        type="time"
-                        value={item.endTime}
-                        onChange={(e) => updateItem(asg.id, { endTime: e.target.value })}
-                        className="h-9 text-xs"
-                      />
-                    </div>
+                        <div className="space-y-1">
+                          <Label className="text-[11px] font-semibold text-muted-foreground">
+                            End Time
+                          </Label>
+                          <Input
+                            type="time"
+                            value={item.endTime}
+                            onChange={(e) => updateItem(asg.id, { endTime: e.target.value })}
+                            className="h-9 text-xs"
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Effective Handover Preview */}
@@ -391,7 +492,7 @@ export function BatchReplaceStaffDialog({
                       <span className="text-muted-foreground font-normal">→ Handed over to</span>
                       <span className="underline">{selectedEmp.name}</span>
                       <span className="text-muted-foreground font-normal">
-                        ({item.shift}, {item.startTime}-{item.endTime}) from {formatDate(item.effectiveDate)}
+                        ({item.shift}, {item.effectiveDate} to {item.endDate})
                       </span>
                     </div>
                   )}
@@ -403,13 +504,13 @@ export function BatchReplaceStaffDialog({
           <div className="rounded-2xl border border-primary/20 bg-primary/5 p-3.5 text-xs text-muted-foreground space-y-1.5">
             <p className="font-bold text-foreground flex items-center gap-2">
               <BellRing className="h-4 w-4 text-primary" />
-              স্বয়ংক্রিয় নোটিফিকেশন ও সিঙ্গেল বিলিং সুবিধা:
+              স্বয়ংক্রিয় নোটিফিকেশন ও বিলিং সুবিধা:
             </p>
             <p className="text-[11px] leading-relaxed">
               ✓ কনফার্ম করার সাথে সাথে প্রত্যেক নতুন নার্সের নিজস্ব স্টাফ পোর্টালে কাজের বিস্তারিত অ্যাসাইনমেন্ট নোটিফিকেশন ও রিংটোন বেজে উঠবে।
             </p>
             <p className="text-[11px] leading-relaxed">
-              ✓ পূর্বের নার্সদের কাছেও হ্যান্ডওভার নোটিফিকেশন পৌঁছে যাবে। ক্লায়েন্টের জন্য একটাই কনসোলিডেটেড বিল জেনারেট হবে যেখানে সব নার্সদের কাজের সময় ও টাকার হিসাব সঠিকভাবে যুক্ত থাকবে।
+              ✓ কাস্টমারের একটিমাত্র মাসিক বিলে প্রতিটি নার্সের শিফট টাইমিং (কাস্টম স্প্লিট উইন্ডো সহ) ও কাজের সঠিক দিন আলাদা আলাদা রো-তে সুন্দরভাবে অন্তর্ভুক্ত থাকবে।
             </p>
           </div>
         </div>
@@ -420,7 +521,7 @@ export function BatchReplaceStaffDialog({
           </Button>
           <Button
             onClick={() => batchMutation.mutate()}
-            disabled={batchMutation.isPending || !allAssigned}
+            disabled={batchMutation.isPending || !allValid}
             className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
           >
             {batchMutation.isPending ? (

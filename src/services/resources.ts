@@ -27,6 +27,7 @@ export interface ReplaceStaffPayload {
   shift?: string;
   start_time?: string;
   end_time?: string;
+  shift_windows?: { start?: string | null; end?: string | null }[] | null;
   reason?: string;
   customer_daily_rate?: number;
   employee_daily_rate?: number;
@@ -41,6 +42,7 @@ export interface BatchReplaceItemPayload {
   shift?: string;
   start_time?: string;
   end_time?: string;
+  shift_windows?: { start?: string | null; end?: string | null }[] | null;
   reason?: string;
   customer_daily_rate?: number;
   employee_daily_rate?: number;
