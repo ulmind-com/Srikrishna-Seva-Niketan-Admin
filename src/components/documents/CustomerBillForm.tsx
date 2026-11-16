@@ -126,6 +126,18 @@ function buildDutyItems(
         days = Math.max(diffDays, 1);
         isOngoing = false;
         endDateStr = formatDate(a.end_date);
+      } else if (a.status === "completed") {
+        let estDays = 1;
+        if (a.shift_windows && a.shift_windows.length > 1) {
+          estDays = a.shift_windows.length;
+        } else if (a.start_time && a.end_time && a.end_time <= a.start_time) {
+          estDays = 2;
+        }
+        days = estDays;
+        isOngoing = false;
+        const e = new Date(s);
+        e.setDate(e.getDate() + (estDays - 1));
+        endDateStr = formatDate(e.toISOString());
       } else {
         const diffDays = Math.round((billDate.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
         days = Math.max(diffDays, 1);

@@ -40,15 +40,37 @@ function fmtTime(t?: string | null): string {
   if (Number.isNaN(hi) || Number.isNaN(mi)) return t;
   return `${hi % 12 || 12}:${String(mi).padStart(2, "0")} ${hi < 12 ? "AM" : "PM"}`;
 }
+function isOvernight(start?: string | null, end?: string | null): boolean {
+  if (!start || !end) return false;
+  return end <= start;
+}
+
 function shiftText(d: PayslipDay): string {
   if (!d.shift) return "";
   if (d.shift === "custom") {
     if (d.shift_windows && d.shift_windows.length) {
-      return d.shift_windows.map((w) => `${fmtTime(w.start)}–${fmtTime(w.end)}`).join(", ");
+      return d.shift_windows
+        .map(
+          (w) =>
+            `${fmtTime(w.start)} – ${fmtTime(w.end)}${
+              isOvernight(w.start, w.end) ? " (Overnight)" : ""
+            }`
+        )
+        .join(", ");
     }
-    if (d.start_time || d.end_time) return `${fmtTime(d.start_time)} – ${fmtTime(d.end_time)}`;
+    if (d.start_time || d.end_time) {
+      const on = isOvernight(d.start_time, d.end_time) ? " (Overnight)" : "";
+      return `${fmtTime(d.start_time)} – ${fmtTime(d.end_time)}${on}`;
+    }
   }
-  return SHIFT_NAME[d.shift] ?? d.shift;
+  const detailed: Record<string, string> = {
+    morning: "Morning (06:00 AM – 02:00 PM)",
+    day: "Day Shift (08:00 AM – 08:00 PM)",
+    night: "Night Shift (08:00 PM – 08:00 AM)",
+    full_24h: "24 Hours (Round-the-clock)",
+    custom: "Custom",
+  };
+  return detailed[d.shift] ?? SHIFT_NAME[d.shift] ?? d.shift;
 }
 function weekday(iso: string): string {
   return new Date(iso).toLocaleDateString("en-IN", { weekday: "short" });

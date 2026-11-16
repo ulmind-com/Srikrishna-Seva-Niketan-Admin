@@ -35,15 +35,36 @@ function fmtTime(t?: string | null): string {
   return `${hi % 12 || 12}:${String(mi).padStart(2, "0")} ${hi < 12 ? "AM" : "PM"}`;
 }
 
+function isWindowOvernight(start?: string | null, end?: string | null): boolean {
+  if (!start || !end) return false;
+  return end <= start;
+}
+
 function shiftText(d: PayslipDay): string {
   if (!d.shift) return "";
   if (d.shift === "custom") {
     if (d.shift_windows && d.shift_windows.length) {
-      return d.shift_windows.map((w) => `${fmtTime(w.start)}-${fmtTime(w.end)}`).join(", ");
+      return d.shift_windows
+        .map(
+          (w) =>
+            `${fmtTime(w.start)}-${fmtTime(w.end)}${
+              isWindowOvernight(w.start, w.end) ? " (Overnight)" : ""
+            }`
+        )
+        .join(", ");
     }
-    if (d.start_time || d.end_time) return `${fmtTime(d.start_time)}-${fmtTime(d.end_time)}`;
+    if (d.start_time || d.end_time) {
+      const on = isWindowOvernight(d.start_time, d.end_time) ? " (Overnight)" : "";
+      return `${fmtTime(d.start_time)}-${fmtTime(d.end_time)}${on}`;
+    }
   }
-  const map: Record<string, string> = { morning: "Morning", day: "Day", night: "Night", full_24h: "24h", custom: "Custom" };
+  const map: Record<string, string> = {
+    morning: "Morning (06:00 AM – 02:00 PM)",
+    day: "Day Shift (08:00 AM – 08:00 PM)",
+    night: "Night Shift (08:00 PM – 08:00 AM)",
+    full_24h: "24h (Round-the-clock)",
+    custom: "Custom",
+  };
   return map[d.shift] ?? d.shift;
 }
 
@@ -166,23 +187,27 @@ export function downloadPayslipPdf(slip: Payslip) {
   // Day-by-day breakdown
   autoTable(doc, {
     startY,
-    head: [["Date", "Day", "Status", "Shift", "Customer", "Amount"]],
+    head: [["Date", "Day", "Status", "Duty Timing & Shift", "Customer", "Daily Rate", "Payable Amount"]],
     body: slip.days.map((d) => [
       d.date,
       WEEKDAY[new Date(d.date).getDay()],
       STATUS_LABEL[d.status] ?? d.status,
       shiftText(d),
       d.customer_name ?? "",
-      d.amount ? rupee(d.amount) : "",
+      d.pay_rate ? rupee(d.pay_rate) : "—",
+      d.amount ? rupee(d.amount) : "—",
     ]),
     theme: "striped",
     styles: { fontSize: 8, cellPadding: 3, textColor: SLATE },
     headStyles: { fillColor: SLATE, textColor: 255, fontStyle: "bold", fontSize: 8 },
     columnStyles: {
-      0: { cellWidth: 70 },
-      1: { cellWidth: 40 },
-      2: { cellWidth: 64 },
-      5: { halign: "right", cellWidth: 72, fontStyle: "bold" },
+      0: { cellWidth: 58 },
+      1: { cellWidth: 30 },
+      2: { cellWidth: 46 },
+      3: { cellWidth: 160 },
+      4: { cellWidth: 90 },
+      5: { halign: "right", cellWidth: 54 },
+      6: { halign: "right", cellWidth: 64, fontStyle: "bold" },
     },
     didParseCell: (data) => {
       if (data.section === "body") {

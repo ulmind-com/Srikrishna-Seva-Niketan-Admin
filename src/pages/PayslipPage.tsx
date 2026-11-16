@@ -55,7 +55,12 @@ function fmtTime(t?: string | null): string {
   return `${h12}:${String(mi).padStart(2, "0")} ${suffix}`;
 }
 
-/** Shift cell for a payslip day — time window(s) for custom shifts. */
+function isWindowOvernight(start?: string | null, end?: string | null): boolean {
+  if (!start || !end) return false;
+  return end <= start;
+}
+
+/** Shift cell for a payslip day — time window(s) for custom shifts with overnight tag. */
 function dayShiftText(d: {
   shift: string | null;
   start_time?: string | null;
@@ -65,11 +70,28 @@ function dayShiftText(d: {
   if (!d.shift) return "—";
   if (d.shift === "custom") {
     if (d.shift_windows && d.shift_windows.length) {
-      return d.shift_windows.map((w) => `${fmtTime(w.start)}–${fmtTime(w.end)}`).join(", ");
+      return d.shift_windows
+        .map(
+          (w) =>
+            `${fmtTime(w.start)} – ${fmtTime(w.end)}${
+              isWindowOvernight(w.start, w.end) ? " (Overnight)" : ""
+            }`
+        )
+        .join(", ");
     }
-    if (d.start_time || d.end_time) return `${fmtTime(d.start_time)} – ${fmtTime(d.end_time)}`;
+    if (d.start_time || d.end_time) {
+      const on = isWindowOvernight(d.start_time, d.end_time) ? " (Overnight)" : "";
+      return `${fmtTime(d.start_time)} – ${fmtTime(d.end_time)}${on}`;
+    }
   }
-  return SHIFT_LABEL[d.shift] ?? d.shift;
+  const detailedMap: Record<string, string> = {
+    morning: "Morning (06:00 AM – 02:00 PM)",
+    day: "Day Shift (08:00 AM – 08:00 PM)",
+    night: "Night Shift (08:00 PM – 08:00 AM)",
+    full_24h: "24 Hours (Round-the-clock)",
+    custom: "Custom",
+  };
+  return detailedMap[d.shift] ?? SHIFT_LABEL[d.shift] ?? d.shift;
 }
 
 function currentMonth(): string {
@@ -344,9 +366,10 @@ export function PayslipPage() {
                     <tr>
                       <th className="px-3 py-2 font-medium">Date</th>
                       <th className="px-3 py-2 font-medium">Status</th>
-                      <th className="px-3 py-2 font-medium">Shift</th>
+                      <th className="px-3 py-2 font-medium">Duty & Shift Timing</th>
                       <th className="px-3 py-2 font-medium">Customer</th>
-                      <th className="px-3 py-2 text-right font-medium">Amount</th>
+                      <th className="px-3 py-2 text-right font-medium">Daily Rate</th>
+                      <th className="px-3 py-2 text-right font-medium">Payable Amount</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -354,16 +377,17 @@ export function PayslipPage() {
                       <tr key={`${d.date}-${d.shift ?? "none"}-${i}`}>
                         <td className="px-3 py-1.5 tabular-nums">{d.date}</td>
                         <td className={`px-3 py-1.5 font-medium ${STATUS_CLS[d.status]}`}>{STATUS_LABEL[d.status]}</td>
-                        <td className="px-3 py-1.5 text-muted-foreground">{dayShiftText(d)}</td>
+                        <td className="px-3 py-1.5 text-muted-foreground font-medium">{dayShiftText(d)}</td>
                         <td className="px-3 py-1.5 text-muted-foreground">{d.customer_name ?? "—"}</td>
-                        <td className="px-3 py-1.5 text-right tabular-nums">{d.amount ? inr(d.amount) : "—"}</td>
+                        <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">{d.pay_rate ? inr(d.pay_rate) : "—"}</td>
+                        <td className="px-3 py-1.5 text-right tabular-nums font-semibold">{d.amount ? inr(d.amount) : "—"}</td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
                     <tr className="border-t-2 border-border font-semibold">
-                      <td className="px-3 py-2" colSpan={4}>Total gross pay</td>
-                      <td className="px-3 py-2 text-right">{inr(slip.summary.gross_pay)}</td>
+                      <td className="px-3 py-2" colSpan={5}>Total gross pay</td>
+                      <td className="px-3 py-2 text-right text-base text-primary font-bold">{inr(slip.summary.gross_pay)}</td>
                     </tr>
                   </tfoot>
                 </table>
