@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useQueries } from "@tanstack/react-query";
 import { Controller, useForm } from "react-hook-form";
 import { Input } from "@/components/ui/input";
@@ -52,6 +52,7 @@ export function ResourceForm<T>({
     handleSubmit,
     control,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<Record<string, unknown>>({ defaultValues });
 
@@ -88,6 +89,16 @@ export function ResourceForm<T>({
     });
     return map;
   }, [dynamicFields, dynamicQueries]);
+
+  // Auto-select single option for required dynamic fields if empty
+  useEffect(() => {
+    dynamicFields.forEach((f) => {
+      const state = dynamicStateMap[f.name];
+      if (f.required && !watchedValues[f.name] && state?.options?.length === 1) {
+        setValue(f.name, state.options[0].value);
+      }
+    });
+  }, [dynamicFields, dynamicStateMap, watchedValues, setValue]);
 
   return (
     <form

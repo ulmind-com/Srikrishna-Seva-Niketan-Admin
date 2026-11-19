@@ -112,11 +112,28 @@ export function ResourceView<T extends { id: string }>({
     queryFn: () => config.service.list(params),
   });
 
+  const sanitizeValues = (vals: Record<string, unknown>) => {
+    const cleaned: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(vals)) {
+      if (typeof v === "string") {
+        const trimmed = v.trim();
+        cleaned[k] = trimmed === "" ? null : trimmed;
+      } else if (typeof v === "number" && isNaN(v)) {
+        cleaned[k] = null;
+      } else {
+        cleaned[k] = v;
+      }
+    }
+    return cleaned;
+  };
+
   const saveMutation = useMutation({
-    mutationFn: (values: Record<string, unknown>) =>
-      editing
-        ? config.service.update(editing.id, values as Partial<T>)
-        : config.service.create(values as Partial<T>),
+    mutationFn: (values: Record<string, unknown>) => {
+      const cleaned = sanitizeValues(values);
+      return editing
+        ? config.service.update(editing.id, cleaned as Partial<T>)
+        : config.service.create(cleaned as Partial<T>);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [config.queryKey] });
       toast.success(editing ? `${config.name} updated` : `${config.name} created`);

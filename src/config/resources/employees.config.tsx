@@ -109,6 +109,7 @@ export const employeesConfig: ResourceConfig<Employee> = {
     { name: "name", label: "Full Name", type: "text", required: true, section: "Personal", colSpan: 2 },
     { name: "phone", label: "Phone", type: "text", required: true, section: "Personal" },
     { name: "alt_phone", label: "Alternate Phone", type: "text", section: "Personal" },
+    { name: "email", label: "Email (Optional)", type: "email", section: "Personal", helper: "Optional — enables staff portal mobile app login" },
     {
       name: "category",
       label: "Category",
