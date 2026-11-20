@@ -77,6 +77,13 @@ export interface MultiStaffAssignPayload {
   staff_list: MultiStaffItemPayload[];
 }
 
+export interface AdminCompleteDutyPayload {
+  cash_collected?: boolean;
+  cash_amount?: number;
+  note?: string;
+  received_by?: string;
+}
+
 export const assignmentService = {
   ...baseAssignments,
   replaceStaff: (id: string, payload: ReplaceStaffPayload) =>
@@ -93,6 +100,11 @@ export const assignmentService = {
     http.post<{ items: Assignment[]; count: number }>(
       endpoints.assignments.multiAssign,
       payload
+    ),
+  completeDuty: (id: string, payload?: AdminCompleteDutyPayload) =>
+    http.post<Assignment>(
+      endpoints.assignments.complete(id),
+      payload ?? {}
     ),
 };
 
