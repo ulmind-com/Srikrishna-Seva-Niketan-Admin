@@ -17,6 +17,7 @@ import { AsyncSelect } from "@/components/common/AsyncSelect";
 import { CustomerField } from "@/components/common/CustomerField";
 import { LocationPinField } from "@/components/resource/fields/LocationPinField";
 import { ShiftWindowsField, type ShiftWindow } from "@/components/resource/fields/ShiftWindowsField";
+import { DutyScheduleField } from "@/components/resource/fields/DutyScheduleField";
 import { ImageUpload } from "@/components/common/ImageUpload";
 import { VideoUpload } from "@/components/common/VideoUpload";
 import { TagsInput } from "@/components/common/TagsInput";
@@ -134,7 +135,7 @@ export function ResourceForm<T>({
                           : ""
                     )}
                   >
-                    {field.type !== "switch" && (
+                    {field.type !== "switch" && field.type !== "duty_schedule" && (
                       <Label htmlFor={field.name}>
                         {field.label}
                         {field.required && (
@@ -143,7 +144,7 @@ export function ResourceForm<T>({
                       </Label>
                     )}
 
-                    {renderControl(field, register, control, dynamicStateMap[field.name])}
+                    {renderControl(field, register, control, dynamicStateMap[field.name], watch, setValue)}
 
                     {field.helper && !error && (
                       <p className="text-xs text-muted-foreground">
@@ -188,9 +189,19 @@ function renderControl(
   field: FieldConfig,
   register: any,
   control: any,
-  dynamicState?: DynamicFieldState
+  dynamicState?: DynamicFieldState,
+  watch?: any,
+  setValue?: any
 ) {
   switch (field.type) {
+    case "duty_schedule":
+      return (
+        <DutyScheduleField
+          watch={watch}
+          setValue={setValue}
+          register={register}
+        />
+      );
     case "textarea":
     case "richtext":
       return (

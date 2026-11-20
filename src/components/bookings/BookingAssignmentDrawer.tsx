@@ -119,7 +119,6 @@ export function BookingAssignmentDrawer({
       place_name: "",
       address: fullAddress,
       start_date: formattedStartDate,
-      duration_days: 10,
       payment_type: booking.payment_type || "prepaid",
       payment_status: booking.payment_type === "postpaid" ? "pending" : "paid",
       notes: `Booking #${booking.reference}. Patient: ${booking.patient_name} (${booking.contact_phone}). Requested: ${booking.service_name}${
@@ -177,13 +176,6 @@ export function BookingAssignmentDrawer({
         Number.isNaN(assignmentPayload.dest_lng)
       ) {
         delete assignmentPayload.dest_lng;
-      }
-      if (
-        assignmentPayload.duration_days === "" ||
-        assignmentPayload.duration_days == null ||
-        Number.isNaN(assignmentPayload.duration_days)
-      ) {
-        delete assignmentPayload.duration_days;
       }
       if (
         assignmentPayload.customer_rate !== undefined &&

@@ -17,7 +17,8 @@ export type FieldType =
   | "time"
   | "shift_windows"
   | "geopoint"
-  | "divider";
+  | "divider"
+  | "duty_schedule";
 
 export interface FieldOption {
   label: string;

@@ -173,7 +173,6 @@ export function CustomerAssignmentDrawer({
       dest_lat: customer.lat != null ? customer.lat : undefined,
       dest_lng: customer.lng != null ? customer.lng : undefined,
       start_date: getTodayIST(),
-      duration_days: customer.duration_days ?? 10,
       customer_rate: customer.billing_rate ?? undefined,
       payment_type: "prepaid",
       payment_status: "pending",

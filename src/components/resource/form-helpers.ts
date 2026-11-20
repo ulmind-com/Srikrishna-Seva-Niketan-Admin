@@ -39,6 +39,7 @@ function fallbackForType(field: FieldConfig): unknown {
       return [];
     case "number":
     case "geopoint":
+    case "duty_schedule":
       return undefined;
     case "image":
     case "video":
@@ -63,6 +64,15 @@ export function buildDefaults(
         ? existing
         : fallbackForType(field)
     );
+    if (field.type === "duty_schedule") {
+      const initObj = (initial || {}) as Record<string, unknown>;
+      if (out.shift === undefined) out.shift = initObj.shift ?? "full_24h";
+      if (out.start_date === undefined) out.start_date = initObj.start_date ?? new Date().toISOString().slice(0, 10);
+      if (out.start_time === undefined) out.start_time = initObj.start_time ?? "08:00";
+      if (out.end_date === undefined) out.end_date = initObj.end_date ?? null;
+      if (out.end_time === undefined) out.end_time = initObj.end_time ?? (initObj.end_date ? "20:00" : null);
+      if (out.shift_windows === undefined) out.shift_windows = initObj.shift_windows ?? [];
+    }
   }
   return out;
 }
