@@ -29,6 +29,7 @@ function shiftLabel(s: string): string {
   if (s === "full_24h") return "24 Hours";
   if (s === "day") return "Day Shift";
   if (s === "night") return "Night Shift";
+  if (s === "morning") return "Morning Shift";
   return s;
 }
 

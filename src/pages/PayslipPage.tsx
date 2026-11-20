@@ -68,24 +68,35 @@ function dayShiftText(d: {
   shift_windows?: { start?: string | null; end?: string | null }[] | null;
 }): string {
   if (!d.shift) return "—";
-  if (d.shift === "custom") {
-    if (d.shift_windows && d.shift_windows.length) {
-      return d.shift_windows
-        .map(
-          (w) =>
-            `${fmtTime(w.start)} – ${fmtTime(w.end)}${
-              isWindowOvernight(w.start, w.end) ? " (Overnight)" : ""
-            }`
-        )
-        .join(", ");
-    }
-    if (d.start_time || d.end_time) {
-      const on = isWindowOvernight(d.start_time, d.end_time) ? " (Overnight)" : "";
-      return `${fmtTime(d.start_time)} – ${fmtTime(d.end_time)}${on}`;
-    }
+  const shiftTitle =
+    d.shift === "morning"
+      ? "Morning"
+      : d.shift === "day"
+      ? "Day Shift"
+      : d.shift === "night"
+      ? "Night Shift"
+      : d.shift === "full_24h"
+      ? "24 Hours"
+      : "Custom";
+
+  if (d.shift_windows && d.shift_windows.length) {
+    return d.shift_windows
+      .map(
+        (w) =>
+          `${fmtTime(w.start)} – ${fmtTime(w.end)}${
+            isWindowOvernight(w.start, w.end) ? " (Overnight)" : ""
+          }`
+      )
+      .join(", ");
   }
+
+  if (d.start_time && d.end_time) {
+    const on = isWindowOvernight(d.start_time, d.end_time) ? " (Overnight)" : "";
+    return `${shiftTitle} (${fmtTime(d.start_time)} – ${fmtTime(d.end_time)})${on}`;
+  }
+
   const detailedMap: Record<string, string> = {
-    morning: "Morning (06:00 AM – 02:00 PM)",
+    morning: "Morning (07:00 AM – 03:00 PM)",
     day: "Day Shift (08:00 AM – 08:00 PM)",
     night: "Night Shift (08:00 PM – 08:00 AM)",
     full_24h: "24 Hours (Round-the-clock)",

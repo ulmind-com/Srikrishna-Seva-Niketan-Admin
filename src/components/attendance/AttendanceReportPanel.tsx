@@ -46,13 +46,17 @@ function fmtTime(t?: string | null): string {
 /** Shift time window(s) for a day entry. */
 function dayShiftText(d: PayslipDay): string {
   if (!d.shift) return "—";
-  if (d.shift === "custom") {
-    if (d.shift_windows && d.shift_windows.length) {
-      return d.shift_windows.map((w) => `${fmtTime(w.start)}–${fmtTime(w.end)}`).join(", ");
-    }
-    if (d.start_time || d.end_time) return `${fmtTime(d.start_time)} – ${fmtTime(d.end_time)}`;
+  const label = SHIFT_LABEL[d.shift] ?? d.shift;
+  if (d.shift_windows && d.shift_windows.length) {
+    return d.shift_windows.map((w) => `${fmtTime(w.start)}–${fmtTime(w.end)}`).join(", ");
   }
-  return SHIFT_LABEL[d.shift] ?? d.shift;
+  if (d.start_time && d.end_time) {
+    return `${label} (${fmtTime(d.start_time)} – ${fmtTime(d.end_time)})`;
+  }
+  if (d.start_time) {
+    return `${label} (${fmtTime(d.start_time)})`;
+  }
+  return label;
 }
 
 function prettyDate(iso: string): string {

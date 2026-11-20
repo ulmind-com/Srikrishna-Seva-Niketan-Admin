@@ -106,7 +106,7 @@ export function downloadMonthlyBillsPdf(month: string, bills: MonthlyBillGroup[]
     // Line items table
     autoTable(doc, {
       startY: y,
-      head: [["Staff / Attendant", "From", "To", "Shift", "Days", "Rate/Day", "Amount"]],
+      head: [["Staff / Attendant", "From", "To", "Shift & Timing", "Days", "Rate/Day", "Amount"]],
       body: bill.line_items.map((li) => [
         li.employee_name
           ? `${li.employee_name}${li.employee_code ? ` (${li.employee_code})` : ""}`
@@ -136,13 +136,13 @@ export function downloadMonthlyBillsPdf(month: string, bills: MonthlyBillGroup[]
         fontSize: 9.5,
       },
       columnStyles: {
-        0: { cellWidth: 125 },
-        1: { cellWidth: 64 },
-        2: { cellWidth: 64 },
-        3: { cellWidth: 74 },
-        4: { halign: "center", cellWidth: 42 },
-        5: { halign: "right", cellWidth: 70 },
-        6: { halign: "right", cellWidth: 84, fontStyle: "bold" },
+        0: { cellWidth: 115 },
+        1: { cellWidth: 58 },
+        2: { cellWidth: 58 },
+        3: { cellWidth: 94 },
+        4: { halign: "center", cellWidth: 38 },
+        5: { halign: "right", cellWidth: 68 },
+        6: { halign: "right", cellWidth: 80, fontStyle: "bold" },
       },
       margin: { left: marginX, right: marginX },
     });

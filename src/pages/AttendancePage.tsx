@@ -369,6 +369,7 @@ export function AttendancePage() {
             {visible.map((e) => {
               const m = marks[e.id];
               const needsShift = m?.status === "present" || m?.status === "half_day";
+              const empRecord = roster?.records?.find((r) => r.employee_id === e.id && r.customer_name);
               return (
                 <div key={e.id} className="flex flex-wrap items-center gap-3 p-3">
                   <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-muted text-xs font-semibold text-muted-foreground">
@@ -380,6 +381,14 @@ export function AttendancePage() {
                       {e.category}
                       {e.daily_rate ? ` · ₹${e.daily_rate}/day` : " · no rate set"}
                     </p>
+                    {empRecord?.customer_name && (
+                      <p className="text-[11px] font-medium text-emerald-500 flex items-center gap-1 mt-0.5">
+                        <span>Patient: {empRecord.customer_name}</span>
+                        {empRecord.start_time && empRecord.end_time && (
+                          <span className="text-muted-foreground">({empRecord.start_time} - {empRecord.end_time})</span>
+                        )}
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex gap-1">
