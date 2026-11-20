@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Send,
   ShieldCheck,
+  Sparkles,
   User,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -67,12 +68,21 @@ export function StaffRegisterPage() {
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<RegisterForm>({
     defaultValues: { name: "", email: "", password: "", location_id: "", otp: "" },
   });
 
   const emailValue = watch("email")?.trim().toLowerCase() || "";
+  const selectedLocation = watch("location_id");
+
+  // Auto-select if only 1 branch is available
+  useEffect(() => {
+    if (branches.length === 1 && !selectedLocation) {
+      setValue("location_id", branches[0].id, { shouldValidate: true });
+    }
+  }, [branches, selectedLocation, setValue]);
 
   // Reset verification state if user edits email
   useEffect(() => {
@@ -302,7 +312,14 @@ export function StaffRegisterPage() {
 
         {/* Branch Selection */}
         <div className="space-y-1.5">
-          <Label htmlFor="location_id">Which branch are you joining?</Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="location_id">Which branch are you joining? (কোন ব্রাঞ্চে যুক্ত হচ্ছেন?)</Label>
+            {branches.length > 0 && (
+              <span className="text-[11px] text-muted-foreground font-medium">
+                {branches.length} {branches.length === 1 ? "branch" : "branches"} available
+              </span>
+            )}
+          </div>
           <div className="relative">
             <Building2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <select
@@ -326,6 +343,37 @@ export function StaffRegisterPage() {
             <p className="text-xs font-medium text-destructive">
               {errors.location_id.message}
             </p>
+          )}
+
+          {/* Quick Branch Suggestion Chips */}
+          {branches.length > 0 && (
+            <div className="pt-1 space-y-1.5">
+              <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
+                <Sparkles className="h-3 w-3 text-primary" /> Branch Suggestions (সরাসরি ক্লিক করে ব্রাঞ্চ বেছে নিন):
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {branches.map((b) => {
+                  const isSelected = selectedLocation === b.id;
+                  return (
+                    <button
+                      key={b.id}
+                      type="button"
+                      onClick={() => setValue("location_id", b.id, { shouldValidate: true })}
+                      className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-all cursor-pointer ${
+                        isSelected
+                          ? "bg-primary text-primary-foreground shadow-sm ring-2 ring-primary/30"
+                          : "bg-muted/80 text-foreground hover:bg-muted border border-border/70 hover:border-primary/40"
+                      }`}
+                    >
+                      <Building2 className={`h-3 w-3 ${isSelected ? "text-primary-foreground" : "text-primary"}`} />
+                      <span>{b.name}</span>
+                      {b.city ? <span className="opacity-75 text-[10px]">({b.city})</span> : null}
+                      {isSelected && <CheckCircle2 className="h-3 w-3 ml-0.5" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           )}
         </div>
 

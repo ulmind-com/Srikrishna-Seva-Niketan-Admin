@@ -56,7 +56,7 @@ export const locationsConfig: ResourceConfig<Location> = {
     { header: "Updated", cell: (r) => <DateCell value={r.updated_at} /> },
   ],
   fields: [
-    { name: "name", label: "Branch Name", type: "text", required: true, placeholder: "e.g. Salt Lake Branch", section: "Details", colSpan: 2 },
+    { name: "name", label: "Branch Name", type: "text", required: true, placeholder: "e.g. Arambag Branch, Main Office", section: "Details", colSpan: 2 },
     { name: "code", label: "Branch Code", type: "text", placeholder: "Auto-generated if blank (e.g. SSN-KOL-4F2A)", section: "Details", helper: "Leave blank to auto-generate a unique code." },
     { name: "phone", label: "Phone", type: "text", placeholder: "e.g. +91 98xxxxxxxx", section: "Details" },
     { name: "email", label: "Email", type: "email", section: "Details" },

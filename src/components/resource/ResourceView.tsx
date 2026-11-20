@@ -138,6 +138,9 @@ export function ResourceView<T extends { id: string }>({
       qc.invalidateQueries({ queryKey: [config.queryKey] });
       if (config.queryKey === "locations") {
         qc.invalidateQueries({ queryKey: ["payroll-locations"] });
+        qc.invalidateQueries({ queryKey: ["field-options"] });
+        qc.invalidateQueries({ queryKey: ["branches"] });
+        qc.invalidateQueries({ queryKey: ["staff-portal"] });
       }
       toast.success(editing ? `${config.name} updated` : `${config.name} created`);
       setSheetOpen(false);
@@ -152,6 +155,9 @@ export function ResourceView<T extends { id: string }>({
       qc.invalidateQueries({ queryKey: [config.queryKey] });
       if (config.queryKey === "locations") {
         qc.invalidateQueries({ queryKey: ["payroll-locations"] });
+        qc.invalidateQueries({ queryKey: ["field-options"] });
+        qc.invalidateQueries({ queryKey: ["branches"] });
+        qc.invalidateQueries({ queryKey: ["staff-portal"] });
       }
       toast.success(`${config.name} deleted`);
       setDeleteTarget(null);
