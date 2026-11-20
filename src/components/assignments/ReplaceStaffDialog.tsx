@@ -152,13 +152,8 @@ export function ReplaceStaffDialog({
   // Compute handoff summary dates
   const handoffDates = useMemo(() => {
     if (!assignment || !effectiveDate) return null;
-    const eff = new Date(effectiveDate);
-    const dayBefore = new Date(eff);
-    dayBefore.setDate(dayBefore.getDate() - 1);
-    const dayBeforeStr = dayBefore.toISOString().slice(0, 10);
-
     return {
-      prevEnd: dayBeforeStr,
+      prevEnd: effectiveDate,
       newStart: effectiveDate,
       newEnd: hasEndDate && endDate ? endDate : "Ongoing (চলমান — প্রতি মাসে বিলিং)",
     };
