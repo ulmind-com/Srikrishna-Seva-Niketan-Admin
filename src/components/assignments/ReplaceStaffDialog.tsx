@@ -57,6 +57,7 @@ export function ReplaceStaffDialog({
 
   const [newEmployeeId, setNewEmployeeId] = useState("");
   const [effectiveDate, setEffectiveDate] = useState(() => getTodayIST());
+  const [hasEndDate, setHasEndDate] = useState<boolean>(false);
   const [endDate, setEndDate] = useState<string>("");
   const [shift, setShift] = useState<ShiftType>("full_24h");
   const [startTime, setStartTime] = useState("08:00");
@@ -71,7 +72,9 @@ export function ReplaceStaffDialog({
   useEffect(() => {
     if (assignment) {
       setEffectiveDate(getTodayIST());
-      setEndDate(assignment.end_date ? String(assignment.end_date).slice(0, 10) : "");
+      const existingEnd = assignment.end_date ? String(assignment.end_date).slice(0, 10) : "";
+      setEndDate(existingEnd);
+      setHasEndDate(Boolean(existingEnd));
       const asgShift = (assignment.shift || "full_24h") as ShiftType;
       setShift(asgShift);
 
@@ -149,9 +152,9 @@ export function ReplaceStaffDialog({
     return {
       prevEnd: dayBeforeStr,
       newStart: effectiveDate,
-      newEnd: endDate || "Ongoing",
+      newEnd: hasEndDate && endDate ? endDate : "Ongoing (চলমান — প্রতি মাসে বিলিং)",
     };
-  }, [assignment, effectiveDate, endDate]);
+  }, [assignment, effectiveDate, hasEndDate, endDate]);
 
   const customWindowsText = useMemo(() => {
     if (shift !== "custom" || !shiftWindows.length) return "";
@@ -166,7 +169,7 @@ export function ReplaceStaffDialog({
       if (!assignment) throw new Error("No assignment selected");
       if (!newEmployeeId) throw new Error("Please select the replacement staff member");
       if (!effectiveDate) throw new Error("Please choose the start date (শুরুর তারিখ)");
-      if (!endDate) throw new Error("Please choose the end date (শেষের তারিখ)");
+      if (hasEndDate && !endDate) throw new Error("Please choose the end date (শেষের তারিখ)");
 
       const isCustom = shift === "custom";
       const validWindows = isCustom
@@ -176,7 +179,7 @@ export function ReplaceStaffDialog({
       return resourceServices.assignments.replaceStaff(assignment.id, {
         new_employee_id: newEmployeeId,
         effective_date: effectiveDate,
-        end_date: endDate.trim(),
+        end_date: hasEndDate && endDate.trim() ? endDate.trim() : undefined,
         shift: shift,
         start_time: isCustom && validWindows?.length ? validWindows[0].start || startTime : startTime.trim() || undefined,
         end_time: isCustom && validWindows?.length ? validWindows[validWindows.length - 1].end || endTime : endTime.trim() || undefined,
@@ -293,10 +296,10 @@ export function ReplaceStaffDialog({
             {/* Shift Type Pills */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {[
-                { id: "full_24h", label: "24 Hours Shift", sub: "24h Continuous" },
-                { id: "day", label: "Day Shift", sub: "8 AM - 8 PM" },
-                { id: "night", label: "Night Shift", sub: "8 PM - 8 AM" },
-                { id: "custom", label: "Custom Shift", sub: "Split Hours / Multi-Time" },
+                { id: "full_24h", label: "24 Hours Shift", sub: "Day & Night" },
+                { id: "day", label: "Day Shift", sub: "Flexible Hours" },
+                { id: "night", label: "Night Shift", sub: "Flexible Hours" },
+                { id: "custom", label: "Custom Shift", sub: "Split Hours / Windows" },
               ].map((opt) => (
                 <button
                   key={opt.id}
@@ -318,11 +321,12 @@ export function ReplaceStaffDialog({
             {shift === "custom" ? (
               <div className="space-y-2 pt-1 border-t border-border/60">
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs font-semibold text-foreground">
-                    Custom Shift Windows (যেমন: সকাল ৬টা-সন্ধ্যা ৬টা, রাত ৮টা-রাত ২টো)
+                  <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5 text-primary" />
+                    Custom Shift Windows (কাস্টম শিফটের সময়সূচী)
                   </Label>
                   <span className="text-[10px] text-muted-foreground">
-                    একাধিক সময়সূচী যোগ করতে 'Add shift time' ব্যবহার করুন
+                    একাধিক সময় যোগ করতে পারেন
                   </span>
                 </div>
                 <ShiftWindowsField
@@ -333,8 +337,9 @@ export function ReplaceStaffDialog({
             ) : (
               <div className="grid grid-cols-2 gap-3 pt-1">
                 <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold text-muted-foreground">
-                    Start Time (কাজের শুরুর সময়)
+                  <Label className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
+                    <Clock className="h-3 w-3 text-primary" />
+                    Start Time (কাজের শুরুর সময় / কটা থেকে?)
                   </Label>
                   <Input
                     type="time"
@@ -344,8 +349,9 @@ export function ReplaceStaffDialog({
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold text-muted-foreground">
-                    End Time (কাজের সমাপ্তির সময়)
+                  <Label className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
+                    <Clock className="h-3 w-3 text-primary" />
+                    End Time (কাজের সমাপ্তির সময় / কটা পর্যন্ত?)
                   </Label>
                   <Input
                     type="time"
@@ -358,35 +364,77 @@ export function ReplaceStaffDialog({
             )}
           </div>
 
-          {/* Date Range: Effective Start Date & End Date (No 'ঐচ্ছিক', both required!) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold flex items-center gap-1.5">
-                <Calendar className="h-3.5 w-3.5 text-primary" />
-                <span>Effective Start Date (শুরুর তারিখ) *</span>
-              </Label>
-              <Input
-                type="date"
-                value={effectiveDate}
-                min={String(assignment.start_date).slice(0, 10)}
-                onChange={(e) => setEffectiveDate(e.target.value)}
-                className="h-9"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold flex items-center gap-1.5">
-                <Calendar className="h-3.5 w-3.5 text-primary" />
-                <span>End Date (শেষের তারিখ) *</span>
-              </Label>
-              <Input
-                type="date"
-                value={endDate}
-                min={effectiveDate}
-                required
-                placeholder="Select end date"
-                onChange={(e) => setEndDate(e.target.value)}
-                className="h-9"
-              />
+          {/* Date Range: Effective Start Date & End Date with ON/OFF Toggle */}
+          <div className="rounded-2xl border border-border/80 bg-card p-3.5 space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5 text-primary" />
+                  <span>Effective Start Date (শুরুর তারিখ) *</span>
+                </Label>
+                <Input
+                  type="date"
+                  value={effectiveDate}
+                  min={String(assignment.start_date).slice(0, 10)}
+                  onChange={(e) => setEffectiveDate(e.target.value)}
+                  className="h-9"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  এই দিন থেকে নতুন স্টাফ দায়িত্ব নেবে (ও আগের স্টাফের দায়িত্ব শেষ হবে)।
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5 text-primary" />
+                    <span>End Date (শেষের তারিখ)</span>
+                  </Label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHasEndDate(!hasEndDate);
+                      if (!hasEndDate && !endDate) {
+                        setEndDate(effectiveDate);
+                      }
+                    }}
+                    className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border transition-all ${
+                      hasEndDate
+                        ? "bg-primary text-primary-foreground border-primary shadow-2xs"
+                        : "bg-muted text-muted-foreground hover:bg-muted/80 border-border"
+                    }`}
+                  >
+                    <span>{hasEndDate ? "ON (নির্দিষ্ট তারিখ)" : "OFF (অনির্দিষ্টকাল)"}</span>
+                  </button>
+                </div>
+
+                {hasEndDate ? (
+                  <div className="space-y-1">
+                    <Input
+                      type="date"
+                      value={endDate}
+                      min={effectiveDate}
+                      required
+                      placeholder="Select end date"
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="h-9"
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      নির্দিষ্ট এই তারিখে দায়িত্ব শেষ হবে।
+                    </p>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-border bg-muted/30 p-2.5 text-center">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-500">
+                      <UserCheck className="h-3.5 w-3.5" />
+                      Ongoing / চলিত ডিউটি (মাসিক বিলিং)
+                    </span>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      ডিউটির কোনো নির্দিষ্ট শেষের তারিখ নেই, অনির্দিষ্টকাল চলবে এবং প্রতি মাসে বিল তৈরি হবে।
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -422,7 +470,7 @@ export function ReplaceStaffDialog({
                   <ArrowRight className="h-4 w-4 shrink-0" />
                   <span>2. {selectedNewEmp.name} (New Replacement):</span>
                   <span>
-                    {formatDate(handoffDates.newStart)} → {formatDate(endDate)}
+                    {formatDate(handoffDates.newStart)} → {hasEndDate && endDate ? formatDate(endDate) : "Ongoing (চলমান ডিউটি)"}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground pl-6 text-[11px]">
@@ -451,7 +499,7 @@ export function ReplaceStaffDialog({
           </Button>
           <Button
             onClick={() => replaceMutation.mutate()}
-            disabled={replaceMutation.isPending || !newEmployeeId || !effectiveDate || !endDate}
+            disabled={replaceMutation.isPending || !newEmployeeId || !effectiveDate || (hasEndDate && !endDate)}
             className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
           >
             {replaceMutation.isPending ? (

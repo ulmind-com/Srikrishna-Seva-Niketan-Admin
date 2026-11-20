@@ -69,6 +69,7 @@ export function BatchReplaceStaffDialog({
 
   const todayStr = useMemo(() => getTodayIST(), []);
   const [globalStartDate, setGlobalStartDate] = useState(() => getTodayIST());
+  const [hasGlobalEndDate, setHasGlobalEndDate] = useState<boolean>(false);
   const [globalEndDate, setGlobalEndDate] = useState<string>(() => {
     const firstEnd = assignments[0]?.end_date;
     return firstEnd ? String(firstEnd).slice(0, 10) : "";
@@ -126,7 +127,11 @@ export function BatchReplaceStaffDialog({
     assignments.length > 0 &&
     assignments.every((a) => {
       const item = replacements[a.id];
-      return Boolean(item?.newEmployeeId && item?.effectiveDate && (item?.endDate || globalEndDate));
+      return Boolean(
+        item?.newEmployeeId &&
+        item?.effectiveDate &&
+        (!hasGlobalEndDate || item?.endDate || globalEndDate)
+      );
     });
 
   const handleGlobalStartDateChange = (date: string) => {
@@ -194,9 +199,9 @@ export function BatchReplaceStaffDialog({
           throw new Error(`Please select replacement for ${asg.employee_name}`);
         }
         const effDate = item.effectiveDate || globalStartDate;
-        const eDate = item.endDate || globalEndDate;
+        const eDate = (item.endDate || (hasGlobalEndDate ? globalEndDate : "")).trim();
         if (!effDate) throw new Error(`Please choose start date for ${asg.employee_name}`);
-        if (!eDate) throw new Error(`Please choose end date for ${asg.employee_name}`);
+        if (hasGlobalEndDate && !eDate) throw new Error(`Please choose end date for ${asg.employee_name}`);
 
         const isCustom = item.shift === "custom";
         const validWindows = isCustom
@@ -207,7 +212,7 @@ export function BatchReplaceStaffDialog({
           assignment_id: asg.id,
           new_employee_id: item.newEmployeeId,
           effective_date: effDate,
-          end_date: eDate.trim(),
+          end_date: eDate || undefined,
           shift: item.shift,
           start_time: isCustom && validWindows?.length ? validWindows[0].start || item.startTime : item.startTime?.trim() || undefined,
           end_time: isCustom && validWindows?.length ? validWindows[validWindows.length - 1].end || item.endTime : item.endTime?.trim() || undefined,
@@ -273,18 +278,37 @@ export function BatchReplaceStaffDialog({
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs font-semibold flex items-center gap-1.5">
-              <Calendar className="h-3.5 w-3.5 text-primary" />
-              <span>Common End Date (শেষের তারিখ) *</span>
-            </Label>
-            <Input
-              type="date"
-              value={globalEndDate}
-              min={globalStartDate}
-              placeholder="Select common end date"
-              onChange={(e) => handleGlobalEndDateChange(e.target.value)}
-              className="h-9"
-            />
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-semibold flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5 text-primary" />
+                <span>Common End Date</span>
+              </Label>
+              <button
+                type="button"
+                onClick={() => setHasGlobalEndDate(!hasGlobalEndDate)}
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-all ${
+                  hasGlobalEndDate
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80 border-border"
+                }`}
+              >
+                <span>{hasGlobalEndDate ? "ON" : "OFF"}</span>
+              </button>
+            </div>
+            {hasGlobalEndDate ? (
+              <Input
+                type="date"
+                value={globalEndDate}
+                min={globalStartDate}
+                placeholder="Select common end date"
+                onChange={(e) => handleGlobalEndDateChange(e.target.value)}
+                className="h-9"
+              />
+            ) : (
+              <div className="h-9 rounded-md border border-dashed border-border bg-muted/20 px-2.5 flex items-center justify-center text-[11px] text-muted-foreground">
+                Ongoing / অনির্দিষ্টকাল (মাসিক বিলিং)
+              </div>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold">
@@ -426,13 +450,13 @@ export function BatchReplaceStaffDialog({
 
                       <div className="space-y-1">
                         <Label className="text-[11px] font-semibold text-muted-foreground">
-                          End Date (শেষের তারিখ) *
+                          End Date (শেষের তারিখ)
                         </Label>
                         <Input
                           type="date"
                           value={item.endDate}
                           min={item.effectiveDate}
-                          required
+                          placeholder="Optional / Ongoing"
                           onChange={(e) => updateItem(asg.id, { endDate: e.target.value })}
                           className="h-9 text-xs"
                         />

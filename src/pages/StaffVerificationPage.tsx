@@ -13,6 +13,11 @@ import {
   ShieldCheck,
   ExternalLink,
   Eye,
+  Vote,
+  CreditCard,
+  Landmark,
+  Image as ImageIcon,
+  FileSignature,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -24,6 +29,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { BranchName } from "@/components/common/BranchName";
 import { VerifiedBadge } from "@/components/common/VerifiedBadge";
 import { ImageUpload } from "@/components/common/ImageUpload";
@@ -49,6 +61,11 @@ export function StaffVerificationPage() {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<string>("pending");
   const [openId, setOpenId] = useState<string | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<{
+    title: string;
+    url: string;
+    number?: string | null;
+  } | null>(null);
 
   const canDecide = Boolean(user?.is_superuser);
 
@@ -93,7 +110,7 @@ export function StaffVerificationPage() {
         <h1 className="text-2xl font-bold tracking-tight">Staff Verification</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {canDecide
-            ? "Review self-registered staff and approve them to generate their ID card and forms."
+            ? "Review self-registered staff, inspect all KYC documents (Aadhaar, Voter, PAN, Bank) and approve them."
             : "Submissions from your branch. Only a super admin can approve or reject."}
         </p>
       </div>
@@ -167,10 +184,51 @@ export function StaffVerificationPage() {
               onToggle={() => setOpenId(openId === staff.id ? null : staff.id)}
               canDecide={canDecide}
               onDone={invalidate}
+              onPreview={(doc) => setPreviewDoc(doc)}
             />
           ))}
         </div>
       )}
+
+      {/* High-Resolution Document Inspection Lightbox Dialog */}
+      <Dialog open={Boolean(previewDoc)} onOpenChange={(open) => !open && setPreviewDoc(null)}>
+        <DialogContent className="max-w-4xl max-h-[92vh] flex flex-col p-4 sm:p-6">
+          <DialogHeader className="pb-3 border-b border-border">
+            <div className="flex flex-wrap items-center justify-between gap-3 pr-6">
+              <div className="space-y-1">
+                <DialogTitle className="text-base sm:text-lg font-bold flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-primary" />
+                  <span>{previewDoc?.title || "Document Inspection"}</span>
+                </DialogTitle>
+                {previewDoc?.number && (
+                  <DialogDescription className="text-xs font-mono font-medium text-foreground">
+                    Number / Details: {previewDoc.number}
+                  </DialogDescription>
+                )}
+              </div>
+              {previewDoc?.url && (
+                <Button asChild size="sm" variant="outline" className="gap-1.5 text-xs">
+                  <a href={previewDoc.url} target="_blank" rel="noreferrer">
+                    <ExternalLink className="h-3.5 w-3.5" /> View Original File
+                  </a>
+                </Button>
+              )}
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-auto rounded-xl border border-border bg-muted/30 p-2 sm:p-4 grid place-items-center min-h-[350px]">
+            {previewDoc?.url ? (
+              <img
+                src={previewDoc.url}
+                alt={previewDoc.title}
+                className="max-h-[70vh] w-auto max-w-full rounded-lg object-contain shadow-md"
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground">No image available</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -181,17 +239,75 @@ function ReviewCard({
   onToggle,
   canDecide,
   onDone,
+  onPreview,
 }: {
   staff: Employee;
   open: boolean;
   onToggle: () => void;
   canDecide: boolean;
   onDone: () => void;
+  onPreview: (doc: { title: string; url: string; number?: string | null }) => void;
 }) {
   const [designation, setDesignation] = useState(staff.designation ?? "");
   const [hrmsCode, setHrmsCode] = useState(staff.hrms_code ?? "");
   const [reason, setReason] = useState("");
   const [showReject, setShowReject] = useState(false);
+
+  const kycDocs = [
+    {
+      key: "primary_id",
+      title: staff.id_proof_type || "Primary Government ID (Aadhaar / DL / Passport)",
+      badge: "Primary ID",
+      number: staff.id_proof_number,
+      image: staff.id_proof,
+      icon: <FileText className="h-4 w-4 text-primary" />,
+      verification: staff.document_verification,
+    },
+    {
+      key: "voter",
+      title: "Voter ID Card",
+      badge: "Voter Card",
+      number: staff.voter_number,
+      image: staff.voter_photo,
+      icon: <Vote className="h-4 w-4 text-emerald-500" />,
+    },
+    {
+      key: "pan",
+      title: "PAN Card",
+      badge: "PAN Card",
+      number: staff.pan_number,
+      image: staff.pan_photo,
+      icon: <CreditCard className="h-4 w-4 text-blue-500" />,
+    },
+    {
+      key: "bank",
+      title: "Bank Account & Passbook / Cheque",
+      badge: "Bank Details",
+      number: staff.bank_account_number
+        ? `A/C: ${staff.bank_account_number}${staff.bank_ifsc ? ` | IFSC: ${staff.bank_ifsc}` : ""}`
+        : null,
+      image: staff.bank_photo,
+      icon: <Landmark className="h-4 w-4 text-purple-500" />,
+    },
+    {
+      key: "photo",
+      title: "Applicant Photo (Current)",
+      badge: "Profile Photo",
+      number: null,
+      image: staff.photo,
+      icon: <ImageIcon className="h-4 w-4 text-amber-500" />,
+    },
+    {
+      key: "signature",
+      title: "Applicant Signature / Thumb Impression",
+      badge: "Signature",
+      number: null,
+      image: staff.signature,
+      icon: <FileSignature className="h-4 w-4 text-indigo-500" />,
+    },
+  ];
+
+  const presentDocs = kycDocs.filter((d) => d.image?.url || d.number);
 
   const verify = useMutation({
     mutationFn: () =>
@@ -283,87 +399,118 @@ function ReviewCard({
                 />
               </div>
 
-              {/* Uploaded ID Document Preview & Anti-Fraud Audit */}
-              {staff.id_proof?.url && (
-                <div className="rounded-xl border border-border bg-card p-4 space-y-3 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                      <FileText className="h-4 w-4 text-primary" /> Uploaded {staff.id_proof_type || "Government ID"} Document
-                    </span>
-                    <a
-                      href={staff.id_proof.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline font-medium"
-                    >
-                      <ExternalLink className="h-3.5 w-3.5" /> View Original File
-                    </a>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row gap-4 items-start">
-                    <a
-                      href={staff.id_proof.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="relative group h-32 w-48 shrink-0 overflow-hidden rounded-xl border border-border bg-muted/40 shadow-sm"
-                    >
-                      <img
-                        src={staff.id_proof.url}
-                        alt="Government ID"
-                        className="h-full w-full object-contain p-1 transition group-hover:scale-105"
-                      />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-medium gap-1">
-                        <Eye className="h-4 w-4" /> Enlarge
-                      </div>
-                    </a>
-
-                    <div className="flex-1 space-y-2 text-xs">
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          variant={
-                            staff.document_verification?.fraudRisk === "high"
-                              ? "danger"
-                              : staff.document_verification?.isVerified
-                              ? "success"
-                              : "warning"
-                          }
-                          className="text-[11px]"
-                        >
-                          <ShieldCheck className="mr-1 h-3.5 w-3.5" />
-                          {staff.document_verification?.isVerified
-                            ? `Authentic ID Verified (${staff.document_verification.confidenceScore}% Match)`
-                            : staff.document_verification?.fraudRisk === "high"
-                            ? "Fraud / Mismatch Detected"
-                            : "Document Attached (Awaiting Verification)"}
-                        </Badge>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-muted-foreground text-[11px]">
-                        <div>
-                          <strong>ID Number Match:</strong>{" "}
-                          <span className={staff.document_verification?.idNumberMatched ? "text-emerald-600 font-medium" : ""}>
-                            {staff.document_verification?.idNumberMatched ? "Confirmed Match" : "Manual verification required"}
-                          </span>
-                        </div>
-                        <div>
-                          <strong>Applicant Name Match:</strong>{" "}
-                          <span className={staff.document_verification?.nameMatched ? "text-emerald-600 font-medium" : ""}>
-                            {staff.document_verification?.nameMatched ? "Confirmed Match" : "Name not found on card"}
-                          </span>
-                        </div>
-                        <div className="sm:col-span-2">
-                          <strong>Anti-Fraud Heuristic:</strong>{" "}
-                          <span className={staff.document_verification?.fraudRisk === "high" ? "text-rose-600 font-semibold" : "text-emerald-600"}>
-                            {staff.document_verification?.fraudFlags && staff.document_verification.fraudFlags.length > 0
-                              ? `Flagged: ${staff.document_verification.fraudFlags.join("; ")}`
-                              : "Clean Original (No AI templates, stock watermarks, or forged patterns detected)"}
-                          </span>
-                        </div>
-                      </div>
+              {/* Uploaded Government & KYC Documents (Aadhaar, Voter, PAN, Bank, Photo, Signature) */}
+              <div className="rounded-2xl border border-border bg-card p-4 space-y-3 shadow-xs">
+                <div className="flex items-center justify-between pb-2 border-b border-border/60">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
+                      <ShieldCheck className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">
+                        Uploaded Government KYC &amp; Verification Documents
+                      </h4>
+                      <p className="text-[11px] text-muted-foreground">
+                        {presentDocs.length} document{presentDocs.length === 1 ? "" : "s"} submitted (আধার, ভোটার, প্যান, ব্যাংক ইত্যাদি)
+                      </p>
                     </div>
                   </div>
                 </div>
-              )}
+
+                {presentDocs.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-2 italic">
+                    No KYC documents or proofs uploaded yet.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                    {presentDocs.map((doc) => (
+                      <div
+                        key={doc.key}
+                        className="rounded-xl border border-border/80 bg-background/60 p-3 flex flex-col justify-between gap-2.5 transition hover:border-primary/40 hover:shadow-sm"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            {doc.icon}
+                            <span className="text-xs font-semibold truncate">{doc.title}</span>
+                          </div>
+                          <Badge variant="outline" className="text-[10px] shrink-0 font-medium">
+                            {doc.badge}
+                          </Badge>
+                        </div>
+
+                        {doc.number && (
+                          <div className="text-[11px] font-mono bg-muted/50 px-2 py-1 rounded-md text-foreground border border-border/40 truncate">
+                            <span className="text-muted-foreground font-sans font-normal text-[10px] mr-1">No:</span>
+                            {doc.number}
+                          </div>
+                        )}
+
+                        {doc.image?.url ? (
+                          <div className="space-y-2">
+                            <div
+                              onClick={() => onPreview({ title: doc.title, url: doc.image!.url, number: doc.number })}
+                              className="relative group h-28 w-full cursor-pointer overflow-hidden rounded-lg border border-border bg-muted/30 shadow-2xs"
+                            >
+                              <img
+                                src={doc.image.url}
+                                alt={doc.title}
+                                className="h-full w-full object-contain p-1 transition duration-200 group-hover:scale-105"
+                              />
+                              <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-medium gap-1.5">
+                                <Eye className="h-4 w-4" /> Enlarge Document
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between text-[11px]">
+                              <button
+                                type="button"
+                                onClick={() => onPreview({ title: doc.title, url: doc.image!.url, number: doc.number })}
+                                className="inline-flex items-center gap-1 text-primary hover:underline font-medium"
+                              >
+                                <Eye className="h-3 w-3" /> Enlarge
+                              </button>
+                              <a
+                                href={doc.image.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground hover:underline"
+                              >
+                                <ExternalLink className="h-3 w-3" /> View Original
+                              </a>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="rounded-lg border border-dashed border-border/80 bg-muted/20 py-4 text-center text-[11px] text-muted-foreground">
+                            Document number provided; file copy not attached
+                          </div>
+                        )}
+
+                        {doc.verification && (
+                          <div className="pt-2 border-t border-border/60 space-y-1.5 text-[11px]">
+                            <Badge
+                              variant={
+                                doc.verification.fraudRisk === "high"
+                                  ? "danger"
+                                  : doc.verification.isVerified
+                                  ? "success"
+                                  : "warning"
+                              }
+                              className="text-[10px]"
+                            >
+                              <ShieldCheck className="mr-1 h-3 w-3" />
+                              {doc.verification.isVerified
+                                ? `ID Verified (${doc.verification.confidenceScore}% Match)`
+                                : doc.verification.fraudRisk === "high"
+                                ? "Fraud / Mismatch Detected"
+                                : "Awaiting Automated Check"}
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
