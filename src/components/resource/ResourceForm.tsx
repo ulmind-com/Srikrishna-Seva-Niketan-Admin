@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQueries } from "@tanstack/react-query";
 import { Controller, useForm } from "react-hook-form";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,7 @@ import { ImageUpload } from "@/components/common/ImageUpload";
 import { VideoUpload } from "@/components/common/VideoUpload";
 import { TagsInput } from "@/components/common/TagsInput";
 import { cn } from "@/lib/utils";
+import { UserCheck } from "lucide-react";
 import type { FieldConfig, ImageAsset } from "./form-helpers";
 import { buildDefaults, groupSections } from "./form-helpers";
 import type { FileAsset, ImageAsset as ImageAssetModel } from "@/types/models";
@@ -374,6 +375,23 @@ function renderControl(
         />
       );
 
+    case "optional_date":
+      return (
+        <Controller
+          control={control}
+          name={field.name}
+          render={({ field: f }) => (
+            <OptionalDateToggle
+              value={f.value as string | undefined}
+              onChange={f.onChange}
+              toggleOnLabel={field.toggleOnLabel}
+              toggleOffLabel={field.toggleOffLabel}
+              ongoingMessage={field.ongoingMessage}
+            />
+          )}
+        />
+      );
+
     case "shift_windows":
       return (
         <Controller
@@ -410,4 +428,65 @@ function getError(errors: any, name: string): string | undefined {
   if (cur?.message) return String(cur.message);
   if (cur?.type === "required") return "This field is required";
   return undefined;
+}
+
+/** Self-contained ON/OFF toggle + date input for optional date fields. */
+function OptionalDateToggle({
+  value,
+  onChange,
+  toggleOnLabel,
+  toggleOffLabel,
+  ongoingMessage,
+}: {
+  value: string | undefined;
+  onChange: (val: string | undefined) => void;
+  toggleOnLabel?: string;
+  toggleOffLabel?: string;
+  ongoingMessage?: string;
+}) {
+  // Track whether the toggle is ON. If the initial value is non-empty, default ON.
+  const [isOn, setIsOn] = useState(() => Boolean(value && String(value).trim()));
+
+  const onLabel = toggleOnLabel || "ON (নির্দিষ্ট তারিখ)";
+  const offLabel = toggleOffLabel || "OFF (অনির্দিষ্টকাল)";
+  const offMessage =
+    ongoingMessage || "Ongoing / চলমান ডিউটি (মাসিক বিলিং) — ডিউটির কোনো নির্দিষ্ট শেষের তারিখ নেই, অনির্দিষ্টকাল চলবে এবং প্রতি মাসে বিল তৈরি হবে।";
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => {
+            const next = !isOn;
+            setIsOn(next);
+            if (!next) onChange(undefined);
+          }}
+          className={cn(
+            "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border transition-all",
+            isOn
+              ? "bg-primary text-primary-foreground border-primary shadow-2xs"
+              : "bg-muted text-muted-foreground hover:bg-muted/80 border-border"
+          )}
+        >
+          <span>{isOn ? onLabel : offLabel}</span>
+        </button>
+      </div>
+
+      {isOn ? (
+        <Input
+          type="date"
+          value={value ? String(value) : ""}
+          onChange={(e) => onChange(e.target.value || undefined)}
+        />
+      ) : (
+        <div className="rounded-xl border border-dashed border-border bg-muted/30 p-2.5 text-center">
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-500">
+            <UserCheck className="h-3.5 w-3.5" />
+            {offMessage}
+          </span>
+        </div>
+      )}
+    </div>
+  );
 }

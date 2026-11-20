@@ -17,7 +17,8 @@ export type FieldType =
   | "time"
   | "shift_windows"
   | "geopoint"
-  | "divider";
+  | "divider"
+  | "optional_date";
 
 export interface FieldOption {
   label: string;
@@ -53,6 +54,11 @@ export interface FieldConfig {
   latField?: string;
   lngField?: string;
   addressField?: string;
+  /** For `optional_date` fields — labels for the ON/OFF toggle button. */
+  toggleOnLabel?: string;
+  toggleOffLabel?: string;
+  /** Message shown when the toggle is OFF (e.g. "Ongoing / চলমান ডিউটি"). */
+  ongoingMessage?: string;
 }
 
 export interface ColumnConfig<T> {

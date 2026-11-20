@@ -115,6 +115,8 @@ export function ResourceView<T extends { id: string }>({
   const sanitizeValues = (vals: Record<string, unknown>) => {
     const cleaned: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(vals)) {
+      // optional_date fields set value to undefined when OFF — skip them
+      if (v === undefined) continue;
       if (typeof v === "string") {
         const trimmed = v.trim();
         cleaned[k] = trimmed === "" ? null : trimmed;

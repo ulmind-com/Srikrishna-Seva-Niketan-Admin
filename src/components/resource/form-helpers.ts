@@ -40,6 +40,8 @@ function fallbackForType(field: FieldConfig): unknown {
     case "number":
     case "geopoint":
       return undefined;
+    case "optional_date":
+      return undefined;
     case "image":
     case "video":
       return null;

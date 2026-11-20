@@ -212,7 +212,7 @@ export function BatchReplaceStaffDialog({
           assignment_id: asg.id,
           new_employee_id: item.newEmployeeId,
           effective_date: effDate,
-          end_date: eDate || undefined,
+          end_date: hasGlobalEndDate && eDate ? eDate : null,
           shift: item.shift,
           start_time: isCustom && validWindows?.length ? validWindows[0].start || item.startTime : item.startTime?.trim() || undefined,
           end_time: isCustom && validWindows?.length ? validWindows[validWindows.length - 1].end || item.endTime : item.endTime?.trim() || undefined,

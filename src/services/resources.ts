@@ -23,7 +23,7 @@ const baseAssignments = createCrudService<Assignment>(endpoints.assignments.root
 export interface ReplaceStaffPayload {
   new_employee_id: string;
   effective_date: string;
-  end_date?: string;
+  end_date?: string | null;
   shift?: string;
   start_time?: string;
   end_time?: string;
@@ -38,7 +38,7 @@ export interface BatchReplaceItemPayload {
   assignment_id: string;
   new_employee_id: string;
   effective_date: string;
-  end_date?: string;
+  end_date?: string | null;
   shift?: string;
   start_time?: string;
   end_time?: string;

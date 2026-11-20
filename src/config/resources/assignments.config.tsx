@@ -368,9 +368,12 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
     {
       name: "end_date",
       label: "End Date (শেষের তারিখ — ঐচ্ছিক)",
-      type: "date",
-      helper: "ডিউটি অনির্দিষ্টকালের জন্য হলে খালি রাখুন — ডিউটি ongoing থাকবে ও প্রতি মাসে মাসিক বিল তৈরি হবে।",
+      type: "optional_date",
+      helper: "ডিউটি অনির্দিষ্টকালের জন্য হলে OFF রাখুন — প্রতি মাসে মাসিক বিল তৈরি হবে। শেষ তারিখ জানা গেলে ON করে তারিখ দিন।",
       section: "Schedule",
+      toggleOnLabel: "ON (নির্দিষ্ট তারিখ)",
+      toggleOffLabel: "OFF (অনির্দিষ্টকাল)",
+      ongoingMessage: "Ongoing / চলমান ডিউটি (মাসিক বিলিং) — ডিউটির শেষের তারিখ নির্দিষ্ট নয়, চলমান থাকবে এবং প্রতি মাসে বিল হবে।",
     },
     {
       name: "payment_type",

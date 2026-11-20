@@ -179,7 +179,7 @@ export function ReplaceStaffDialog({
       return resourceServices.assignments.replaceStaff(assignment.id, {
         new_employee_id: newEmployeeId,
         effective_date: effectiveDate,
-        end_date: hasEndDate && endDate.trim() ? endDate.trim() : undefined,
+        end_date: hasEndDate && endDate.trim() ? endDate.trim() : null,
         shift: shift,
         start_time: isCustom && validWindows?.length ? validWindows[0].start || startTime : startTime.trim() || undefined,
         end_time: isCustom && validWindows?.length ? validWindows[validWindows.length - 1].end || endTime : endTime.trim() || undefined,
