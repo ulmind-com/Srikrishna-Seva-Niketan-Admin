@@ -136,6 +136,9 @@ export function ResourceView<T extends { id: string }>({
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [config.queryKey] });
+      if (config.queryKey === "locations") {
+        qc.invalidateQueries({ queryKey: ["payroll-locations"] });
+      }
       toast.success(editing ? `${config.name} updated` : `${config.name} created`);
       setSheetOpen(false);
       setEditing(null);
@@ -147,6 +150,9 @@ export function ResourceView<T extends { id: string }>({
     mutationFn: (id: string) => config.service.remove(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [config.queryKey] });
+      if (config.queryKey === "locations") {
+        qc.invalidateQueries({ queryKey: ["payroll-locations"] });
+      }
       toast.success(`${config.name} deleted`);
       setDeleteTarget(null);
     },
