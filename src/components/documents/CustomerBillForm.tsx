@@ -106,44 +106,59 @@ function buildDutyItems(
       endDateStr = a.end_date
         ? formatDate(a.end_date)
         : `${formatDate(billDate.toISOString())} (Till Date)`;
-    } else if (a.total_days != null && a.total_days > 0) {
-      days = a.total_days;
-      isOngoing = !a.end_date;
-      endDateStr = a.end_date
-        ? formatDate(a.end_date)
-        : `${formatDate(billDate.toISOString())} (Till Date)`;
-    } else if (a.duration_days != null && a.duration_days > 0) {
-      days = a.duration_days;
-      isOngoing = !a.end_date;
-      endDateStr = a.end_date
-        ? formatDate(a.end_date)
-        : `${formatDate(billDate.toISOString())} (Till Date)`;
     } else {
       const s = new Date(a.start_date);
-      if (a.end_date) {
-        const e = new Date(a.end_date);
-        const diffDays = Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-        days = Math.max(diffDays, 1);
-        isOngoing = false;
-        endDateStr = formatDate(a.end_date);
-      } else if (a.status === "completed") {
-        let estDays = 1;
-        if (a.shift_windows && a.shift_windows.length > 1) {
-          estDays = a.shift_windows.length;
-        } else if (a.start_time && a.end_time && a.end_time <= a.start_time) {
-          estDays = 2;
+      const targetEnd = a.end_date ? new Date(a.end_date) : billDate;
+      isOngoing = !a.end_date;
+      endDateStr = a.end_date
+        ? formatDate(a.end_date)
+        : `${formatDate(targetEnd.toISOString())} (Till Date)`;
+
+      let grossDays = 0;
+      if (a.start_time && a.end_time) {
+        try {
+          const [sh, sm] = a.start_time.split(":").map(Number);
+          const [eh, em] = a.end_time.split(":").map(Number);
+          const stDt = new Date(s.getFullYear(), s.getMonth(), s.getDate(), sh, sm);
+          const etDt = new Date(targetEnd.getFullYear(), targetEnd.getMonth(), targetEnd.getDate(), eh, em);
+          const diffHrs = (etDt.getTime() - stDt.getTime()) / (1000 * 60 * 60);
+          if (diffHrs > 0) {
+            if (a.shift === "full_24h") {
+              grossDays = Math.round((diffHrs / 24) * 2) / 2;
+            } else if (a.shift === "day" || a.shift === "night" || a.shift === "morning") {
+              grossDays = Math.round((diffHrs / 12) * 2) / 2;
+            } else {
+              grossDays = Math.round((diffHrs / 24) * 2) / 2;
+            }
+          }
+        } catch {
+          // ignore
         }
-        days = estDays;
-        isOngoing = false;
-        const e = new Date(s);
-        e.setDate(e.getDate() + (estDays - 1));
-        endDateStr = formatDate(e.toISOString());
-      } else {
-        const diffDays = Math.round((billDate.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-        days = Math.max(diffDays, 1);
-        isOngoing = true;
-        endDateStr = `${formatDate(billDate.toISOString())} (Till Date)`;
       }
+
+      if (grossDays <= 0) {
+        const sCal = new Date(s.getFullYear(), s.getMonth(), s.getDate());
+        const eCal = new Date(targetEnd.getFullYear(), targetEnd.getMonth(), targetEnd.getDate());
+        const calDays = Math.round((eCal.getTime() - sCal.getTime()) / (1000 * 60 * 60 * 24));
+        grossDays = isOngoing ? Math.max(calDays, 1) : Math.max(calDays + 1, 1);
+      }
+
+      // Deduct duty breaks dynamically if any
+      let breakDays = 0;
+      if (a.duty_breaks && a.duty_breaks.length > 0) {
+        for (const b of a.duty_breaks) {
+          if (!b.start_date || !b.end_date) continue;
+          const bStart = new Date(b.start_date);
+          const bEnd = new Date(b.end_date);
+          const cStart = bStart > s ? bStart : s;
+          const cEnd = bEnd < targetEnd ? bEnd : targetEnd;
+          if (cEnd >= cStart) {
+            breakDays += Math.round((cEnd.getTime() - cStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+          }
+        }
+      }
+
+      days = Math.max(0.5, Math.round((grossDays - breakDays) * 2) / 2);
     }
 
     // Financials calculation (Rate & Amount)

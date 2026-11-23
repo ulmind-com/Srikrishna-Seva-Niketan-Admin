@@ -61,23 +61,31 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
   ],
   columns: [
     {
-      // Staff, customer and branch — the "who / where" of the row, stacked.
+      // Staff, customer, posted location and branch — the "who / where" of the row, stacked.
       header: "Staff → Customer",
-      headClassName: "min-w-[170px]",
+      headClassName: "min-w-[180px]",
       cell: (r) => (
         <div className="flex flex-col gap-1">
-          <span className="flex items-center gap-1.5 whitespace-nowrap font-medium">
+          <span className="flex items-center gap-1.5 font-medium">
             <span>{r.employee_name}</span>
             {r.acceptance_status === "accepted" && (
               <VerifiedBadge size={15} title="Verified Staff" />
             )}
           </span>
-          <span className="whitespace-nowrap text-xs text-muted-foreground">
-            → {r.customer_name}
+          <span className="text-xs text-muted-foreground flex items-center gap-1">
+            <span className="font-medium text-foreground/90">→ {r.customer_name}</span>
+            <span className="text-[11px] text-muted-foreground/70">
+              ({PLACE_LABEL[r.place_type] ?? r.place_type})
+            </span>
           </span>
+          {r.place_name && (
+            <span className="text-[11px] text-muted-foreground/80 truncate max-w-[200px]">
+              📍 {r.place_name}
+            </span>
+          )}
           <BranchName
             id={r.location_id}
-            className="whitespace-nowrap text-[11px] text-muted-foreground/70"
+            className="text-[11px] text-muted-foreground/70"
           />
           {r.is_replacement && (
             <span className="inline-flex items-center gap-1 text-[10px] font-medium text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/20 w-fit">
@@ -93,57 +101,45 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
       ),
     },
     {
-      // Shift window(s) + the date range they run over.
-      header: "Shift & Period",
-      headClassName: "min-w-[150px]",
+      // Shift window(s), date range, duty breaks, and progress bar
+      header: "Shift, Period & Progress",
+      headClassName: "min-w-[180px]",
       cell: (r) => (
         <div className="flex flex-col gap-1.5">
-          {r.shift === "custom" && r.shift_label ? (
-            <div className="flex flex-col gap-1">
-              {r.shift_label.split(", ").map((w, i) => (
-                <span
-                  key={i}
-                  className="inline-flex w-fit items-center whitespace-nowrap rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-primary"
-                >
-                  {w}
-                </span>
-              ))}
-            </div>
-          ) : (
-            <Badge variant="outline" className="w-fit whitespace-nowrap">
-              {shiftText(r)}
-            </Badge>
-          )}
-          <span className="flex flex-col gap-0.5 whitespace-nowrap text-[11px] tabular-nums text-muted-foreground">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {r.shift === "custom" && r.shift_label ? (
+              <div className="flex flex-col gap-1">
+                {r.shift_label.split(", ").map((w, i) => (
+                  <span
+                    key={i}
+                    className="inline-flex w-fit items-center rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-primary"
+                  >
+                    {w}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <Badge variant="outline" className="w-fit">
+                {shiftText(r)}
+              </Badge>
+            )}
+            {r.duty_breaks && r.duty_breaks.length > 0 && (
+              <span className="inline-flex w-fit items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-400">
+                ⏸️ {r.duty_breaks.length} {r.duty_breaks.length === 1 ? "Break" : "Breaks"}
+              </span>
+            )}
+          </div>
+          <span className="flex flex-col gap-0.5 text-[11px] tabular-nums text-muted-foreground">
             <span><DateCell value={r.start_date} /></span>
             <span className="text-muted-foreground/70">
               {r.end_date ? <>→ <DateCell value={r.end_date} /></> : "→ ongoing"}
             </span>
           </span>
-          {r.duty_breaks && r.duty_breaks.length > 0 && (
-            <span className="inline-flex w-fit items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-400">
-              ⏸️ {r.duty_breaks.length} {r.duty_breaks.length === 1 ? "Break" : "Breaks"}
-            </span>
-          )}
+          <div className="mt-0.5 pt-1 border-t border-border/40">
+            <AssignmentProgress row={r} />
+          </div>
         </div>
       ),
-    },
-    {
-      header: "Posted At",
-      headClassName: "min-w-[120px]",
-      cell: (r) => (
-        <div className="flex flex-col">
-          <span className="whitespace-nowrap text-sm">{PLACE_LABEL[r.place_type] ?? "—"}</span>
-          {r.place_name && (
-            <span className="text-xs text-muted-foreground">{r.place_name}</span>
-          )}
-        </div>
-      ),
-    },
-    {
-      header: "Progress",
-      headClassName: "min-w-[120px]",
-      cell: (r) => <AssignmentProgress row={r} />,
     },
     {
       // Rates, profit and how the money is collected — the full billing picture.

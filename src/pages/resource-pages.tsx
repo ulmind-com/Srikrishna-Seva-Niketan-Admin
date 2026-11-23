@@ -73,39 +73,11 @@ export const AssignmentsPage = () => {
       <ResourceView
         config={assignmentsConfig}
         extraRowAction={(assignment) => (
-          <div className="flex items-center gap-1.5">
-            {assignment.status !== "completed" && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 px-2 text-xs font-semibold gap-1 border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300 transition-all shadow-xs"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCompleteAssignment(assignment);
-                }}
-                title={`Mark duty completed and record cash collection for ${assignment.customer_name}`}
-              >
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Complete &amp; Cash</span>
-              </Button>
-            )}
+          <div className="flex items-center gap-1">
             <Button
               size="sm"
               variant="outline"
-              className="h-7 px-2 text-xs font-semibold gap-1 border-amber-500/40 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 hover:text-amber-300 transition-all shadow-xs"
-              onClick={(e) => {
-                e.stopPropagation();
-                setBreakAssignment(assignment);
-              }}
-              title={`Manage pause/breaks for ${assignment.customer_name}`}
-            >
-              <PauseCircle className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Pause / Break</span>
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 px-2 text-xs font-semibold gap-1 border-blue-500/40 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300 transition-all shadow-xs"
+              className="h-7 px-2 text-xs font-semibold gap-1 border-blue-500/30 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300 transition-all shadow-xs"
               onClick={(e) => {
                 e.stopPropagation();
                 setReplaceAssignment(assignment);
@@ -113,12 +85,12 @@ export const AssignmentsPage = () => {
               title={`Replace staff or handover duty for ${assignment.customer_name}`}
             >
               <UserCheck className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Replace</span>
+              <span>Replace</span>
             </Button>
             <Button
               size="sm"
               variant="outline"
-              className="h-7 px-2.5 text-xs font-semibold gap-1.5 border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300 transition-all shadow-xs"
+              className="h-7 w-7 p-0 border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300 transition-all shadow-xs"
               onClick={(e) => {
                 e.stopPropagation();
                 handleSendPush(assignment);
@@ -131,7 +103,6 @@ export const AssignmentsPage = () => {
               ) : (
                 <BellRing className="h-3.5 w-3.5 text-emerald-400" />
               )}
-              <span>Push to Nurse</span>
             </Button>
           </div>
         )}

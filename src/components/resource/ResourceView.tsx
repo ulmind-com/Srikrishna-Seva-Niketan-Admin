@@ -261,8 +261,8 @@ export function ResourceView<T extends { id: string }>({
                   {col.header}
                 </TableHead>
               ))}
-              {(canUpdate || canDelete) && (
-                <TableHead className="w-16 text-right">Actions</TableHead>
+              {(canUpdate || canDelete || extraRowAction || extraDropdownItems) && (
+                <TableHead className="text-right pr-4">Actions</TableHead>
               )}
             </TableRow>
           </TableHeader>
@@ -313,7 +313,19 @@ export function ResourceView<T extends { id: string }>({
                         onClick={(e) => e.stopPropagation()}
                       >
                         {extraRowAction?.(row)}
-                        {(canUpdate || canDelete || extraDropdownItems) && (
+                        {canUpdate && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs font-medium gap-1 text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                            onClick={() => openEdit(row)}
+                            title="Edit"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            <span>Edit</span>
+                          </Button>
+                        )}
+                        {(canDelete || extraDropdownItems) && (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon-sm">
@@ -322,11 +334,6 @@ export function ResourceView<T extends { id: string }>({
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               {extraDropdownItems?.(row)}
-                              {canUpdate && (
-                                <DropdownMenuItem onClick={() => openEdit(row)}>
-                                  <Pencil /> Edit
-                                </DropdownMenuItem>
-                              )}
                               {canDelete && (
                                 <DropdownMenuItem
                                   destructive
