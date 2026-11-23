@@ -118,6 +118,11 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
               {r.end_date ? <>→ <DateCell value={r.end_date} /></> : "→ ongoing"}
             </span>
           </span>
+          {r.duty_breaks && r.duty_breaks.length > 0 && (
+            <span className="inline-flex w-fit items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-400">
+              ⏸️ {r.duty_breaks.length} {r.duty_breaks.length === 1 ? "Break" : "Breaks"}
+            </span>
+          )}
         </div>
       ),
     },

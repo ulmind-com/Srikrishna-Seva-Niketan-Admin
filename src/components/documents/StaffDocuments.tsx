@@ -166,8 +166,21 @@ export function StaffDocuments({
     }
   }
 
+  const isVerified = (staff.verification_status ?? "verified") === "verified";
+
   return (
     <div className="space-y-5">
+      {!isVerified && (
+        <div className="no-print rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-900 dark:text-amber-200">
+          <p className="text-sm font-semibold">⚠️ Staff Verification Pending</p>
+          <p className="mt-1 text-xs text-amber-800/80 dark:text-amber-300/80">
+            This staff member ({staff.name}) is currently{" "}
+            <span className="font-medium uppercase underline">{staff.verification_status || "pending"}</span>.
+            Official ID cards and application forms are only issued once verified by Super Admin.
+          </p>
+        </div>
+      )}
+
       {/* Toolbar */}
       <div className="no-print flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-1.5 rounded-xl bg-muted p-1">
@@ -190,14 +203,14 @@ export function StaffDocuments({
 
         <div className="flex gap-2">
           {active === "id-card" && (
-            <Button variant="outline" onClick={downloadCard} disabled={downloading}>
+            <Button variant="outline" onClick={downloadCard} disabled={downloading || !isVerified}>
               <Download className="mr-2 h-4 w-4" />
               {downloading ? "Preparing…" : "Download Card"}
             </Button>
           )}
           <Button
             onClick={() => (active === "id-card" ? printCard() : window.print())}
-            disabled={active === "id-card" && downloading}
+            disabled={(active === "id-card" && downloading) || !isVerified}
           >
             <Printer className="mr-2 h-4 w-4" />
             Print {TABS.find((t) => t.key === active)?.label}

@@ -70,6 +70,7 @@ export async function loadEmployeeOptions() {
     branchNames(),
   ]);
   return res.items
+    .filter((e) => (e.verification_status ?? "verified") === "verified")
     .map((e) => ({
       label: [`${e.name} (${e.code})`, e.category, names[e.location_id]]
         .filter(Boolean)

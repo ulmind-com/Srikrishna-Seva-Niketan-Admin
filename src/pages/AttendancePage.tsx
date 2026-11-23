@@ -135,11 +135,12 @@ export function AttendancePage() {
   const employees = empData?.items ?? [];
   const locations = locData?.items ?? [];
 
-  // Filter staff by branch and search
+  // Filter staff by branch, verified status, and search
   const filteredEmployees = useMemo(() => {
     const q = staffSearch.trim().toLowerCase();
     return employees
       .filter((e) => (branchFilter === "all" ? true : e.location_id === branchFilter))
+      .filter((e) => (e.verification_status ?? "verified") === "verified")
       .filter((e) =>
         q
           ? [e.name, e.code, e.category, e.phone]

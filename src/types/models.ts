@@ -205,6 +205,16 @@ export type AssignmentPlace = "home" | "hospital" | "nursing_home" | "other";
 
 export type AcceptanceStatus = "pending" | "accepted" | "declined";
 
+export interface DutyBreak {
+  id: string;
+  start_date: string;
+  end_date: string;
+  start_time?: string | null;
+  end_time?: string | null;
+  reason?: string | null;
+  created_at?: string | null;
+}
+
 export interface Assignment extends BaseDoc {
   customer_id: string;
   customer_name: string;
@@ -253,6 +263,7 @@ export interface Assignment extends BaseDoc {
   replaced_by_employee_name?: string | null;
   replacement_reason?: string | null;
   days_worked?: number | null;
+  duty_breaks?: DutyBreak[] | null;
   notes?: string | null;
   /** Server-computed progress. Null when the engagement is open-ended. */
   total_days?: number | null;

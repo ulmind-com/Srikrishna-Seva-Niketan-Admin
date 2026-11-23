@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { BellRing, CheckCircle2, Loader2, UserCheck } from "lucide-react";
+import { BellRing, CheckCircle2, Loader2, PauseCircle, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { ReplaceStaffDialog } from "@/components/assignments/ReplaceStaffDialog";
 import { AdminCompleteDutyDialog } from "@/components/assignments/AdminCompleteDutyDialog";
+import { DutyBreakDialog } from "@/components/assignments/DutyBreakDialog";
 import type { Assignment } from "@/types/models";
 import { pushNotificationService } from "@/services/push-notification.service";
 import { ResourceView } from "@/components/resource/ResourceView";
@@ -42,6 +43,7 @@ export const AssignmentsPage = () => {
   const [pushingId, setPushingId] = useState<string | null>(null);
   const [replaceAssignment, setReplaceAssignment] = useState<Assignment | null>(null);
   const [completeAssignment, setCompleteAssignment] = useState<Assignment | null>(null);
+  const [breakAssignment, setBreakAssignment] = useState<Assignment | null>(null);
 
   const handleSendPush = async (assignment: Assignment) => {
     setPushingId(assignment.id);
@@ -90,6 +92,19 @@ export const AssignmentsPage = () => {
             <Button
               size="sm"
               variant="outline"
+              className="h-7 px-2 text-xs font-semibold gap-1 border-amber-500/40 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 hover:text-amber-300 transition-all shadow-xs"
+              onClick={(e) => {
+                e.stopPropagation();
+                setBreakAssignment(assignment);
+              }}
+              title={`Manage pause/breaks for ${assignment.customer_name}`}
+            >
+              <PauseCircle className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Pause / Break</span>
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
               className="h-7 px-2 text-xs font-semibold gap-1 border-blue-500/40 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300 transition-all shadow-xs"
               onClick={(e) => {
                 e.stopPropagation();
@@ -131,6 +146,12 @@ export const AssignmentsPage = () => {
               </DropdownMenuItem>
             )}
             <DropdownMenuItem
+              onClick={() => setBreakAssignment(assignment)}
+              className="gap-2 cursor-pointer font-medium text-amber-400 focus:text-amber-300"
+            >
+              <PauseCircle className="h-4 w-4 text-amber-400" /> সাময়িক বন্ধ / ছুটি (Duty Pause / Break)
+            </DropdownMenuItem>
+            <DropdownMenuItem
               onClick={() => setReplaceAssignment(assignment)}
               className="gap-2 cursor-pointer font-medium text-blue-400 focus:text-blue-300"
             >
@@ -154,6 +175,11 @@ export const AssignmentsPage = () => {
       <AdminCompleteDutyDialog
         assignment={completeAssignment}
         onClose={() => setCompleteAssignment(null)}
+      />
+
+      <DutyBreakDialog
+        assignment={breakAssignment}
+        onClose={() => setBreakAssignment(null)}
       />
     </>
   );

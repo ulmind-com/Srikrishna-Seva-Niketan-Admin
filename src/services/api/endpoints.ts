@@ -112,6 +112,8 @@ export const endpoints = {
     batchReplace: "/assignments/batch-replace",
     multiAssign: "/assignments/multi-assign",
     complete: (id: string) => `/assignments/${id}/complete`,
+    addBreak: (id: string) => `/assignments/${id}/breaks`,
+    removeBreak: (id: string, breakId: string) => `/assignments/${id}/breaks/${breakId}`,
   },
   billing: {
     monthly: "/billing/monthly",

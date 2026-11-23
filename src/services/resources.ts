@@ -106,6 +106,18 @@ export const assignmentService = {
       endpoints.assignments.complete(id),
       payload ?? {}
     ),
+  addBreak: (
+    id: string,
+    payload: {
+      start_date: string;
+      end_date: string;
+      start_time?: string | null;
+      end_time?: string | null;
+      reason?: string | null;
+    }
+  ) => http.post<Assignment>(endpoints.assignments.addBreak(id), payload),
+  removeBreak: (id: string, breakId: string) =>
+    http.del<Assignment>(endpoints.assignments.removeBreak(id, breakId)),
 };
 
 /** CRUD services for the config-driven resource modules. */
