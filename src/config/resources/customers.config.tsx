@@ -63,10 +63,6 @@ export const customersConfig: ResourceConfig<Customer> = {
       ),
     },
     {
-      header: "1-to-1",
-      cell: (r) => <BoolCell value={r.one_to_one} />,
-    },
-    {
       header: "Branch",
       cell: (r) => <BranchName id={r.location_id} className="text-sm" />,
     },
@@ -103,20 +99,11 @@ export const customersConfig: ResourceConfig<Customer> = {
     },
     { name: "service_label", label: "Service Required", type: "text", placeholder: "e.g. 24 hrs Health Attendant", section: "Details" },
     { name: "duration_days", label: "Duration (days)", type: "number", min: 0, section: "Details" },
-    { name: "billing_rate", label: "Billing Rate (₹)", type: "number", min: 0, helper: "Amount charged to the customer.", section: "Details" },
-    { name: "one_to_one", label: "One-to-one (dedicated staff)", type: "switch", defaultValue: true, section: "Details" },
+    { name: "billing_rate", label: "Contract Amount (₹)", type: "number", min: 0, helper: "Agreed service charges / contract amount (e.g. 13500).", section: "Details" },
     branchField(),
     { name: "address", label: "Address", type: "textarea", section: "Address", colSpan: 2 },
     { name: "city", label: "City", type: "text", section: "Address" },
     { name: "pincode", label: "Pincode", type: "text", section: "Address" },
-    {
-      name: "lat",
-      label: "Map Location",
-      type: "geopoint",
-      section: "Address",
-      colSpan: 2,
-      helper: "Optional — drop a pin for exact routing, or leave it and we geocode the address.",
-    },
     {
       name: "id_proof_type",
       label: "ID Proof Type",

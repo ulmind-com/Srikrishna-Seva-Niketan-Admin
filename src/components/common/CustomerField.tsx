@@ -34,7 +34,11 @@ export function CustomerField({
 }) {
   const qc = useQueryClient();
   const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ name: "", phone: "" });
+  const [form, setForm] = useState<{ name: string; phone: string; billing_rate: string }>({
+    name: "",
+    phone: "",
+    billing_rate: "",
+  });
 
   // The staff member chosen in the same form drives the branch constraint.
   const staffId = useWatch({ control, name: "employee_id" }) as
@@ -98,6 +102,7 @@ export function CustomerField({
       resourceServices.customers.create({
         name: form.name.trim(),
         phone: form.phone.trim(),
+        billing_rate: form.billing_rate ? Number(form.billing_rate) : undefined,
         // New customer joins the staff member's branch so the pair always match.
         location_id: staffBranch || undefined,
       } as never),
@@ -106,7 +111,7 @@ export function CustomerField({
       qc.invalidateQueries({ queryKey: ["field-options", "customer-options"] });
       onChange(customer.id);
       setAdding(false);
-      setForm({ name: "", phone: "" });
+      setForm({ name: "", phone: "", billing_rate: "" });
       toast.success("Customer added");
     },
     onError: (err) => toast.error(describeError(err)),
@@ -146,6 +151,15 @@ export function CustomerField({
               value={form.phone}
               onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
               placeholder="Mobile number"
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Contract Amount (₹)</Label>
+            <Input
+              type="number"
+              value={form.billing_rate}
+              onChange={(e) => setForm((f) => ({ ...f, billing_rate: e.target.value }))}
+              placeholder="e.g. 13500"
             />
           </div>
           <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs">

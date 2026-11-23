@@ -1,6 +1,13 @@
 import type { ReactNode } from "react";
 import type { Assignment, Customer } from "@/types/models";
-import { ORG_DEPARTMENT, ORG_LOGO, ORG_NAME, ORG_TAGLINE, formatDate } from "./document-utils";
+import {
+  ORG_DEPARTMENT,
+  ORG_LOGO,
+  ORG_NAME,
+  ORG_TAGLINE,
+  formatDate,
+  amountInWordsINR,
+} from "./document-utils";
 
 const CARE_LABEL: Record<string, string> = {
   home: "Home Care",
@@ -21,76 +28,111 @@ const PLACE_LABEL: Record<string, string> = {
   other: "Other",
 };
 
-const inr = (n?: number | null) => (n != null ? `₹${n.toLocaleString("en-IN")}` : "—");
-const inWords = (n?: number | null) => (n != null ? `Rupees ${n.toLocaleString("en-IN")} only` : "—");
+const inr = (n?: number | null) => (n != null && n > 0 ? `₹${n.toLocaleString("en-IN")}` : "—");
 
 /**
  * The single A4 service agreement generated for a customer — a plain, signable
  * contract (no long terms & conditions): who the service is for, what is
  * provided, the agreed amount, and two signatures. Printed in duplicate: one
  * copy for the office and one for the customer.
- *
- * ``assignment`` (the customer's current engagement, when one exists) fills in
- * the staff member, shift, posting and dates; otherwise those read from the
- * customer record alone.
  */
 export function CustomerAgreementForm({
   customer,
   assignment,
   branchName,
   authorizedSignatureUrl,
+  agreementDate,
+  overrideAmount,
 }: {
   customer: Customer;
   assignment?: Assignment | null;
   branchName?: string;
   authorizedSignatureUrl?: string | null;
+  agreementDate?: string;
+  overrideAmount?: number | null;
 }) {
-  const amount = assignment?.customer_rate ?? customer.billing_rate ?? null;
   const duration = assignment?.total_days ?? customer.duration_days ?? null;
+  const amount =
+    overrideAmount !== undefined && overrideAmount !== null
+      ? overrideAmount
+      : (assignment?.customer_rate && assignment.customer_rate > 0)
+        ? assignment.customer_rate
+        : (customer.billing_rate && customer.billing_rate > 0)
+          ? customer.billing_rate
+          : (assignment?.customer_daily_rate && assignment.customer_daily_rate > 0)
+            ? (duration && duration > 1 && assignment.customer_daily_rate < 3000
+                ? assignment.customer_daily_rate * duration
+                : assignment.customer_daily_rate)
+            : null;
+
   const service = customer.service_label || CARE_LABEL[customer.care_type] || "Home Health Care";
-  const today = new Date().toISOString();
+  const dateToUse = agreementDate || new Date().toISOString();
 
   return (
     <div className="doc-sheet mx-auto w-[210mm] bg-white p-[14mm] text-[#111] shadow-soft">
-      <Letterhead refNo={customer.code} />
+      <Letterhead
+        refNo={customer.code}
+        date={dateToUse}
+        branchName={branchName}
+      />
 
-      <SectionTitle>1. Parties</SectionTitle>
-      <FieldGrid>
-        <Field label="Service Provider" value={ORG_NAME} wide />
-        <Field label="Branch / Office" value={branchName} />
-        <Field label="Agreement Date" value={formatDate(today)} />
-      </FieldGrid>
-
-      <SectionTitle>2. Customer Details</SectionTitle>
+      <SectionTitle>1. Customer Details</SectionTitle>
       <FieldGrid>
         <Field label="Customer Name" value={customer.name} wide />
         <Field label="Customer ID" value={customer.code} />
         <Field label="Phone" value={customer.phone} />
         <Field label="Alternate Phone" value={customer.alt_phone} />
-        <Field label="ID Proof" value={customer.id_proof_type} />
+        <Field
+          label="ID Proof"
+          value={
+            customer.id_proof_type
+              ? `${customer.id_proof_type}${customer.id_proof_number ? ` - ${customer.id_proof_number}` : ""}`
+              : null
+          }
+        />
         <Field label="Address" value={customer.address} wide />
         <Field label="City" value={customer.city} />
         <Field label="PIN Code" value={customer.pincode} />
       </FieldGrid>
 
-      <SectionTitle>3. Service & Charges</SectionTitle>
+      <SectionTitle>2. Service Charges</SectionTitle>
       <FieldGrid>
         <Field label="Service Provided" value={service} wide />
         <Field label="Care Type" value={CARE_LABEL[customer.care_type] ?? customer.care_type} />
-        <Field label="Posting" value={assignment ? PLACE_LABEL[assignment.place_type] ?? assignment.place_type : CARE_LABEL[customer.care_type]} />
+        <Field
+          label="Posting"
+          value={
+            assignment
+              ? PLACE_LABEL[assignment.place_type] ?? assignment.place_type
+              : CARE_LABEL[customer.care_type]
+          }
+        />
         <Field label="Staff Assigned" value={assignment?.employee_name} />
-        <Field label="Shift" value={assignment ? SHIFT_LABEL[assignment.shift] ?? assignment.shift : "—"} />
-        <Field label="Start Date" value={assignment ? formatDate(assignment.start_date) : "—"} />
-        <Field label="Duration" value={duration != null ? `${duration} day${duration === 1 ? "" : "s"}` : "—"} />
+        <Field
+          label="Shift"
+          value={assignment ? SHIFT_LABEL[assignment.shift] ?? assignment.shift : "—"}
+        />
+        <Field
+          label="Start Date"
+          value={assignment ? formatDate(assignment.start_date) : "—"}
+        />
+        <Field
+          label="Duration"
+          value={duration != null ? `${duration} day${duration === 1 ? "" : "s"}` : "—"}
+        />
         <Field label="Contract Amount" value={inr(amount)} />
-        <Field label="Amount in Words" value={inWords(amount)} wide />
+        <Field label="Amount in Words" value={amountInWordsINR(amount)} wide />
       </FieldGrid>
 
       <div className="mt-4 rounded border border-slate-300 bg-[#fdf6ec]/60 p-3">
         <p className="text-[8.5px] font-bold uppercase tracking-wide text-[#8a1538]">Agreement</p>
         <p className="mt-1 text-[9px] leading-relaxed text-slate-700">
           {ORG_NAME} agrees to provide the service described above to the customer
-          named herein, for the agreed amount of <span className="font-semibold">{inr(amount)}</span>.
+          named herein, for the agreed amount of{" "}
+          <span className="font-semibold">
+            {inr(amount)}
+            {amount && amount > 0 ? ` (${amountInWordsINR(amount)})` : ""}
+          </span>.
           The customer confirms that the above particulars are correct and agrees
           to the service and charges stated. This document is a record of the
           engagement between both parties and is issued in duplicate — one copy
@@ -135,7 +177,15 @@ export function CustomerAgreementForm({
 
 /* ---- shared building blocks (mirrors StaffApplicationForms) ---- */
 
-function Letterhead({ refNo }: { refNo: string }) {
+function Letterhead({
+  refNo,
+  date,
+  branchName,
+}: {
+  refNo: string;
+  date: string;
+  branchName?: string;
+}) {
   return (
     <header className="border-b-2 border-[#8a1538] pb-3">
       <div className="flex items-start justify-between gap-4">
@@ -147,11 +197,20 @@ function Letterhead({ refNo }: { refNo: string }) {
             </h1>
             <p className="font-serif text-[10px] font-bold text-[#c0121f]">{ORG_DEPARTMENT}</p>
             <p className="text-[9px] text-slate-500">{ORG_TAGLINE}</p>
+            {branchName ? (
+              <p className="mt-0.5 text-[9.5px] font-bold text-[#8a1538]">
+                Branch Office: <span className="font-semibold text-slate-800">{branchName}</span>
+              </p>
+            ) : null}
           </div>
         </div>
         <div className="text-right">
           <p className="text-[8.5px] uppercase tracking-wide text-slate-500">Ref. No.</p>
-          <p className="font-mono text-[11px] font-bold">{refNo}</p>
+          <p className="font-mono text-[11px] font-bold text-slate-800">{refNo}</p>
+          <div className="mt-1">
+            <p className="text-[8.5px] uppercase tracking-wide text-slate-500">Date</p>
+            <p className="font-mono text-[10px] font-bold text-slate-800">{formatDate(date)}</p>
+          </div>
         </div>
       </div>
 

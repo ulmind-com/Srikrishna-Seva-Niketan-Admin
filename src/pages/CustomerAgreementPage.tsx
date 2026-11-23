@@ -1,11 +1,15 @@
+import { useState, useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
-import { ArrowLeft, Loader2, Printer } from "lucide-react";
+import { ArrowLeft, Loader2, Printer, Save } from "lucide-react";
+import { toast } from "sonner";
 import { resourceServices } from "@/services/resources";
 import { settingsService } from "@/services/settings.service";
 import { CustomerAgreementForm } from "@/components/documents/CustomerAgreementForm";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import type { Assignment } from "@/types/models";
 
 /** Occupying statuses — the engagement that is current for this customer. */
@@ -18,6 +22,7 @@ const ACTIVE = new Set(["scheduled", "active"]);
  */
 export function CustomerAgreementPage() {
   const { id = "" } = useParams();
+  const qc = useQueryClient();
 
   const { data: customer, isLoading } = useQuery({
     queryKey: ["customers", "detail", id],
@@ -43,6 +48,51 @@ export function CustomerAgreementPage() {
     staleTime: 300_000,
   });
 
+  const rows: Assignment[] = assignments?.items ?? [];
+  // Prefer the current engagement; fall back to the most recent one.
+  const current =
+    rows.find((a) => ACTIVE.has(a.status)) ??
+    [...rows].sort((a, b) => (b.start_date ?? "").localeCompare(a.start_date ?? ""))[0] ??
+    null;
+
+  const [agreementDate, setAgreementDate] = useState<string>(() =>
+    new Date().toISOString().slice(0, 10)
+  );
+  const [amountStr, setAmountStr] = useState<string>("");
+  const [hasUserEditedAmount, setHasUserEditedAmount] = useState(false);
+
+  // Sync initial amount once customer/assignment loads if user hasn't typed their own
+  useEffect(() => {
+    if (!hasUserEditedAmount && customer) {
+      const derived =
+        (current?.customer_rate && current.customer_rate > 0 ? current.customer_rate : null) ??
+        (customer.billing_rate && customer.billing_rate > 0 ? customer.billing_rate : null) ??
+        (current?.customer_daily_rate
+          ? (current.total_days || customer.duration_days
+              ? current.customer_daily_rate * (current.total_days || customer.duration_days!)
+              : current.customer_daily_rate)
+          : null);
+      if (derived != null) {
+        setAmountStr(String(derived));
+      }
+    }
+  }, [customer, current, hasUserEditedAmount]);
+
+  const saveRateMutation = useMutation({
+    mutationFn: async (newRate: number) => {
+      await resourceServices.customers.update(id, { billing_rate: newRate });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["customers", "detail", id] });
+      qc.invalidateQueries({ queryKey: ["customers"] });
+      toast.success("Contract amount saved to customer record");
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : "Failed to save contract amount";
+      toast.error(msg);
+    },
+  });
+
   if (isLoading) {
     return (
       <div className="grid h-64 place-items-center">
@@ -60,15 +110,9 @@ export function CustomerAgreementPage() {
     );
   }
 
-  const rows: Assignment[] = assignments?.items ?? [];
-  // Prefer the current engagement; fall back to the most recent one.
-  const current =
-    rows.find((a) => ACTIVE.has(a.status)) ??
-    [...rows].sort((a, b) => (b.start_date ?? "").localeCompare(a.start_date ?? ""))[0] ??
-    null;
-
   const branchName = locations?.items.find((b) => b.id === customer.location_id)?.name;
   const authorizedSignatureUrl = settings?.authorized_signature?.url ?? null;
+  const parsedAmount = amountStr.trim() !== "" ? Number(amountStr) : null;
 
   return (
     <div className="space-y-5">
@@ -76,12 +120,65 @@ export function CustomerAgreementPage() {
         <title>Service Agreement — {customer.name}</title>
       </Helmet>
 
-      <div className="no-print flex flex-wrap items-center justify-between gap-3">
-        <BackLink />
-        <Button onClick={() => window.print()}>
-          <Printer className="mr-2 h-4 w-4" />
-          Print Agreement
-        </Button>
+      {/* Top action toolbar (hidden during print) */}
+      <div className="no-print rounded-2xl border border-border bg-card p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <BackLink />
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="agreement-date" className="text-xs text-muted-foreground whitespace-nowrap">
+                Date:
+              </Label>
+              <Input
+                id="agreement-date"
+                type="date"
+                value={agreementDate}
+                onChange={(e) => setAgreementDate(e.target.value)}
+                className="h-8 w-36 text-xs"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Label htmlFor="contract-amount" className="text-xs text-muted-foreground whitespace-nowrap">
+                Contract Amount (₹):
+              </Label>
+              <Input
+                id="contract-amount"
+                type="number"
+                placeholder="e.g. 13500"
+                value={amountStr}
+                onChange={(e) => {
+                  setHasUserEditedAmount(true);
+                  setAmountStr(e.target.value);
+                }}
+                className="h-8 w-32 text-xs font-semibold"
+              />
+              {parsedAmount != null && parsedAmount !== customer.billing_rate && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 text-xs font-medium"
+                  disabled={saveRateMutation.isPending}
+                  onClick={() => saveRateMutation.mutate(parsedAmount)}
+                  title="Save this amount to the customer record"
+                >
+                  {saveRateMutation.isPending ? (
+                    <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Save className="mr-1 h-3.5 w-3.5" />
+                  )}
+                  Save Amount
+                </Button>
+              )}
+            </div>
+
+            <Button onClick={() => window.print()} className="h-8">
+              <Printer className="mr-2 h-4 w-4" />
+              Print Agreement
+            </Button>
+          </div>
+        </div>
       </div>
 
       <div className="overflow-x-auto rounded-2xl bg-muted/40 p-3 sm:p-5">
@@ -92,6 +189,8 @@ export function CustomerAgreementPage() {
               assignment={current}
               branchName={branchName}
               authorizedSignatureUrl={authorizedSignatureUrl}
+              agreementDate={agreementDate}
+              overrideAmount={parsedAmount}
             />
           </div>
         </div>
