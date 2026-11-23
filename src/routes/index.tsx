@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { LoginPage } from "@/pages/LoginPage";
@@ -18,7 +18,6 @@ import {
   AssignmentsPage,
   ExpensesPage,
 } from "@/pages/resource-pages";
-import { PaymentsPage } from "@/pages/PaymentsPage";
 import { EmployeeIdCardPage } from "@/pages/EmployeeIdCardPage";
 import { EmployeeDocumentsPage } from "@/pages/EmployeeDocumentsPage";
 import { StaffVerificationPage } from "@/pages/StaffVerificationPage";
@@ -99,7 +98,7 @@ export function AppRoutes() {
           <Route path="/general-bills" element={<MonthlyBillsPage />} />
           <Route path="/payslips" element={<PayslipPage />} />
           <Route path="/expenses" element={<ExpensesPage />} />
-          <Route path="/payments" element={<PaymentsPage />} />
+          <Route path="/payments" element={<Navigate to="/monthly-bills" replace />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/applications" element={<ApplicationsPage />} />
           <Route path="/blogs" element={<BlogsPage />} />

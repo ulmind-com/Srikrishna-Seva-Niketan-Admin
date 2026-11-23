@@ -45,7 +45,7 @@ import { formatDate, formatCurrency, timeAgo } from "@/lib/utils";
 const GENERAL_QUICK_ACTIONS = [
   { label: "Staff Directory", to: "/employees", icon: Users },
   { label: "Assignments / Shifts", to: "/assignments", icon: Activity },
-  { label: "Payments & Revenue", to: "/payments", icon: IndianRupee },
+  { label: "General Bill & Revenue", to: "/monthly-bills", icon: IndianRupee },
   { label: "Bookings", to: "/bookings", icon: CalendarCheck },
   { label: "Verification Queue", to: "/staff-verification", icon: ShieldCheck },
   { label: "Medical Services", to: "/services", icon: Stethoscope },
@@ -54,7 +54,7 @@ const GENERAL_QUICK_ACTIONS = [
 const MANAGER_QUICK_ACTIONS = [
   { label: "Assign Staff to Duty", to: "/assignments", icon: Activity },
   { label: "Branch Staff Directory", to: "/employees", icon: Users },
-  { label: "Record Payment", to: "/payments", icon: IndianRupee },
+  { label: "General Bill", to: "/monthly-bills", icon: IndianRupee },
   { label: "Register New Staff", to: "/employees", icon: Plus },
   { label: "Patients & Customers", to: "/customers", icon: HeartPulse },
   { label: "Branch Reports", to: "/reports", icon: TrendingUp },
@@ -163,7 +163,7 @@ export function DashboardPage() {
           icon: <IndianRupee className="h-5 w-5" />,
           tone: "success" as const,
           hint: `${stats.revenue?.payment_count ?? 0} engagements`,
-          to: "/payments",
+          to: "/monthly-bills",
         },
         {
           label: "Active Shifts",
@@ -225,7 +225,7 @@ export function DashboardPage() {
           icon: <IndianRupee className="h-5 w-5" />,
           tone: "success" as const,
           hint: `${stats.revenue?.payment_count ?? 0} total engagements`,
-          to: "/payments",
+          to: "/monthly-bills",
         },
         {
           label: "Active Shifts",
