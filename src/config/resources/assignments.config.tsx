@@ -143,8 +143,9 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
       header: "Billing (₹)",
       headClassName: "min-w-[150px]",
       cell: (r) => {
-        const bill = r.customer_rate ?? 0;
-        const pay = r.employee_payout ?? 0;
+        const days = r.days_worked ?? r.total_days;
+        const bill = r.customer_rate != null ? r.customer_rate : (r.customer_daily_rate && days ? Math.round(r.customer_daily_rate * days) : 0);
+        const pay = r.employee_payout != null ? r.employee_payout : (r.employee_daily_rate && days ? Math.round(r.employee_daily_rate * days) : 0);
         const exp = r.other_expense ?? 0;
         const profit = bill - pay - exp;
         const isPostpaid = r.payment_type === "postpaid";
@@ -160,8 +161,8 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
         return (
           <div className="flex flex-col gap-1.5">
             <div className="flex flex-col gap-0.5 whitespace-nowrap text-xs tabular-nums text-muted-foreground">
-              {r.customer_rate != null && <div>Bill: <span className="font-semibold text-foreground">₹{r.customer_rate.toLocaleString()}</span></div>}
-              {r.employee_payout != null && <div>Pay: ₹{r.employee_payout.toLocaleString()}</div>}
+              {bill > 0 && <div>Bill: <span className="font-semibold text-foreground">₹{bill.toLocaleString()}</span></div>}
+              {pay > 0 && <div>Pay: ₹{pay.toLocaleString()}</div>}
               {r.other_expense != null && r.other_expense > 0 && <div>Exp: ₹{r.other_expense.toLocaleString()}</div>}
               {bill > 0 && (
                 <div className={`font-semibold ${profit >= 0 ? "text-success" : "text-destructive"}`}>
