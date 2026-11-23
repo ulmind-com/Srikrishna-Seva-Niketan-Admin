@@ -103,6 +103,11 @@ export interface DutyReportItem {
   payment_received_by?: string | null;
   location_id: string;
   location_name: string;
+  is_replacement?: boolean;
+  replacement_for_employee_name?: string | null;
+  replaced_by_employee_name?: string | null;
+  replacement_reason?: string | null;
+  days_worked?: number | null;
 }
 
 export interface DutyReportSummary {

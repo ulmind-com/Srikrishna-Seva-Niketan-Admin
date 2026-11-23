@@ -199,7 +199,7 @@ export interface Customer extends BaseDoc {
 }
 
 export type ShiftType = "morning" | "day" | "night" | "full_24h" | "custom";
-export type AssignmentStatus = "scheduled" | "active" | "completed" | "cancelled";
+export type AssignmentStatus = "scheduled" | "active" | "completed" | "cancelled" | "replaced";
 
 export type AssignmentPlace = "home" | "hospital" | "nursing_home" | "other";
 

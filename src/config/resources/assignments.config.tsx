@@ -31,6 +31,7 @@ const STATUS_VARIANT: Record<string, "success" | "secondary" | "warning" | "dang
   scheduled: "secondary",
   completed: "warning",
   cancelled: "danger",
+  replaced: "warning",
 };
 
 export const assignmentsConfig: ResourceConfig<Assignment> = {
@@ -52,6 +53,7 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
       options: [
         { label: "Scheduled", value: "scheduled" },
         { label: "Active", value: "active" },
+        { label: "Replaced", value: "replaced" },
         { label: "Completed", value: "completed" },
         { label: "Cancelled", value: "cancelled" },
       ],
@@ -252,10 +254,14 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
             </div>
           );
         }
+        const isReplaced = r.status === "replaced" || Boolean(r.replaced_by_employee_name);
         return (
           <div className="flex flex-col gap-2 items-start">
-            <Badge variant={STATUS_VARIANT[r.status] ?? "outline"} className="capitalize">
-              {r.status}
+            <Badge
+              variant={isReplaced ? "warning" : (STATUS_VARIANT[r.status] ?? "outline")}
+              className={`capitalize ${isReplaced ? "bg-amber-500/15 text-amber-400 border-amber-500/30" : ""}`}
+            >
+              {isReplaced ? "Replaced" : r.status}
             </Badge>
             {response}
           </div>

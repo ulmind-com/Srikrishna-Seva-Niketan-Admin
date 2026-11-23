@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -547,8 +546,9 @@ export function ReportsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Statuses</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
                       <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="replaced">Replaced</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
                       <SelectItem value="scheduled">Scheduled</SelectItem>
                     </SelectContent>
                   </Select>
@@ -605,7 +605,6 @@ export function ReportsPage() {
                     <TableHead className="text-right">Expense</TableHead>
                     <TableHead className="text-right">Net Profit</TableHead>
                     <TableHead>Duty Status</TableHead>
-                    <TableHead className="text-right">Bill</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -626,7 +625,7 @@ export function ReportsPage() {
                     if (!filtered.length) {
                       return (
                         <TableRow>
-                          <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                          <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                             No duty engagements found for the selected period.
                           </TableCell>
                         </TableRow>
@@ -656,7 +655,7 @@ export function ReportsPage() {
                               <span className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
                                 <Clock className="h-3 w-3" />
                                 {r.shift_label || (r.shift === "full_24h" ? "24 Hours" : r.shift === "day" ? "Day" : r.shift === "night" ? "Night" : r.shift)}
-                                {r.duration_days ? ` · ${r.duration_days} day(s)` : ""}
+                                {r.duration_days != null ? ` · ${r.duration_days} ${r.duration_days === 1 ? "day" : "days"}` : ""}
                               </span>
                             </div>
                           </TableCell>
@@ -728,32 +727,40 @@ export function ReportsPage() {
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-col gap-1 items-start">
-                              <Badge
-                                variant="outline"
-                                className={
-                                  r.status === "completed"
-                                    ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-                                    : r.status === "active"
-                                    ? "bg-primary/10 text-primary border-primary/20"
-                                    : "bg-muted text-muted-foreground"
-                                }
-                              >
-                                {r.status === "completed" ? "✓ Completed" : r.status}
-                              </Badge>
-                              {r.work_completed_at && (
+                              {r.status === "replaced" || r.replaced_by_employee_name ? (
+                                <div className="flex flex-col gap-0.5 items-start">
+                                  <Badge
+                                    variant="outline"
+                                    className="bg-amber-500/10 text-amber-400 border-amber-500/30 gap-1 text-[11px] font-semibold"
+                                  >
+                                    🔄 Replaced
+                                  </Badge>
+                                  {r.replaced_by_employee_name && (
+                                    <span className="text-[10px] text-muted-foreground">
+                                      by {r.replaced_by_employee_name}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <Badge
+                                  variant="outline"
+                                  className={
+                                    r.status === "completed"
+                                      ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                                      : r.status === "active"
+                                      ? "bg-primary/10 text-primary border-primary/20"
+                                      : "bg-muted text-muted-foreground"
+                                  }
+                                >
+                                  {r.status === "completed" ? "✓ Completed" : r.status}
+                                </Badge>
+                              )}
+                              {r.work_completed_at && r.status === "completed" && (
                                 <span className="text-[10px] text-muted-foreground">
                                   Done: {new Date(r.work_completed_at).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short" })}
                                 </span>
                               )}
                             </div>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Link
-                              to={`/assignments/${r.id}/bill?print=1`}
-                              className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                            >
-                              <Receipt className="h-3.5 w-3.5" /> Bill
-                            </Link>
                           </TableCell>
                         </TableRow>
                       );

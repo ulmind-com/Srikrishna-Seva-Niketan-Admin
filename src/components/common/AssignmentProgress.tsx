@@ -19,7 +19,16 @@ export function AssignmentProgress({
   row,
   className = "",
 }: {
-  row: Pick<Assignment, "total_days" | "days_elapsed" | "days_remaining" | "progress_pct" | "end_date">;
+  row: Pick<
+    Assignment,
+    | "total_days"
+    | "days_elapsed"
+    | "days_remaining"
+    | "progress_pct"
+    | "end_date"
+    | "status"
+    | "replaced_by_employee_name"
+  >;
   className?: string;
 }) {
   // Open-ended engagements have no finish line to measure against.
@@ -31,10 +40,13 @@ export function AssignmentProgress({
 
   const { total_days: total, days_remaining: left } = row;
   const pct = row.progress_pct ?? 0;
+  const isReplaced = row.status === "replaced" || Boolean(row.replaced_by_employee_name);
 
   const tone =
     left === 0
-      ? { bar: "bg-muted-foreground/40", text: "text-muted-foreground" }
+      ? isReplaced
+        ? { bar: "bg-amber-500/50", text: "text-amber-400" }
+        : { bar: "bg-muted-foreground/40", text: "text-muted-foreground" }
       : left <= 1
         ? { bar: "bg-danger", text: "text-danger" }
         : left <= 3
@@ -45,7 +57,7 @@ export function AssignmentProgress({
     <div className={`min-w-[132px] ${className}`}>
       <div className="flex items-baseline justify-between gap-2">
         <span className={`text-xs font-medium ${tone.text}`}>
-          {left === 0 ? "Completed" : `${left} day${left === 1 ? "" : "s"} left`}
+          {left === 0 ? (isReplaced ? "Replaced" : "Completed") : `${left} day${left === 1 ? "" : "s"} left`}
         </span>
         <span className="text-[11px] text-muted-foreground">
           {row.days_elapsed ?? 0}/{total}
