@@ -96,6 +96,7 @@ export function AppRoutes() {
           <Route path="/assignments/:id/bill" element={<CustomerBillPage />} />
           <Route path="/attendance" element={<AttendancePage />} />
           <Route path="/monthly-bills" element={<MonthlyBillsPage />} />
+          <Route path="/general-bills" element={<MonthlyBillsPage />} />
           <Route path="/payslips" element={<PayslipPage />} />
           <Route path="/expenses" element={<ExpensesPage />} />
           <Route path="/payments" element={<PaymentsPage />} />

@@ -6,6 +6,7 @@ export interface MonthlyBillLineItem {
   employee_id?: string;
   employee_name?: string;
   employee_code?: string | null;
+  employee_category?: string | null;
   from: string;
   to: string;
   shift: string;
@@ -15,6 +16,11 @@ export interface MonthlyBillLineItem {
   days: number;
   daily_rate: number;
   amount: number;
+  is_ongoing?: boolean;
+  is_replacement?: boolean;
+  replacement_reason?: string | null;
+  replacement_for_employee_name?: string | null;
+  replaced_by_employee_name?: string | null;
 }
 
 export interface MonthlyBillGroup {
@@ -30,6 +36,11 @@ export interface MonthlyBillGroup {
   customer_address?: string | null;
   location_id: string;
   location_name?: string | null;
+  branch_phone?: string | null;
+  branch_city?: string | null;
+  branch_pincode?: string | null;
+  start_date?: string;
+  end_date?: string;
   line_items: MonthlyBillLineItem[];
   total_days: number;
   total_amount: number;
@@ -37,22 +48,40 @@ export interface MonthlyBillGroup {
 }
 
 export interface MonthlyBillsResponse {
-  month: string;
+  month?: string;
+  period?: { start: string; end: string; label: string };
   totals: { bills: number; total_days: number; total_amount: number };
   bills: MonthlyBillGroup[];
 }
 
 export const billingService = {
-  monthly: (month: string, location_id?: string) =>
+  monthly: (
+    month?: string,
+    location_id?: string,
+    start_date?: string,
+    end_date?: string,
+    customer_id?: string
+  ) =>
     http.get<MonthlyBillsResponse>(endpoints.billing.monthly, {
-      month,
-      ...(location_id ? { location_id } : {}),
+      ...(month ? { month } : {}),
+      ...(start_date ? { start_date } : {}),
+      ...(end_date ? { end_date } : {}),
+      ...(location_id && location_id !== "all" ? { location_id } : {}),
+      ...(customer_id && customer_id !== "all" ? { customer_id } : {}),
     }),
 
-  issueMonthly: (month: string, customer_id: string, employee_id?: string) =>
+  issueMonthly: (
+    month: string,
+    customer_id: string,
+    employee_id?: string,
+    start_date?: string,
+    end_date?: string
+  ) =>
     http.post<{ bill_no: number }>(endpoints.billing.issueMonthly, {
       month,
       customer_id,
       employee_id,
+      ...(start_date ? { start_date } : {}),
+      ...(end_date ? { end_date } : {}),
     }),
 };

@@ -1,10 +1,8 @@
-import { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import { toast } from "sonner";
 import {
-  CalendarDays,
-  FileDown,
   FileSpreadsheet,
   Loader2,
   Receipt,
@@ -12,9 +10,11 @@ import {
   ChevronUp,
   UserCheck,
   Stethoscope,
+  Printer,
 } from "lucide-react";
 import { billingService, type MonthlyBillGroup } from "@/services/billing.service";
 import { resourceServices } from "@/services/resources";
+import { settingsService } from "@/services/settings.service";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -34,74 +34,152 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  downloadMonthlyBillsPdf,
-  downloadMonthlyBillsXlsx,
-} from "@/lib/monthly-bill-export";
+import { downloadMonthlyBillsXlsx } from "@/lib/monthly-bill-export";
+import { GeneralBillViewDialog } from "@/components/documents/GeneralBillViewDialog";
+import type { Customer } from "@/types/models";
 
 const rupee = (n?: number | null) => `₹${(n ?? 0).toLocaleString("en-IN")}`;
 
-function currentMonth(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+function toISODate(d: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
+function getCurrentMonthRange(): { start: string; end: string } {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth(), 1);
+  const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return { start: toISODate(first), end: toISODate(last) };
 }
 
 /**
- * Monthly billing — one consolidated bill per customer for a calendar month.
- * If multiple attendants served the client (e.g. staff replacement or shifts),
- * both attendants are itemized under the single client invoice.
+ * General Bill (সাধারণ বিল ও ডিউটি স্টেটমেন্ট) — consolidated customer bills & duty
+ * statements for any selected date range, branch, or customer.
+ * Itemizes all assigned care attendants, shift timings, replacement handovers,
+ * and accurate duty days.
  */
 export function MonthlyBillsPage() {
   const qc = useQueryClient();
-  const [month, setMonth] = useState(currentMonth());
-  const [branch, setBranch] = useState("all");
+  const defaultRange = useMemo(() => getCurrentMonthRange(), []);
+
+  const [startDate, setStartDate] = useState<string>(defaultRange.start);
+  const [endDate, setEndDate] = useState<string>(defaultRange.end);
+  const [branch, setBranch] = useState<string>("all");
+  const [customerId, setCustomerId] = useState<string>("all");
+  const [customerSearch] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const [selectedBill, setSelectedBill] = useState<MonthlyBillGroup | null>(null);
 
+  // Locations / Branches
   const { data: locations } = useQuery({
     queryKey: ["locations", "all"],
     queryFn: () => resourceServices.locations.list({ page_size: 100 }),
     staleTime: 60_000,
   });
 
+  // Customers list for customer dropdown / search
+  const { data: customersData } = useQuery({
+    queryKey: ["customers", "all-list"],
+    queryFn: () => resourceServices.customers.list({ page_size: 150 }),
+    staleTime: 60_000,
+  });
+
+  // Website settings (authorized signature for bill)
+  const { data: settings } = useQuery({
+    queryKey: ["settings", "website"],
+    queryFn: () => settingsService.getWebsite(),
+    staleTime: 300_000,
+  });
+  const authorizedSignatureUrl = settings?.authorized_signature?.url ?? null;
+
+  // Filter customers based on branch and search
+  const allCustomers = customersData?.items ?? [];
+  const filteredCustomerOptions = useMemo(() => {
+    const q = customerSearch.trim().toLowerCase();
+    return allCustomers
+      .filter((c) => (branch === "all" ? true : c.location_id === branch))
+      .filter((c) =>
+        q
+          ? [c.name, c.code, c.phone, c.address]
+              .filter(Boolean)
+              .some((v) => String(v).toLowerCase().includes(q))
+          : true
+      )
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [allCustomers, branch, customerSearch]);
+
+  // Derived month string for legacy compatibility
+  const derivedMonth = startDate.slice(0, 7);
+
+  // Fetch statement bills for selected range, branch, and customer
   const { data, isLoading } = useQuery({
-    queryKey: ["monthly-bills", month, branch],
-    queryFn: () => billingService.monthly(month, branch === "all" ? undefined : branch),
-    enabled: Boolean(month),
+    queryKey: ["general-bills", startDate, endDate, branch, customerId],
+    queryFn: () =>
+      billingService.monthly(
+        derivedMonth,
+        branch === "all" ? undefined : branch,
+        startDate,
+        endDate,
+        customerId === "all" ? undefined : customerId
+      ),
+    enabled: Boolean(startDate && endDate),
   });
 
   const bills = data?.bills ?? [];
   const totals = data?.totals;
 
-  /** Make sure a bill has a number (idempotent), returning the numbered copy. */
+  // Quick Presets
+  const applyPreset = (preset: "this_month" | "last_15" | "last_30" | "last_month") => {
+    const now = new Date();
+    if (preset === "this_month") {
+      const r = getCurrentMonthRange();
+      setStartDate(r.start);
+      setEndDate(r.end);
+    } else if (preset === "last_15") {
+      const past = new Date();
+      past.setDate(past.getDate() - 14);
+      setStartDate(toISODate(past));
+      setEndDate(toISODate(now));
+    } else if (preset === "last_30") {
+      const past = new Date();
+      past.setDate(past.getDate() - 29);
+      setStartDate(toISODate(past));
+      setEndDate(toISODate(now));
+    } else if (preset === "last_month") {
+      const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const last = new Date(now.getFullYear(), now.getMonth(), 0);
+      setStartDate(toISODate(first));
+      setEndDate(toISODate(last));
+    }
+  };
+
+  /** Ensure a bill has a number allocated (idempotent), returning the numbered copy. */
   async function ensureIssued(b: MonthlyBillGroup): Promise<MonthlyBillGroup> {
     if (b.bill_no != null) return b;
-    const res = await billingService.issueMonthly(month, b.customer_id, b.employee_id);
+    const res = await billingService.issueMonthly(
+      derivedMonth,
+      b.customer_id,
+      b.employee_id,
+      startDate,
+      endDate
+    );
     return { ...b, bill_no: res.bill_no };
   }
 
-  async function handleOne(b: MonthlyBillGroup) {
+  /** View & Print single customer bill in the official printed bill pad format. */
+  async function handleViewBill(b: MonthlyBillGroup) {
     setBusy(true);
     try {
       const numbered = await ensureIssued(b);
-      downloadMonthlyBillsPdf(month, [numbered]);
-      qc.invalidateQueries({ queryKey: ["monthly-bills"] });
+      setSelectedBill(numbered);
+      qc.invalidateQueries({ queryKey: ["general-bills"] });
     } catch {
-      toast.error("Could not generate the bill. Try again.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleAll() {
-    if (!bills.length) return;
-    setBusy(true);
-    try {
-      const numbered = await Promise.all(bills.map(ensureIssued));
-      downloadMonthlyBillsPdf(month, numbered);
-      qc.invalidateQueries({ queryKey: ["monthly-bills"] });
-    } catch {
-      toast.error("Could not generate the bills. Try again.");
+      toast.error("Could not allocate bill number. Try again.");
     } finally {
       setBusy(false);
     }
@@ -109,13 +187,13 @@ export function MonthlyBillsPage() {
 
   function handleDownloadExcel() {
     if (!bills.length) {
-      toast.error("No bill records to export for this month");
+      toast.error("No bill records to export for this period");
       return;
     }
     try {
-      downloadMonthlyBillsXlsx(month, bills);
-      toast.success("Monthly bills exported to Excel (.xlsx)");
-    } catch (err) {
+      downloadMonthlyBillsXlsx(derivedMonth, bills);
+      toast.success("General bills exported to Excel (.xlsx)");
+    } catch {
       toast.error("Failed to export Excel file");
     }
   }
@@ -123,14 +201,14 @@ export function MonthlyBillsPage() {
   return (
     <div className="space-y-6">
       <Helmet>
-        <title>Monthly Bills</title>
+        <title>General Bill — Srikrishna Seva Niketan</title>
       </Helmet>
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Monthly Bills</h1>
+          <h1 className="text-2xl font-bold tracking-tight">General Bill (সাধারণ বিল)</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            One consolidated bill per customer for a calendar month — includes all assigned attendants &amp; replacements.
+            Customer billing &amp; duty statement for any custom date range — includes all attendants, replacements, and shift timings.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -138,64 +216,143 @@ export function MonthlyBillsPage() {
             variant="outline"
             onClick={handleDownloadExcel}
             disabled={busy || !bills.length}
-            className="border-emerald-600/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+            className="border-emerald-600/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 h-9 text-xs"
           >
             <FileSpreadsheet className="mr-2 h-4 w-4" />
             Download Excel (.xlsx)
           </Button>
-          <Button onClick={handleAll} disabled={busy || !bills.length}>
-            {busy ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <FileDown className="mr-2 h-4 w-4" />
-            )}
-            Download All (PDF)
+        </div>
+      </div>
+
+      {/* Filter Controls (Bank Statement style) */}
+      <div className="space-y-3 rounded-2xl border border-border bg-card p-4 shadow-xs">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Branch filter */}
+          <div className="space-y-1">
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Branch Office
+            </label>
+            <Select value={branch} onValueChange={setBranch}>
+              <SelectTrigger className="h-9 text-xs">
+                <SelectValue placeholder="All Branches" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Branches</SelectItem>
+                {locations?.items.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>
+                    {b.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Customer filter */}
+          <div className="space-y-1">
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Select Client / Customer
+            </label>
+            <Select value={customerId} onValueChange={setCustomerId}>
+              <SelectTrigger className="h-9 text-xs">
+                <SelectValue placeholder="All Customers" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Customers</SelectItem>
+                {filteredCustomerOptions.map((c: Customer) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name} {c.code ? `(${c.code})` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* From Date */}
+          <div className="space-y-1">
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              From Date
+            </label>
+            <div className="relative">
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="h-9 text-xs"
+              />
+            </div>
+          </div>
+
+          {/* To Date */}
+          <div className="space-y-1">
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              To Date
+            </label>
+            <div className="relative">
+              <Input
+                type="date"
+                value={endDate}
+                min={startDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="h-9 text-xs"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Range Presets */}
+        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-border/40 text-xs">
+          <span className="text-muted-foreground text-[11px] font-medium mr-1">Quick Range:</span>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+            onClick={() => applyPreset("this_month")}
+          >
+            This Month
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+            onClick={() => applyPreset("last_15")}
+          >
+            Last 15 Days
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+            onClick={() => applyPreset("last_30")}
+          >
+            Last 30 Days
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+            onClick={() => applyPreset("last_month")}
+          >
+            Previous Month
           </Button>
         </div>
       </div>
 
-      {/* Controls */}
-      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-card p-4">
-        <div className="flex items-center gap-2">
-          <CalendarDays className="h-4 w-4 text-primary" />
-          <Input
-            type="month"
-            value={month}
-            onChange={(e) => setMonth(e.target.value)}
-            className="h-9 w-44"
-          />
-        </div>
-        <Select value={branch} onValueChange={setBranch}>
-          <SelectTrigger className="h-9 w-56">
-            <SelectValue placeholder="All branches" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All branches</SelectItem>
-            {locations?.items.map((b) => (
-              <SelectItem key={b.id} value={b.id}>
-                {b.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Summary */}
+      {/* Summary Statistics */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <Stat label="Customers Billed" value={String(totals?.bills ?? 0)} />
+        <Stat label="Clients / Invoices" value={String(totals?.bills ?? 0)} />
         <Stat label="Total Duty Days" value={String(totals?.total_days ?? 0)} />
-        <Stat label="Total Revenue Amount" value={rupee(totals?.total_amount)} tone="text-emerald-500" />
+        <Stat label="Total Billable Amount" value={rupee(totals?.total_amount)} tone="text-emerald-500" />
       </div>
 
-      {/* Table */}
-      <div className="rounded-2xl border border-border bg-card overflow-hidden">
+      {/* Bills Table */}
+      <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-xs">
         {isLoading ? (
           <div className="grid h-40 place-items-center">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : bills.length === 0 ? (
           <div className="grid h-40 place-items-center text-sm text-muted-foreground">
-            No billable duty for this month.
+            No billable duty found for the selected period.
           </div>
         ) : (
           <Table>
@@ -218,9 +375,8 @@ export function MonthlyBillsPage() {
                 const hasMultipleStaff = (b.line_items?.length ?? 0) > 1;
 
                 return (
-                  <>
+                  <React.Fragment key={b.key}>
                     <TableRow
-                      key={b.key}
                       className="cursor-pointer hover:bg-muted/40 transition"
                       onClick={() => setExpandedKey(isExpanded ? null : b.key)}
                     >
@@ -285,10 +441,10 @@ export function MonthlyBillsPage() {
                           size="sm"
                           variant="outline"
                           disabled={busy}
-                          onClick={() => handleOne(b)}
-                          className="h-8 gap-1.5"
+                          onClick={() => handleViewBill(b)}
+                          className="h-8 gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
                         >
-                          <Receipt className="h-3.5 w-3.5 text-primary" />
+                          <Receipt className="h-3.5 w-3.5" />
                           <span>Bill PDF</span>
                         </Button>
                       </TableCell>
@@ -299,9 +455,19 @@ export function MonthlyBillsPage() {
                       <TableRow className="bg-muted/20 hover:bg-muted/20">
                         <TableCell colSpan={9} className="p-4 pt-1 pb-4">
                           <div className="rounded-xl border border-border bg-card p-3 shadow-xs space-y-2">
-                            <div className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 uppercase tracking-wide">
-                              <UserCheck className="h-3.5 w-3.5 text-primary" />
-                              Itemized Duty &amp; Staff Breakdown ({b.customer_name})
+                            <div className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
+                              <div className="flex items-center gap-1.5 uppercase tracking-wide">
+                                <UserCheck className="h-3.5 w-3.5 text-primary" />
+                                Itemized Duty &amp; Staff Breakdown ({b.customer_name})
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 text-[11px] gap-1 text-primary hover:underline p-0"
+                                onClick={() => handleViewBill(b)}
+                              >
+                                <Printer className="h-3 w-3" /> Print Pad Format
+                              </Button>
                             </div>
                             <div className="overflow-x-auto">
                               <table className="w-full text-xs">
@@ -309,7 +475,7 @@ export function MonthlyBillsPage() {
                                   <tr className="border-b border-border/70 text-muted-foreground">
                                     <th className="text-left py-1.5 font-semibold">Staff / Attendant</th>
                                     <th className="text-left py-1.5 font-semibold">Shift</th>
-                                    <th className="text-left py-1.5 font-semibold">Duty Span (From → To)</th>
+                                    <th className="text-left py-1.5 font-semibold">Duty Span</th>
                                     <th className="text-center py-1.5 font-semibold">Days</th>
                                     <th className="text-right py-1.5 font-semibold">Daily Rate</th>
                                     <th className="text-right py-1.5 font-semibold">Amount</th>
@@ -350,7 +516,7 @@ export function MonthlyBillsPage() {
                                   ))}
                                   <tr className="bg-muted/40 font-bold border-t border-border">
                                     <td colSpan={3} className="py-2 text-right">
-                                      Total for this month:
+                                      Total for selected period:
                                     </td>
                                     <td className="py-2 text-center">
                                       {b.total_days} days
@@ -367,13 +533,20 @@ export function MonthlyBillsPage() {
                         </TableCell>
                       </TableRow>
                     )}
-                  </>
+                  </React.Fragment>
                 );
               })}
             </TableBody>
           </Table>
         )}
       </div>
+
+      {/* Dedicated Bill Modal in the Official Printed Pad Format */}
+      <GeneralBillViewDialog
+        bill={selectedBill}
+        onClose={() => setSelectedBill(null)}
+        authorizedSignatureUrl={authorizedSignatureUrl}
+      />
     </div>
   );
 }
