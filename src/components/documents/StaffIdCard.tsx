@@ -70,8 +70,8 @@ export function StaffIdCard({
           <p className="font-serif text-[11px] font-bold leading-tight text-[#c0121f]">
             {ORG_DEPARTMENT}
           </p>
-          <p className="font-serif text-[9px] font-semibold leading-tight text-[#111]">
-            {(branchName ?? "Head Office").toUpperCase()}
+          <p className="font-serif text-[8.5px] font-semibold leading-tight text-[#111]">
+            {(branchName ?? "Head Office").toUpperCase()}, 9239701265
           </p>
         </div>
 
@@ -108,7 +108,16 @@ export function StaffIdCard({
           <Row label="D.O.B." value={formatDate(staff.dob)} />
           <Row label="GENDER" value={staff.gender ?? "—"} capitalize />
           <Row label="E-HRMS Code" value={staff.hrms_code ?? staff.code} />
-          <Row label="DESIGNATION" value={staff.designation ?? staff.category} capitalize />
+          <Row
+            label="DESIGNATION"
+            value={
+              staff.designation ??
+              (staff.category === "other" && (staff as any).other_category
+                ? (staff as any).other_category
+                : staff.category)
+            }
+            capitalize
+          />
         </dl>
 
         {/* ---- Signatures ---- */}

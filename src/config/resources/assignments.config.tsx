@@ -265,7 +265,6 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
       required: true,
       section: "Assignment",
       placeholder: "Select staff…",
-      helper: "Staff and customer must belong to the same branch.",
       emptyMessage: "No staff registered yet. Add them in Staff Register first.",
       dynamicOptions: { queryKey: "employee-options", fetch: loadEmployeeOptions },
     },
@@ -327,11 +326,10 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
       required: true,
       defaultValue: "prepaid",
       options: [
-        { label: "Prepaid (অফিসে অগ্রিম পরিশোধিত)", value: "prepaid" },
-        { label: "Postpaid (সার্ভিসের পর স্টাফ ক্যাশ নেবে)", value: "postpaid" },
+        { label: "Prepaid", value: "prepaid" },
+        { label: "Postpaid", value: "postpaid" },
       ],
       section: "Billing",
-      helper: "Prepaid: office already collected. Postpaid: staff member collects cash in hand after service.",
     },
     {
       name: "payment_status",
@@ -341,7 +339,7 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
       options: [
         { label: "Pending (বকেয়া)", value: "pending" },
         { label: "Paid / Received (পরিশোধিত)", value: "paid" },
-        { label: "Collected by Staff (স্টাফ ক্যাশ বুঝে পেয়েছে)", value: "received" },
+        { label: "Collected (ক্যাশ বুঝে পেয়েছে)", value: "received" },
       ],
       section: "Billing",
     },

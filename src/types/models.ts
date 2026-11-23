@@ -96,6 +96,7 @@ export interface Employee extends BaseDoc {
   city?: string | null;
   pincode?: string | null;
   category: string;
+  other_category?: string | null;
   gender?: Gender | null;
   experience?: string | null;
   photo?: ImageAsset | null;
@@ -275,6 +276,7 @@ export interface DeploymentBranch {
     name: string;
     code: string;
     category: string;
+  other_category?: string | null;
     phone?: string | null;
     alt_phone?: string | null;
     address?: string | null;
@@ -296,6 +298,7 @@ export interface DeploymentOverview {
 
 export interface Expense extends BaseDoc {
   category: string;
+  other_category?: string | null;
   amount: number;
   date: string;
   location_id: string;
@@ -527,6 +530,7 @@ export interface StaffMember extends BaseDoc {
   name: string;
   photo?: ImageAsset | null;
   category: string;
+  other_category?: string | null;
   rating: number;
   service_label: string;
   price_7_days?: number | null;

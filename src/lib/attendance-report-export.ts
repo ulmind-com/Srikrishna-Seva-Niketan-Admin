@@ -58,26 +58,30 @@ export function downloadAttendanceReportPdf(slip: Payslip) {
   const marginX = 36;
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const label = monthLabel(slip.period.month);
+
+  const dateRangeLabel =
+    slip.period.start && slip.period.end
+      ? `${slip.period.start} to ${slip.period.end}`
+      : monthLabel(slip.period.month);
 
   // Header banner
   doc.setFillColor(...EMERALD);
   doc.rect(0, 0, pageWidth, 54, "F");
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(16);
+  doc.setFontSize(15);
   doc.setTextColor(255, 255, 255);
-  doc.text("SRIKRISHNA SEVA NIKETAN", marginX, 26);
+  doc.text("SRIKRISHNA SEVA NIKETAN", marginX, 24);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setTextColor(220, 245, 240);
-  doc.text("Monthly Attendance Report", marginX, 40);
+  doc.text("Staff Duty & Attendance Statement Report  ·  Helpdesk: 9239701265", marginX, 40);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
+  doc.setFontSize(10.5);
   doc.setTextColor(255, 255, 255);
-  doc.text(label, pageWidth - marginX, 30, { align: "right" });
+  doc.text(dateRangeLabel, pageWidth - marginX, 32, { align: "right" });
 
   // Staff block
-  let y = 78;
+  let y = 74;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
   doc.setTextColor(...SLATE);
@@ -86,12 +90,12 @@ export function downloadAttendanceReportPdf(slip: Payslip) {
   doc.setFontSize(9);
   doc.setTextColor(...MUTED);
   doc.text(
-    `${slip.employee.code}  ·  ${slip.employee.category}`,
+    `Staff ID: ${slip.employee.code}  ·  Designation: ${slip.employee.category || "Staff"}  ·  Daily Rate: ${rupee(slip.employee.daily_rate)}/day`,
     marginX,
     y + 14
   );
   doc.text(
-    `Generated: ${new Date().toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })}`,
+    `Statement Generated: ${new Date().toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })}`,
     pageWidth - marginX,
     y + 14,
     { align: "right" }
@@ -101,13 +105,12 @@ export function downloadAttendanceReportPdf(slip: Payslip) {
   const s = slip.summary;
   autoTable(doc, {
     startY: y + 26,
-    head: [["Days Worked", "Present (days)", "Shifts Worked", "Absent", "Half", "Off Days", "Gross Pay"]],
+    head: [["Payable Days", "Total Shifts", "Present", "Half Days", "Off / Leave", "Gross Pay"]],
     body: [
       [
-        String(s.worked_days),
-        String(s.present_days),
+        String(s.payable_days ?? s.worked_days),
         String(s.total_shifts ?? s.present_days),
-        String(s.absent_days),
+        String(s.present_days),
         String(s.half_days),
         String((s.off_days ?? 0) + (s.leave_days ?? 0)),
         rupee(s.gross_pay),
@@ -117,8 +120,8 @@ export function downloadAttendanceReportPdf(slip: Payslip) {
     styles: { fontSize: 8.5, cellPadding: 5, halign: "center", textColor: SLATE },
     headStyles: { fillColor: EMERALD, textColor: 255, fontSize: 8, fontStyle: "bold" },
     columnStyles: {
-      3: { textColor: ROSE, fontStyle: "bold" },
-      6: { halign: "right", fontStyle: "bold" },
+      0: { fontStyle: "bold", textColor: EMERALD },
+      5: { halign: "right", fontStyle: "bold" },
     },
     margin: { left: marginX, right: marginX },
   });
@@ -127,44 +130,67 @@ export function downloadAttendanceReportPdf(slip: Payslip) {
 
   if (s.absent_dates.length) {
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
+    doc.setFontSize(8.5);
     doc.setTextColor(...ROSE);
     const text = `Absent on: ${s.absent_dates.join(", ")}`;
     const lines = doc.splitTextToSize(text, pageWidth - marginX * 2);
     doc.text(lines, marginX, startY + 4);
-    startY += lines.length * 11 + 8;
+    startY += lines.length * 11 + 6;
   }
 
   // Day-by-day table
   autoTable(doc, {
     startY,
-    head: [["Date", "Day", "Status", "Shift", "Customer", "Amount"]],
+    head: [["Date", "Day", "Duty Hours / Window", "Duration", "Shift", "Customer / Patient", "Status", "Amount"]],
     body: slip.days.map((d) => {
       const wd = WEEKDAY[new Date(d.date).getDay()];
+      const timing =
+        d.start_time && d.end_time
+          ? `${fmtTime(d.start_time)} – ${fmtTime(d.end_time)}`
+          : d.start_time
+            ? `from ${fmtTime(d.start_time)}`
+            : "—";
+      const dur =
+        d.duration ||
+        (d.status === "half_day"
+          ? "12 hrs"
+          : d.shift === "full_24h"
+            ? "24 hrs"
+            : d.shift
+              ? "12 hrs"
+              : "—");
       return [
         d.date,
         wd,
-        STATUS_LABEL[d.status] ?? d.status,
+        timing,
+        dur,
         shiftText(d),
-        d.customer_name ?? "",
-        d.amount ? rupee(d.amount) : "",
+        d.customer_name ?? "—",
+        STATUS_LABEL[d.status] ?? d.status,
+        d.amount ? rupee(d.amount) : "—",
       ];
     }),
     theme: "striped",
-    styles: { fontSize: 8, cellPadding: 3, textColor: SLATE },
+    styles: { fontSize: 7.5, cellPadding: 3.5, textColor: SLATE },
     headStyles: { fillColor: SLATE, textColor: 255, fontStyle: "bold", fontSize: 8 },
     columnStyles: {
-      0: { cellWidth: 70 },
-      1: { cellWidth: 44 },
-      2: { cellWidth: 70 },
-      5: { halign: "right", cellWidth: 70 },
+      0: { cellWidth: 60 },
+      1: { cellWidth: 35 },
+      2: { cellWidth: 90 },
+      3: { cellWidth: 50 },
+      4: { cellWidth: 50 },
+      6: { cellWidth: 60 },
+      7: { halign: "right", cellWidth: 60 },
     },
-    // Paint absent rows red for instant scanning.
+    // Paint half_day amber and absent rows red
     didParseCell: (data) => {
       if (data.section === "body") {
         const raw = slip.days[data.row.index];
         if (raw && raw.status === "absent") {
           data.cell.styles.textColor = ROSE;
+          data.cell.styles.fontStyle = "bold";
+        } else if (raw && raw.status === "half_day") {
+          data.cell.styles.textColor = [180, 83, 9];
           data.cell.styles.fontStyle = "bold";
         }
       }
@@ -175,7 +201,7 @@ export function downloadAttendanceReportPdf(slip: Payslip) {
       doc.setFont("helvetica", "normal");
       doc.setTextColor(148, 163, 184);
       doc.text(
-        `Page ${data.pageNumber}   |   Shri Krishna Nursing Care Services   |   Confidential`,
+        `Page ${data.pageNumber}   |   Shri Krishna Nursing Care Services (Helpline: 9239701265)   |   Confidential`,
         pageWidth / 2,
         pageHeight - 15,
         { align: "center" }
@@ -183,6 +209,6 @@ export function downloadAttendanceReportPdf(slip: Payslip) {
     },
   });
 
-  const name = `attendance_${slip.employee.name.replace(/\s+/g, "_")}_${slip.period.month}.pdf`;
+  const name = `statement_${slip.employee.name.replace(/\s+/g, "_")}_${slip.period.start}_${slip.period.end}.pdf`;
   doc.save(name);
 }

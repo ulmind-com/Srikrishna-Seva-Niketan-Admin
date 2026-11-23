@@ -76,7 +76,11 @@ export const employeesConfig: ResourceConfig<Employee> = {
     },
     {
       header: "Category",
-      cell: (r) => <Badge variant="secondary" className="capitalize">{r.category}</Badge>,
+      cell: (r) => (
+        <Badge variant="secondary" className="capitalize">
+          {r.category === "other" && r.other_category ? r.other_category : r.category}
+        </Badge>
+      ),
     },
     { header: "Phone", cell: (r) => <span className="text-sm">{r.phone}</span> },
     {
@@ -125,6 +129,14 @@ export const employeesConfig: ResourceConfig<Employee> = {
         { label: "Other", value: "other" },
       ],
       section: "Personal",
+    },
+    {
+      name: "other_category",
+      label: "Specify Other Category / Role",
+      type: "text",
+      placeholder: "e.g. Ward Boy, Cook, Caregiver",
+      section: "Personal",
+      showWhen: { field: "category", in: ["other"] },
     },
     {
       name: "gender",

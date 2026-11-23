@@ -52,6 +52,7 @@ export interface PayslipDay {
   shift: ShiftKind | null;
   start_time?: string | null;
   end_time?: string | null;
+  duration?: string | null;
   shift_windows?: { start?: string | null; end?: string | null }[] | null;
   customer_name?: string | null;
   pay_rate?: number | null;
@@ -140,8 +141,18 @@ export const payrollService = {
   deleteRecord: (id: string) =>
     http.del<{ success: boolean }>(endpoints.payroll.attendanceItem(id)),
 
-  payslip: (employee_id: string, month: string) =>
-    http.get<Payslip>(endpoints.payroll.payslip, { employee_id, month }),
+  payslip: (
+    employee_id: string,
+    month?: string,
+    start_date?: string,
+    end_date?: string,
+  ) =>
+    http.get<Payslip>(endpoints.payroll.payslip, {
+      employee_id,
+      month: month || undefined,
+      start_date: start_date || undefined,
+      end_date: end_date || undefined,
+    }),
 
   payrollRun: (month: string, location_id?: string) =>
     http.get<PayrollRun>(endpoints.payroll.payslips, { month, location_id }),

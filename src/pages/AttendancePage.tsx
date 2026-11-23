@@ -1,18 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
-import { toast } from "sonner";
 import {
   CalendarDays,
-  ChevronLeft,
-  ChevronRight,
   Clock,
+  Download,
   Loader2,
-  Moon,
+  Printer,
   RefreshCw,
-  Save,
   Search,
-  Sun,
+  UserCheck,
   Users,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -20,12 +17,9 @@ import { http } from "@/services/api/http";
 import { endpoints } from "@/services/api/endpoints";
 import {
   payrollService,
-  type AttendanceStatus,
-  type ShiftKind,
+  type PayslipDay,
 } from "@/services/payroll.service";
 import type { Employee, Location } from "@/types/models";
-import { describeError } from "@/services/api/client";
-import { AttendanceReportPanel } from "@/components/attendance/AttendanceReportPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -35,21 +29,54 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { downloadAttendanceReportPdf } from "@/lib/attendance-report-export";
 
-const STATUSES: { key: AttendanceStatus; label: string; cls: string }[] = [
-  { key: "present", label: "Present", cls: "bg-emerald-500 text-white border-emerald-500" },
-  { key: "half_day", label: "Half", cls: "bg-amber-500 text-white border-amber-500" },
-  { key: "absent", label: "Absent", cls: "bg-rose-600 text-white border-rose-600" },
-  { key: "off", label: "Off", cls: "bg-slate-500 text-white border-slate-500" },
-];
+const inr = (n?: number | null) => `₹${(n ?? 0).toLocaleString("en-IN")}`;
 
-const SHIFTS: { key: ShiftKind; label: string; icon: typeof Sun }[] = [
-  { key: "morning", label: "Morning", icon: Sun },
-  { key: "day", label: "Day", icon: Sun },
-  { key: "night", label: "Night", icon: Moon },
-  { key: "full_24h", label: "24h", icon: Clock },
-  { key: "custom", label: "Custom", icon: Clock },
-];
+const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
+  present: {
+    label: "Present",
+    cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800",
+  },
+  half_day: {
+    label: "Half Day",
+    cls: "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-300 dark:border-amber-800",
+  },
+  absent: {
+    label: "Absent",
+    cls: "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300 dark:border-rose-800",
+  },
+  leave: {
+    label: "Off",
+    cls: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-700",
+  },
+  off: {
+    label: "Off",
+    cls: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-700",
+  },
+  unmarked: {
+    label: "—",
+    cls: "bg-muted text-muted-foreground border-transparent",
+  },
+};
+
+const SHIFT_LABEL: Record<string, string> = {
+  morning: "Morning",
+  day: "Day",
+  night: "Night",
+  full_24h: "24 Hours",
+  custom: "Custom",
+};
+
+function fmtTime(t?: string | null): string {
+  if (!t) return "";
+  const [h, m] = t.split(":");
+  const hi = Number(h);
+  const mi = Number(m);
+  if (Number.isNaN(hi) || Number.isNaN(mi)) return t;
+  const suffix = hi < 12 ? "AM" : "PM";
+  return `${hi % 12 || 12}:${String(mi).padStart(2, "0")} ${suffix}`;
+}
 
 function toISODate(d: Date): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -59,378 +86,596 @@ function toISODate(d: Date): string {
     day: "2-digit",
   }).format(d);
 }
-function shiftDate(iso: string, days: number): string {
+
+function formatDateWithDay(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number);
   const dt = new Date(y, m - 1, d);
-  dt.setDate(dt.getDate() + days);
-  return toISODate(dt);
-}
-function prettyDate(iso: string): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString("en-IN", {
+  return dt.toLocaleDateString("en-IN", {
     timeZone: "Asia/Kolkata",
-    weekday: "long",
-    day: "numeric",
-    month: "long",
+    day: "2-digit",
+    month: "short",
     year: "numeric",
+    weekday: "short",
   });
 }
 
-interface Mark {
-  status: AttendanceStatus | null;
-  shift: ShiftKind;
-  rate?: number | null;
+function getCurrentMonthRange(): { start: string; end: string } {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth(), 1);
+  const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return { start: toISODate(first), end: toISODate(last) };
 }
 
-/**
- * The daily attendance register — mark every staff member present / half-day /
- * on-leave / off for a chosen day. Leave and off days earn nothing, so they
- * flow straight through to the monthly payslip as unpaid off-dates.
- *
- * Backend scoping means a branch manager only sees and marks their own staff.
- */
 export function AttendancePage() {
   const { user } = useAuth();
-  const qc = useQueryClient();
-  const today = toISODate(new Date());
-  const [date, setDate] = useState(today);
-  const [branch, setBranch] = useState<string>("all");
-  const [query, setQuery] = useState("");
-  const [marks, setMarks] = useState<Record<string, Mark>>({});
+  const defaultRange = useMemo(() => getCurrentMonthRange(), []);
+
+  const [employeeId, setEmployeeId] = useState<string>("");
+  const [startDate, setStartDate] = useState<string>(defaultRange.start);
+  const [endDate, setEndDate] = useState<string>(defaultRange.end);
+  const [branchFilter, setBranchFilter] = useState<string>("all");
+  const [staffSearch, setStaffSearch] = useState<string>("");
 
   const { data: empData, isLoading: empLoading } = useQuery({
-    queryKey: ["payroll-employees"],
+    queryKey: ["statement-employees"],
     queryFn: () =>
       http.list<Employee>(endpoints.employees.root, {
-        page_size: 100,
+        page_size: 150,
       }),
     staleTime: 60_000,
   });
 
   const { data: locData } = useQuery({
-    queryKey: ["payroll-locations"],
+    queryKey: ["statement-locations"],
     queryFn: () => http.list<Location>(endpoints.locations.root, { page_size: 100 }),
     staleTime: 300_000,
     enabled: !!user?.is_superuser,
   });
 
-  const { data: roster, isFetching: rosterFetching } = useQuery({
-    queryKey: ["attendance-day", date],
-    queryFn: () => payrollService.dayRoster(date),
-    staleTime: 3_000,
-  });
-
-  // Seed local marks from whatever is already recorded for the day.
-  useEffect(() => {
-    const seed: Record<string, Mark> = {};
-    for (const r of roster?.records ?? []) {
-      // A staff member can have several rows that day (two shifts, or an
-      // auto-present row + a manual one). Prefer a payable status so the mark
-      // shows correctly instead of letting the last row win.
-      const existing = seed[r.employee_id];
-      const isPayable = r.status === "present" || r.status === "half_day";
-      const rawStatus = r.status === "leave" ? "off" : r.status;
-      if (!existing || isPayable) {
-        seed[r.employee_id] = { status: rawStatus as AttendanceStatus, shift: r.shift, rate: r.pay_rate };
-      }
-    }
-    setMarks(seed);
-  }, [roster, date]);
-
   const employees = empData?.items ?? [];
   const locations = locData?.items ?? [];
 
-  const visible = useMemo(() => {
-    const q = query.trim().toLowerCase();
+  // Filter staff by branch and search
+  const filteredEmployees = useMemo(() => {
+    const q = staffSearch.trim().toLowerCase();
     return employees
-      .filter((e) => (branch === "all" ? true : e.location_id === branch))
+      .filter((e) => (branchFilter === "all" ? true : e.location_id === branchFilter))
       .filter((e) =>
         q
           ? [e.name, e.code, e.category, e.phone]
               .filter(Boolean)
               .some((v) => String(v).toLowerCase().includes(q))
-          : true,
+          : true
       )
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [employees, branch, query]);
+  }, [employees, branchFilter, staffSearch]);
 
-  // Live counts from the current (unsaved) marks across visible staff.
-  const counts = useMemo(() => {
-    const c: Record<string, number> = { present: 0, half_day: 0, absent: 0, off: 0, unmarked: 0 };
-    for (const e of visible) {
-      const s = marks[e.id]?.status;
-      if (!s) c.unmarked += 1;
-      else if (s === "leave") c.off += 1;
-      else if (s in c) c[s] += 1;
-      else c.off += 1;
+  // If no employee selected and we have staff, default to the first one
+  const selectedEmp = useMemo(() => {
+    if (!employeeId && filteredEmployees.length > 0) {
+      return filteredEmployees[0];
     }
-    return c;
-  }, [visible, marks]);
+    return employees.find((e) => e.id === employeeId);
+  }, [employeeId, filteredEmployees, employees]);
 
-  function setMark(empId: string, patch: Partial<Mark>) {
-    setMarks((prev) => ({
-      ...prev,
-      [empId]: {
-        status: prev[empId]?.status ?? null,
-        shift: prev[empId]?.shift ?? "full_24h",
-        rate: prev[empId]?.rate,
-        ...patch,
-      },
-    }));
-  }
+  const activeEmployeeId = selectedEmp?.id || employeeId;
 
-  function setAll(status: AttendanceStatus) {
-    setMarks((prev) => {
-      const next = { ...prev };
-      for (const e of visible) {
-        next[e.id] = {
-          status,
-          shift: next[e.id]?.shift ?? "full_24h",
-          rate: next[e.id]?.rate,
-        };
-      }
-      return next;
-    });
-  }
-
-  const saveMut = useMutation({
-    mutationFn: () => {
-      const items = visible
-        .filter((e) => marks[e.id]?.status)
-        .map((e) => ({
-          employee_id: e.id,
-          status: marks[e.id].status as AttendanceStatus,
-          shift: marks[e.id].shift,
-        }));
-      if (items.length === 0) return Promise.reject(new Error("Nothing to save — mark at least one staff member."));
-      return payrollService.markBulk(date, items);
-    },
-    onSuccess: (res) => {
-      toast.success(`Saved attendance for ${res.saved} staff`);
-      qc.invalidateQueries({ queryKey: ["attendance-day", date] });
-    },
-    onError: (e) => toast.error(describeError(e)),
+  // Fetch statement data for selected staff member and date range
+  const {
+    data: slip,
+    isLoading: statementLoading,
+    isFetching: statementFetching,
+    refetch,
+  } = useQuery({
+    queryKey: ["attendance-statement", activeEmployeeId, startDate, endDate],
+    queryFn: () => payrollService.payslip(activeEmployeeId, undefined, startDate, endDate),
+    enabled: Boolean(activeEmployeeId && startDate && endDate),
+    staleTime: 5_000,
   });
 
-  const syncMut = useMutation({
-    mutationFn: () => payrollService.syncFromAssignments(date),
-    onSuccess: (res) => {
-      toast.success(`Auto-marked ${res.created} from running duties`);
-      qc.invalidateQueries({ queryKey: ["attendance-day", date] });
-    },
-    onError: (e) => toast.error(describeError(e)),
-  });
+  // Presets
+  const applyPreset = (preset: "this_month" | "last_15" | "last_30" | "last_month") => {
+    const now = new Date();
+    if (preset === "this_month") {
+      const r = getCurrentMonthRange();
+      setStartDate(r.start);
+      setEndDate(r.end);
+    } else if (preset === "last_15") {
+      const past = new Date();
+      past.setDate(past.getDate() - 14);
+      setStartDate(toISODate(past));
+      setEndDate(toISODate(now));
+    } else if (preset === "last_30") {
+      const past = new Date();
+      past.setDate(past.getDate() - 29);
+      setStartDate(toISODate(past));
+      setEndDate(toISODate(now));
+    } else if (preset === "last_month") {
+      const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const last = new Date(now.getFullYear(), now.getMonth(), 0);
+      setStartDate(toISODate(first));
+      setEndDate(toISODate(last));
+    }
+  };
 
-  const [view, setView] = useState<"daily" | "report">("daily");
+  const s = slip?.summary;
+  const daysList = slip?.days ?? [];
+
+  // Printable action
+  const handlePrint = () => {
+    window.print();
+  };
 
   return (
     <div className="space-y-6">
       <Helmet>
-        <title>Attendance</title>
+        <title>Staff Duty & Attendance Statement</title>
       </Helmet>
 
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      {/* Print-only CSS styling */}
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          #printable-duty-statement, #printable-duty-statement * {
+            visibility: visible;
+          }
+          #printable-duty-statement {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            margin: 0;
+            padding: 16px;
+            background: white !important;
+            color: black !important;
+          }
+          .no-print {
+            display: none !important;
+          }
+        }
+      `}</style>
+
+      {/* Header bar */}
+      <div className="flex flex-wrap items-center justify-between gap-4 no-print">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Attendance</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Staff Duty & Attendance Statement</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Mark each staff member present, half-day, absent or off for the day.
-            Off days are unpaid on the payslip.
+            Auto-synced from client assignments. View and print the bank-statement register of duties, timings, and daily payouts.
           </p>
         </div>
-        {view === "daily" && (
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => syncMut.mutate()}
-              disabled={syncMut.isPending}
-            >
-              {syncMut.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="mr-2 h-4 w-4" />
-              )}
-              Auto-fill from duties
-            </Button>
-            <Button onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
-              {saveMut.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="mr-2 h-4 w-4" />
-              )}
-              Save attendance
-            </Button>
-          </div>
-        )}
-      </div>
-
-      {/* Tabs: daily register vs per-staff monthly report */}
-      <div className="flex w-fit gap-1 rounded-xl border border-border bg-card p-1">
-        {([
-          { key: "daily", label: "Mark Attendance" },
-          { key: "report", label: "Monthly Report" },
-        ] as const).map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => setView(t.key)}
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
-              view === t.key
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-muted/50"
-            }`}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetch()}
+            disabled={statementFetching}
+            className="h-9"
           >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {view === "report" ? (
-        <AttendanceReportPanel />
-      ) : (
-        <div className="space-y-6">
-
-      {/* Date bar */}
-      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-card p-3">
-        <Button variant="outline" size="icon" aria-label="Previous day" onClick={() => setDate((d) => shiftDate(d, -1))}>
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <CalendarDays className="h-4 w-4 shrink-0 text-primary" />
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">{prettyDate(date)}</p>
-            {date === today && <p className="text-[11px] text-muted-foreground">Today</p>}
-          </div>
+            <RefreshCw className={`mr-2 h-4 w-4 ${statementFetching ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => slip && downloadAttendanceReportPdf(slip)}
+            disabled={!slip || statementLoading}
+            className="h-9"
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Download PDF
+          </Button>
+          <Button
+            size="sm"
+            onClick={handlePrint}
+            disabled={!slip || statementLoading}
+            className="h-9 bg-primary text-primary-foreground shadow"
+          >
+            <Printer className="mr-2 h-4 w-4" />
+            Print Statement
+          </Button>
         </div>
-        <Input type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} className="w-auto" />
-        {date !== today && (
-          <Button variant="outline" onClick={() => setDate(today)}>Today</Button>
-        )}
-        <Button variant="outline" size="icon" aria-label="Next day" onClick={() => setDate((d) => shiftDate(d, 1))}>
-          <ChevronRight className="h-4 w-4" />
-        </Button>
       </div>
 
-      {/* Summary tiles */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
-        <div className="rounded-2xl border border-border bg-card p-4">
-          <div className="flex items-start justify-between">
+      {/* Filter and Date Range Control Bar */}
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-sm no-print space-y-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          {/* Branch filter for Super Admin */}
+          {user?.is_superuser && locations.length > 0 && (
             <div>
-              <p className="text-sm text-muted-foreground">Staff</p>
-              <p className="mt-1 text-3xl font-bold tracking-tight">{visible.length}</p>
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Branch Office
+              </label>
+              <Select value={branchFilter} onValueChange={setBranchFilter}>
+                <SelectTrigger className="mt-1.5 h-10">
+                  <SelectValue placeholder="All Branches" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Branches</SelectItem>
+                  {locations.map((loc) => (
+                    <SelectItem key={loc.id} value={loc.id}>
+                      {loc.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary">
-              <Users className="h-5 w-5" />
+          )}
+
+          {/* Quick Staff Search */}
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Search Staff
+            </label>
+            <div className="relative mt-1.5">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Type name, ID…"
+                value={staffSearch}
+                onChange={(e) => setStaffSearch(e.target.value)}
+                className="pl-9 h-10"
+              />
+            </div>
+          </div>
+
+          {/* Staff Member Selector */}
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Select Staff Member
+            </label>
+            <Select
+              value={activeEmployeeId}
+              onValueChange={(val) => setEmployeeId(val)}
+              disabled={empLoading}
+            >
+              <SelectTrigger className="mt-1.5 h-10">
+                <SelectValue placeholder="Choose a staff member…" />
+              </SelectTrigger>
+              <SelectContent className="max-h-80">
+                {filteredEmployees.map((emp) => (
+                  <SelectItem key={emp.id} value={emp.id}>
+                    {emp.name} ({emp.code || emp.category})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* From Date */}
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              From Date
+            </label>
+            <div className="relative mt-1.5">
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="h-10"
+              />
+            </div>
+          </div>
+
+          {/* To Date */}
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              To Date
+            </label>
+            <div className="relative mt-1.5">
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="h-10"
+              />
             </div>
           </div>
         </div>
-        {STATUSES.map((s) => (
-          <div key={s.key} className="rounded-2xl border border-border bg-card p-4">
-            <p className="text-sm text-muted-foreground">{s.label}</p>
-            <p className="mt-1 text-3xl font-bold tracking-tight">{counts[s.key]}</p>
-            {s.key === "off" && counts.unmarked > 0 && (
-              <p className="mt-0.5 text-xs text-muted-foreground">{counts.unmarked} unmarked</p>
+
+        {/* Quick Date Presets */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground mr-1">Quick Range:</span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => applyPreset("this_month")}
+              className="h-7 text-xs px-2.5 rounded-lg"
+            >
+              This Month
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => applyPreset("last_15")}
+              className="h-7 text-xs px-2.5 rounded-lg"
+            >
+              Last 15 Days
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => applyPreset("last_30")}
+              className="h-7 text-xs px-2.5 rounded-lg"
+            >
+              Last 30 Days
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => applyPreset("last_month")}
+              className="h-7 text-xs px-2.5 rounded-lg"
+            >
+              Previous Month
+            </Button>
+          </div>
+
+          <div className="text-xs text-muted-foreground">
+            {selectedEmp && (
+              <span>
+                Viewing statement for <strong className="text-foreground">{selectedEmp.name}</strong> ({selectedEmp.code})
+              </span>
             )}
           </div>
-        ))}
-      </div>
-
-      {/* Controls */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative max-w-sm flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search staff…" className="pl-9" />
-        </div>
-        {user?.is_superuser && locations.length > 0 && (
-          <Select value={branch} onValueChange={setBranch}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="All branches" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All branches</SelectItem>
-              {locations.map((l) => (
-                <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-        <div className="flex gap-1">
-          <Button variant="outline" size="sm" onClick={() => setAll("present")}>All present</Button>
-          <Button variant="outline" size="sm" onClick={() => setAll("off")}>All off</Button>
         </div>
       </div>
 
-      {empLoading ? (
-        <div className="grid h-48 place-items-center">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      {/* Main Content Area */}
+      {!activeEmployeeId ? (
+        <div className="grid h-64 place-items-center rounded-2xl border border-dashed border-border bg-card/50 text-center">
+          <div className="max-w-sm space-y-2 p-6">
+            <Users className="mx-auto h-10 w-10 text-muted-foreground/60" />
+            <h3 className="font-semibold text-foreground">Select a Staff Member</h3>
+            <p className="text-xs text-muted-foreground">
+              Choose a staff member and date range above to generate their bank-statement duty and payment record.
+            </p>
+          </div>
         </div>
-      ) : (
-        <div className={`overflow-hidden rounded-2xl border border-border bg-card ${rosterFetching ? "opacity-70" : ""}`}>
-          <div className="divide-y divide-border">
-            {visible.map((e) => {
-              const m = marks[e.id];
-              const needsShift = m?.status === "present" || m?.status === "half_day";
-              const empRecord = roster?.records?.find((r) => r.employee_id === e.id && r.customer_name);
-              return (
-                <div key={e.id} className="flex flex-wrap items-center gap-3 p-3">
-                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-muted text-xs font-semibold text-muted-foreground">
-                    {e.name.charAt(0)}
-                  </div>
-                  <div className="min-w-[150px] flex-1">
-                    <p className="text-sm font-medium">{e.name}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {e.category}
-                      {e.daily_rate ? ` · ₹${e.daily_rate}/day` : " · no rate set"}
-                    </p>
-                    {empRecord?.customer_name && (
-                      <p className="text-[11px] font-medium text-emerald-500 flex items-center gap-1 mt-0.5">
-                        <span>Patient: {empRecord.customer_name}</span>
-                        {empRecord.start_time && empRecord.end_time && (
-                          <span className="text-muted-foreground">({empRecord.start_time} - {empRecord.end_time})</span>
-                        )}
-                      </p>
-                    )}
-                  </div>
+      ) : statementLoading ? (
+        <div className="grid h-64 place-items-center rounded-2xl border border-border bg-card">
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm font-medium text-muted-foreground">Generating Statement Report…</p>
+          </div>
+        </div>
+      ) : slip ? (
+        <div id="printable-duty-statement" className="space-y-6">
+          {/* Statement Printable Letterhead Header */}
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border/80 pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-bold tracking-tight text-primary">
+                    SRIKRISHNA SEVA NIKETAN
+                  </h2>
+                  <span className="rounded bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+                    DUTY STATEMENT
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Nursing, Ayah & Attendant Care Services  ·  Helpline: <strong className="text-foreground">9239701265</strong>
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground">Statement Period</p>
+                <p className="text-sm font-bold text-foreground">
+                  {slip.period.start} to {slip.period.end}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Span: {slip.period.days_in_month} Days
+                </p>
+              </div>
+            </div>
 
-                  <div className="flex gap-1">
-                    {STATUSES.map((s) => (
-                      <button
-                        key={s.key}
-                        type="button"
-                        onClick={() => setMark(e.id, { status: s.key })}
-                        className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition ${
-                          m?.status === s.key ? s.cls : "border-border bg-background hover:bg-muted/50"
+            {/* Staff Info Banner */}
+            <div className="grid grid-cols-2 gap-4 pt-4 sm:grid-cols-4">
+              <div>
+                <p className="text-xs text-muted-foreground">Staff Name</p>
+                <p className="text-sm font-bold text-foreground">{slip.employee.name}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Staff ID / Code</p>
+                <p className="text-sm font-semibold text-foreground">{slip.employee.code || "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Designation / Role</p>
+                <p className="text-sm font-semibold capitalize text-foreground">
+                  {slip.employee.category || "Care Staff"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Daily Pay Rate</p>
+                <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                  {inr(slip.employee.daily_rate)} / day
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Executive KPI Summary Cards */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium text-muted-foreground">Payable Days</p>
+                <CalendarDays className="h-4 w-4 text-emerald-500" />
+              </div>
+              <p className="mt-2 text-2xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
+                {s?.payable_days ?? s?.worked_days ?? 0}
+                <span className="ml-1 text-xs font-normal text-muted-foreground">days</span>
+              </p>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                {s?.present_days ?? 0} full + {s?.half_days ?? 0} half days
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium text-muted-foreground">Total Shifts Worked</p>
+                <Clock className="h-4 w-4 text-primary" />
+              </div>
+              <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">
+                {s?.total_shifts ?? s?.present_days ?? 0}
+                <span className="ml-1 text-xs font-normal text-muted-foreground">shifts</span>
+              </p>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Across {s?.worked_days ?? 0} worked dates
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium text-muted-foreground">Off / Leave Days</p>
+                <Users className="h-4 w-4 text-slate-500" />
+              </div>
+              <p className="mt-2 text-2xl font-bold tracking-tight text-slate-700 dark:text-slate-300">
+                {(s?.off_days ?? 0) + (s?.leave_days ?? 0)}
+                <span className="ml-1 text-xs font-normal text-muted-foreground">days</span>
+              </p>
+              <p className="mt-1 text-[11px] text-muted-foreground">Unpaid days</p>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium text-muted-foreground">Gross Payout</p>
+                <UserCheck className="h-4 w-4 text-primary" />
+              </div>
+              <p className="mt-2 text-2xl font-bold tracking-tight text-primary">
+                {inr(s?.gross_pay)}
+              </p>
+              <p className="mt-1 text-[11px] text-muted-foreground">Total payable amount</p>
+            </div>
+          </div>
+
+          {/* Bank-Statement Style Duty Register Table */}
+          <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+            <div className="border-b border-border/80 bg-muted/40 px-4 py-3">
+              <h3 className="text-sm font-semibold tracking-wide text-foreground">
+                Daily Duty & Payout Ledger
+              </h3>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-border/80 bg-muted/20 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    <th className="py-3 pl-4 pr-2 w-12 text-center">#</th>
+                    <th className="py-3 px-3">Date & Day</th>
+                    <th className="py-3 px-3">Duty Hours / Window</th>
+                    <th className="py-3 px-3">Duration</th>
+                    <th className="py-3 px-3">Shift Type</th>
+                    <th className="py-3 px-3">Customer / Patient</th>
+                    <th className="py-3 px-3 text-center">Status</th>
+                    <th className="py-3 pl-3 pr-4 text-right">Pay Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {daysList.map((d: PayslipDay, index: number) => {
+                    const statusInfo = STATUS_BADGE[d.status] || STATUS_BADGE.unmarked;
+                    const shiftName = d.shift ? (SHIFT_LABEL[d.shift] || d.shift) : "—";
+                    const dutyTiming =
+                      d.start_time && d.end_time
+                        ? `${fmtTime(d.start_time)} – ${fmtTime(d.end_time)}`
+                        : d.start_time
+                          ? `from ${fmtTime(d.start_time)}`
+                          : "—";
+
+                    const dur =
+                      d.duration ||
+                      (d.status === "half_day"
+                        ? "12 hrs"
+                        : d.shift === "full_24h"
+                          ? "24 hrs"
+                          : d.shift
+                            ? "12 hrs"
+                            : "—");
+
+                    const isPayable = d.status === "present" || d.status === "half_day";
+
+                    return (
+                      <tr
+                        key={`${d.date}-${index}`}
+                        className={`transition hover:bg-muted/30 ${
+                          d.status === "half_day" ? "bg-amber-500/5" : ""
                         }`}
                       >
-                        {s.label}
-                      </button>
-                    ))}
-                  </div>
+                        <td className="py-3 pl-4 pr-2 text-center text-xs text-muted-foreground font-mono">
+                          {index + 1}
+                        </td>
+                        <td className="py-3 px-3 font-medium text-foreground whitespace-nowrap">
+                          {formatDateWithDay(d.date)}
+                        </td>
+                        <td className="py-3 px-3 text-xs text-foreground whitespace-nowrap font-mono">
+                          {dutyTiming}
+                        </td>
+                        <td className="py-3 px-3 text-xs whitespace-nowrap">
+                          <span className="rounded bg-muted px-2 py-0.5 font-medium text-foreground">
+                            {dur}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-xs text-foreground whitespace-nowrap">
+                          {shiftName}
+                        </td>
+                        <td className="py-3 px-3 text-sm text-foreground">
+                          {d.customer_name ? (
+                            <span className="font-semibold text-primary">{d.customer_name}</span>
+                          ) : (
+                            <span className="text-muted-foreground italic">No duty assigned</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-3 text-center whitespace-nowrap">
+                          <span
+                            className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusInfo.cls}`}
+                          >
+                            {statusInfo.label}
+                          </span>
+                        </td>
+                        <td className="py-3 pl-3 pr-4 text-right whitespace-nowrap font-semibold">
+                          {isPayable && d.amount > 0 ? (
+                            <span className="text-emerald-600 dark:text-emerald-400 font-mono">
+                              {inr(d.amount)}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground font-mono text-xs">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                {/* Statement Summary Table Footer */}
+                <tfoot>
+                  <tr className="border-t-2 border-border bg-muted/40 font-bold text-foreground">
+                    <td colSpan={3} className="py-3.5 pl-4 pr-2 text-sm">
+                      Total Payable Duties: {s?.payable_days ?? s?.worked_days ?? 0} Days ({s?.total_shifts ?? s?.present_days ?? 0} Shifts)
+                    </td>
+                    <td colSpan={4} className="py-3.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">
+                      Net Total Gross Pay:
+                    </td>
+                    <td className="py-3.5 pl-3 pr-4 text-right text-base text-primary font-mono font-bold">
+                      {inr(s?.gross_pay)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
 
-                  <div className="w-[120px]">
-                    {needsShift ? (
-                      <Select value={m?.shift ?? "full_24h"} onValueChange={(v) => setMark(e.id, { shift: v as ShiftKind })}>
-                        <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {SHIFTS.map((sh) => (
-                            <SelectItem key={sh.key} value={sh.key}>{sh.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-            {visible.length === 0 && (
-              <div className="p-8 text-center text-sm text-muted-foreground">No staff match.</div>
-            )}
+            {/* Statement footer note */}
+            <div className="border-t border-border/80 bg-muted/20 p-4 text-xs text-muted-foreground flex flex-wrap items-center justify-between gap-2">
+              <p>
+                Certified official duty statement issued by Shri Krishna Nursing Care Services. For discrepancies, contact branch operations at 9239701265.
+              </p>
+              <p className="font-mono text-[11px]">
+                Authorized Signatory: _________________________
+              </p>
+            </div>
           </div>
         </div>
-      )}
-        </div>
-      )}
+      ) : null}
     </div>
   );
 }
