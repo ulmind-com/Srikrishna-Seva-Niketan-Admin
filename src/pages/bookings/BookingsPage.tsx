@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import { motion } from "framer-motion";
-import { CalendarCheck, CheckCircle2, Download, Eye, UserCheck } from "lucide-react";
+import { CalendarCheck, CheckCircle2, Download, Eye, UserCheck, UserPlus, Contact, Loader2 } from "lucide-react";
 import { VerifiedBadge } from "@/components/common/VerifiedBadge";
 import { toast } from "sonner";
 import type { ListParams } from "@/types/api";
@@ -50,6 +51,7 @@ const STATUS_FILTERS: { label: string; value: string }[] = [
 
 export function BookingsPage() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const { hasPermission } = useAuth();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -58,6 +60,26 @@ export function BookingsPage() {
   const [selected, setSelected] = useState<Booking | null>(null);
   const [assigningBooking, setAssigningBooking] = useState<Booking | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [convertingId, setConvertingId] = useState<string | null>(null);
+
+  const convertMutation = useMutation({
+    mutationFn: (bookingId: string) => {
+      setConvertingId(bookingId);
+      return bookingService.convertToCustomer(bookingId);
+    },
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["bookings"] });
+      qc.invalidateQueries({ queryKey: ["customers"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      toast.success(`✓ কাস্টমারে সফলভাবে যুক্ত হয়েছে: ${res.customer.name} (${res.customer.code})`);
+      setConvertingId(null);
+      navigate(`/customers?edit=${res.customer.id}`);
+    },
+    onError: (err) => {
+      setConvertingId(null);
+      toast.error(normalizeError(err).message);
+    },
+  });
 
   const completeMutation = useMutation({
     mutationFn: (id: string) => bookingService.changeStatus(id, "completed"),
@@ -193,6 +215,20 @@ export function BookingsPage() {
                   <TableCell>
                     <p className="font-medium">{b.patient_name}</p>
                     <p className="text-xs text-muted-foreground">{b.contact_phone}</p>
+                    {b.customer_id && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/customers?edit=${b.customer_id}`);
+                        }}
+                        className="mt-1 inline-flex items-center gap-1 rounded bg-purple-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-purple-400 border border-purple-500/30 hover:bg-purple-500/25 transition-colors"
+                        title="View / Edit Customer in Customers register"
+                      >
+                        <Contact className="h-3 w-3" />
+                        <span>Customer Linked</span>
+                      </button>
+                    )}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {b.service_name}
@@ -251,6 +287,35 @@ export function BookingsPage() {
                       className="flex items-center justify-end gap-2"
                       onClick={(e) => e.stopPropagation()}
                     >
+                      {!b.customer_id ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 gap-1.5 border-purple-500/40 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 hover:text-purple-300 text-xs font-semibold shadow-xs"
+                          onClick={() => convertMutation.mutate(b.id)}
+                          disabled={convertMutation.isPending && convertingId === b.id}
+                          title="Add this booking into Customers database"
+                        >
+                          {convertMutation.isPending && convertingId === b.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <UserPlus className="h-3.5 w-3.5 text-purple-400" />
+                          )}
+                          <span>Add to Customer</span>
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 gap-1.5 border-purple-500/30 bg-purple-500/5 text-purple-400 hover:bg-purple-500/15 text-xs font-medium shadow-xs"
+                          onClick={() => navigate(`/customers?edit=${b.customer_id}`)}
+                          title="Open customer profile to edit or view details"
+                        >
+                          <Contact className="h-3.5 w-3.5 text-purple-400" />
+                          <span>Edit Customer</span>
+                        </Button>
+                      )}
+
                       {(b.status === "assigned" || b.status === "in_progress") && (
                         <Button
                           variant="outline"

@@ -19,6 +19,7 @@ import {
   MessageSquare,
   ClipboardList,
   CreditCard,
+  Contact,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Booking, BookingStatus } from "@/types/models";
@@ -122,6 +123,17 @@ export function BookingDrawer({ booking, onClose, onAssignDuty }: Props) {
     onSuccess: (_, newStatus) => {
       invalidate();
       toast.success(`Booking status changed to ${humanize(newStatus)}`);
+    },
+    onError: (err) => toast.error(normalizeError(err).message),
+  });
+
+  const convertToCustomerMutation = useMutation({
+    mutationFn: () => bookingService.convertToCustomer(booking!.id),
+    onSuccess: (res) => {
+      invalidate();
+      toast.success(`✓ কাস্টমারে সফলভাবে যুক্ত হয়েছে: ${res.customer.name} (${res.customer.code})`);
+      onClose();
+      navigate(`/customers?edit=${res.customer.id}`);
     },
     onError: (err) => toast.error(normalizeError(err).message),
   });
@@ -297,6 +309,55 @@ export function BookingDrawer({ booking, onClose, onAssignDuty }: Props) {
                   </div>
                 )}
               </section>
+
+              {/* Customer Conversion Quick Action */}
+              {canUpdate && (
+                <div className="rounded-xl border border-purple-500/30 bg-purple-500/5 p-4 shadow-sm">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex items-start gap-2.5">
+                      <div className="mt-0.5 rounded-lg bg-purple-500/20 p-1.5 text-purple-400">
+                        {booking.customer_id ? <Contact className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-purple-300">
+                          {booking.customer_id
+                            ? "Customer Profile Linked (কাস্টমার রেজিস্টার্ড)"
+                            : "Add to Customer (কাস্টমারে যোগ করুন)"}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {booking.customer_id
+                            ? "This patient is registered in Customers. Click to view or edit profile."
+                            : "Save this website booking into Customers and open edit profile."}
+                        </p>
+                      </div>
+                    </div>
+                    {booking.customer_id ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-purple-500/40 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20 gap-1.5 shrink-0"
+                        onClick={() => {
+                          onClose();
+                          navigate(`/customers?edit=${booking.customer_id}`);
+                        }}
+                      >
+                        <Contact className="h-3.5 w-3.5" />
+                        Edit Customer
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        className="bg-purple-600 hover:bg-purple-500 text-white gap-1.5 shrink-0 shadow-sm"
+                        onClick={() => convertToCustomerMutation.mutate()}
+                        loading={convertToCustomerMutation.isPending}
+                      >
+                        <UserPlus className="h-3.5 w-3.5" />
+                        Add to Customer
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Customer Conversion & Duty Assignment Quick Action */}
               {canUpdate && (

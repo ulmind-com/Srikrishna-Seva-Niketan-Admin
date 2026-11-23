@@ -66,14 +66,14 @@ export function ResourceView<T extends { id: string }>({
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [search, setSearch] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [search, setSearch] = useState(() => searchParams.get("search") || "");
   const [filters, setFilters] = useState<Record<string, string>>(
     config.defaultFilters ?? {},
   );
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<T | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<T | null>(null);
-  const [searchParams] = useSearchParams();
 
   const canCreate = hasPermission(`${config.permission}:create`);
   const canUpdate = hasPermission(`${config.permission}:update`);
@@ -143,8 +143,7 @@ export function ResourceView<T extends { id: string }>({
         qc.invalidateQueries({ queryKey: ["staff-portal"] });
       }
       toast.success(editing ? `${config.name} updated` : `${config.name} created`);
-      setSheetOpen(false);
-      setEditing(null);
+      handleSheetOpenChange(false);
     },
     onError: (err) => toast.error(normalizeError(err).message),
   });
@@ -168,6 +167,42 @@ export function ResourceView<T extends { id: string }>({
   const items = listQuery.data?.items ?? [];
   const meta = listQuery.data?.pagination;
   const colCount = config.columns.length + (canUpdate || canDelete ? 1 : 0);
+
+  const editId = searchParams.get("edit") || searchParams.get("id");
+
+  useEffect(() => {
+    if (!editId) return;
+    if (editing && (editing as any).id === editId) return;
+    const found = items.find((it) => (it as any).id === editId);
+    if (found) {
+      setEditing(found);
+      setSheetOpen(true);
+    } else if (config.service?.get) {
+      config.service
+        .get(editId)
+        .then((res) => {
+          if (res) {
+            setEditing(res);
+            setSheetOpen(true);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [editId, items, config.service, editing]);
+
+  const handleSheetOpenChange = (open: boolean) => {
+    setSheetOpen(open);
+    if (!open) {
+      setEditing(null);
+      if (searchParams.get("edit") || searchParams.get("id") || searchParams.get("action")) {
+        const next = new URLSearchParams(searchParams);
+        next.delete("edit");
+        next.delete("id");
+        next.delete("action");
+        setSearchParams(next, { replace: true });
+      }
+    }
+  };
 
   const openCreate = () => {
     setEditing(null);
@@ -369,7 +404,7 @@ export function ResourceView<T extends { id: string }>({
       </Card>
 
       {/* Create / Edit drawer */}
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+      <Sheet open={sheetOpen} onOpenChange={handleSheetOpenChange}>
         <SheetContent className={sheetWidth}>
           <SheetHeader>
             <SheetTitle>
@@ -387,7 +422,7 @@ export function ResourceView<T extends { id: string }>({
               fields={config.fields}
               initial={prefillInitial}
               submitting={saveMutation.isPending}
-              onCancel={() => setSheetOpen(false)}
+              onCancel={() => handleSheetOpenChange(false)}
               onSubmit={(values) => saveMutation.mutate(values)}
               submitLabel={editing ? "Save changes" : `Create ${config.name}`}
             />
