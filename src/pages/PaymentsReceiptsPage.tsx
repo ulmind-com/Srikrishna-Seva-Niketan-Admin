@@ -12,9 +12,7 @@ import {
   Clock,
   CreditCard,
   Download,
-  FileText,
   History,
-  IndianRupee,
   Loader2,
   Plus,
   Receipt,
@@ -449,34 +447,66 @@ export function PaymentsReceiptsPage() {
             </Select>
           )}
 
-          {can("payments:create") && activeTab === "client" && (
-            <Button
-              size="sm"
-              onClick={() => {
-                setQuickCustId(
-                  filteredClients[0]?.customer_id || allCustomers[0]?.id || ""
-                );
-                setQuickClientOpen(true);
-              }}
-            >
-              <Plus className="mr-1.5 h-4 w-4" /> New Client Payment
-            </Button>
-          )}
-
-          {can("payments:create") && activeTab === "staff" && (
-            <Button
-              size="sm"
-              onClick={() => {
-                setQuickEmpId(
-                  filteredStaff[0]?.employee_id || allVerifiedStaff[0]?.id || ""
-                );
-                setQuickStaffOpen(true);
-              }}
-            >
-              <Plus className="mr-1.5 h-4 w-4" /> Pay Staff Salary
-            </Button>
+          {can("payments:create") && (
+            <>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setQuickCustId(
+                    filteredClients[0]?.customer_id || allCustomers[0]?.id || ""
+                  );
+                  setQuickClientOpen(true);
+                }}
+              >
+                <Plus className="mr-1.5 h-4 w-4" /> Receive Payment
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setQuickEmpId(
+                    filteredStaff[0]?.employee_id || allVerifiedStaff[0]?.id || ""
+                  );
+                  setQuickStaffOpen(true);
+                }}
+              >
+                <Plus className="mr-1.5 h-4 w-4" /> Pay Staff
+              </Button>
+            </>
           )}
         </div>
+      </div>
+
+      {/* Unified Client Collection + Staff Payout Control Dashboard */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiCard
+          title="Client Received (আদায় হয়েছে)"
+          value={inr(cSum?.total_received)}
+          subtitle={`Billed ${inr(cSum?.total_billed)} · ${(cSum?.collection_rate_pct ?? 0).toFixed(1)}% collected`}
+          tone="text-emerald-500"
+          icon={<Banknote className="h-5 w-5 text-emerald-500" />}
+        />
+        <KpiCard
+          title="Client Remaining (কাস্টমার বাকি)"
+          value={inr(cSum?.total_outstanding)}
+          subtitle={`${cSum?.paid_clients ?? 0} paid · ${cSum?.partial_clients ?? 0} partial · ${cSum?.unpaid_clients ?? 0} unpaid`}
+          tone="text-rose-500"
+          icon={<Clock className="h-5 w-5 text-rose-500" />}
+        />
+        <KpiCard
+          title={`Staff Paid (${monthLabelIST(staffMonth)})`}
+          value={inr(sSum?.total_paid)}
+          subtitle={`Total Salary Due: ${inr(sSum?.total_salary_due)}`}
+          tone="text-indigo-400"
+          icon={<CreditCard className="h-5 w-5 text-indigo-400" />}
+        />
+        <KpiCard
+          title="Staff Remaining (স্টাফ বাকি)"
+          value={inr(sSum?.total_remaining)}
+          subtitle={`${sSum?.paid_staff ?? 0} paid · ${sSum?.partial_staff ?? 0} partial · ${sSum?.unpaid_staff ?? 0} unpaid`}
+          tone="text-amber-500"
+          icon={<Wallet className="h-5 w-5 text-amber-500" />}
+        />
       </div>
 
       {/* Tabs */}
@@ -495,35 +525,6 @@ export function PaymentsReceiptsPage() {
 
         {/* ================= TAB 1: CLIENT RECEIPTS ================= */}
         <TabsContent value="client" className="mt-5 space-y-5">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <KpiCard
-              title="Total Billed (Invoiced)"
-              value={inr(cSum?.total_billed)}
-              subtitle={`${cSum?.client_count ?? 0} clients billed`}
-              icon={<FileText className="h-5 w-5 text-sky-500" />}
-            />
-            <KpiCard
-              title="Actual Cash Received"
-              value={inr(cSum?.total_received)}
-              subtitle={`${cSum?.paid_clients ?? 0} paid · ${cSum?.partial_clients ?? 0} partial`}
-              tone="text-emerald-500"
-              icon={<Banknote className="h-5 w-5 text-emerald-500" />}
-            />
-            <KpiCard
-              title="Outstanding Receivable"
-              value={inr(cSum?.total_outstanding)}
-              subtitle={`${cSum?.unpaid_clients ?? 0} unpaid clients`}
-              tone="text-rose-500"
-              icon={<Clock className="h-5 w-5 text-rose-500" />}
-            />
-            <KpiCard
-              title="Collection Rate"
-              value={`${(cSum?.collection_rate_pct ?? 0).toFixed(1)}%`}
-              subtitle="Received vs Total Billed"
-              tone="text-primary"
-              icon={<IndianRupee className="h-5 w-5 text-primary" />}
-            />
-          </div>
 
           <div className="overflow-hidden rounded-2xl border border-border bg-card">
             <div className="overflow-x-auto">
@@ -774,40 +775,6 @@ export function PaymentsReceiptsPage() {
 
         {/* ================= TAB 2: STAFF PAYMENTS ================= */}
         <TabsContent value="staff" className="mt-5 space-y-5">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <KpiCard
-              title={`Total Salary Due (${monthLabelIST(staffMonth)})`}
-              value={inr(sSum?.total_salary_due)}
-              subtitle={`${sSum?.staff_count ?? 0} staff members`}
-              icon={<Wallet className="h-5 w-5 text-sky-500" />}
-            />
-            <KpiCard
-              title="Salary Paid"
-              value={inr(sSum?.total_paid)}
-              subtitle={`${sSum?.paid_staff ?? 0} fully paid · ${sSum?.partial_staff ?? 0} partial`}
-              tone="text-emerald-500"
-              icon={<CheckCircle2 className="h-5 w-5 text-emerald-500" />}
-            />
-            <KpiCard
-              title="Balance Salary Payable"
-              value={inr(sSum?.total_remaining)}
-              subtitle={`${sSum?.unpaid_staff ?? 0} unpaid`}
-              tone="text-rose-500"
-              icon={<Clock className="h-5 w-5 text-rose-500" />}
-            />
-            <KpiCard
-              title="Disbursement Progress"
-              value={
-                sSum && sSum.total_salary_due > 0
-                  ? `${Math.min(100, Math.round((sSum.total_paid / sSum.total_salary_due) * 100))}%`
-                  : "0%"
-              }
-              subtitle="Paid vs Earned"
-              tone="text-primary"
-              icon={<CreditCard className="h-5 w-5 text-primary" />}
-            />
-          </div>
-
           <div className="overflow-hidden rounded-2xl border border-border bg-card">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">

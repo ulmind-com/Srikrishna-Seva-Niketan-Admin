@@ -33,7 +33,6 @@ import {
   Wallet,
   Receipt,
   BarChart3,
-  History,
   type LucideIcon,
 } from "lucide-react";
 
@@ -68,17 +67,15 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Assignments", to: "/assignments", icon: CalendarClock, permission: "assignments:view" },
       { label: "Staff Deployment", to: "/staff-deployment", icon: Activity, permission: "assignments:view" },
       { label: "Payslips", to: "/payslips", icon: Receipt, permission: "payroll:view" },
+      { label: "General Bill", to: "/monthly-bills", icon: FileText, permission: "assignments:view" },
+      { label: "Expenses", to: "/expenses", icon: Wallet, permission: "expenses:view" },
+      { label: "Reports", to: "/reports", icon: BarChart3, permission: "reports:view" },
     ],
   },
   {
     title: "Payments & Receipts",
     items: [
-      { label: "Client Receipts", to: "/payments?tab=client", icon: Receipt, permission: "payments:view" },
-      { label: "Staff Payments", to: "/payments?tab=staff", icon: Users, permission: "payments:view" },
-      { label: "Payment History", to: "/payments?tab=history", icon: History, permission: "payments:view" },
-      { label: "General Bill", to: "/monthly-bills", icon: FileText, permission: "assignments:view" },
-      { label: "Expenses", to: "/expenses", icon: Wallet, permission: "expenses:view" },
-      { label: "Reports", to: "/reports", icon: BarChart3, permission: "reports:view" },
+      { label: "Payments & Receipts", to: "/payments", icon: Wallet, permission: "payments:view" },
     ],
   },
   {
