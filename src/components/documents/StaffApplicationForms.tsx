@@ -21,6 +21,9 @@ export function ApplicationFormI({
   staff: Employee;
   branchName?: string;
 }) {
+  const effectiveJoinDate =
+    staff.join_date ?? staff.created_at ?? staff.verified_at ?? staff.submitted_at;
+
   return (
     <Sheet>
       <Letterhead
@@ -136,8 +139,8 @@ export function ApplicationFormI({
       <div className="mt-3 flex items-end justify-between gap-8">
         <div className="text-[8px] text-slate-600">
           <p>
-            <span className="font-semibold">Date (তারিখ):</span>{" "}
-            {formatDate(staff.verified_at ?? staff.submitted_at ?? new Date().toISOString())}
+            <span className="font-semibold">Date of Joining / Date (যোগদানের তারিখ):</span>{" "}
+            {formatDate(effectiveJoinDate)}
           </p>
           <p className="mt-0.5">
             <span className="font-semibold">Place (স্থান):</span> {staff.city || "—"}
@@ -163,8 +166,13 @@ export function ApplicationFormI({
           For office use only (শুধুমাত্র অফিসের ব্যবহারের জন্য)
         </p>
         <div className="mt-1.5 grid grid-cols-3 gap-3">
-          <Field label="Verified On (যাচাইয়ের তারিখ)" value={formatDate(staff.verified_at)} />
-          <Field label="Submitted On (জমার তারিখ)" value={formatDate(staff.submitted_at)} />
+          <Field label="Date of Joining (যোগদানের তারিখ)" value={formatDate(effectiveJoinDate)} />
+          <Field
+            label="Verified On (যাচাইয়ের তারিখ)"
+            value={formatDate(
+              staff.verified_at ?? (staff.verification_status === "verified" ? effectiveJoinDate : null)
+            )}
+          />
           <Field label="Status (অবস্থা)" value={staff.verification_status} capitalize />
         </div>
         <div className="mt-4 flex justify-end">

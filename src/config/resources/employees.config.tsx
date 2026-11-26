@@ -179,7 +179,13 @@ export const employeesConfig: ResourceConfig<Employee> = {
       section: "Employment",
     },
     { name: "daily_rate", label: "Daily Rate / Payout (₹)", type: "number", min: 0, section: "Employment" },
-    { name: "join_date", label: "Join Date", type: "date", section: "Employment" },
+    {
+      name: "join_date",
+      label: "Date of Joining (যোগদানের তারিখ)",
+      type: "date",
+      section: "Employment",
+      helper: "Prints as Date of Joining on the staff agreement. Defaults to today if left blank.",
+    },
     {
       name: "rating",
       label: "Rating",
