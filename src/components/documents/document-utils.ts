@@ -5,6 +5,25 @@ export const ORG_TAGLINE = "Nursing · Aaya · Attendant Services";
 /** Printed brand logo for the ID card and application forms. */
 export const ORG_LOGO = "/brand/ssn-logo.webp";
 
+/** Format `"18:00"` -> `"06:00 PM"`, `"07:00"` -> `"07:00 AM"`. */
+export function formatTime12h(value?: string | null): string {
+  if (!value) return "";
+  const [h, m] = value.split(":");
+  const hi = Number(h);
+  const mi = Number(m);
+  if (Number.isNaN(hi) || Number.isNaN(mi)) return value;
+  const suffix = hi < 12 ? "AM" : "PM";
+  const hr12 = String(hi % 12 || 12).padStart(2, "0");
+  return `${hr12}:${String(mi).padStart(2, "0")} ${suffix}`;
+}
+
+/** Format ISO date + optional `"HH:MM"` clock time cleanly for bills & statements. */
+export function formatDateWithTime(dateStr?: string | null, timeStr?: string | null): string {
+  const d = formatDate(dateStr);
+  const t = formatTime12h(timeStr);
+  return t ? `${d} (${t})` : d;
+}
+
 /** Format an ISO date (or null) as `DD/MM/YYYY` for printed documents. */
 export function formatDate(value?: string | null): string {
   if (!value) return "—";

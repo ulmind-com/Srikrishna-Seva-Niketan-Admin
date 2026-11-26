@@ -2,6 +2,7 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import type { MonthlyBillGroup } from "@/services/billing.service";
+import { formatDateWithTime } from "@/components/documents/document-utils";
 
 const EMERALD: [number, number, number] = [15, 118, 110];
 const SLATE: [number, number, number] = [30, 41, 59];
@@ -111,8 +112,8 @@ export function downloadMonthlyBillsPdf(month: string, bills: MonthlyBillGroup[]
         li.employee_name
           ? `${li.employee_name}${li.employee_code ? ` (${li.employee_code})` : ""}`
           : bill.employee_name || "Staff",
-        li.from,
-        li.to,
+        formatDateWithTime(li.from, li.from_time ?? li.start_time),
+        formatDateWithTime(li.to, li.to_time ?? (li.is_ongoing ? null : li.end_time)),
         li.shift_label,
         String(li.days),
         rupee(li.daily_rate),
@@ -228,8 +229,8 @@ export function downloadMonthlyBillsXlsx(month: string, bills: MonthlyBillGroup[
         "Attendant / Staff Name": li.employee_name || b.employee_name,
         "Staff Code": li.employee_code || "",
         Shift: li.shift_label,
-        "Duty From": li.from,
-        "Duty To": li.to,
+        "Duty From": formatDateWithTime(li.from, li.from_time ?? li.start_time),
+        "Duty To": formatDateWithTime(li.to, li.to_time ?? (li.is_ongoing ? null : li.end_time)),
         "Days Worked": li.days,
         "Daily Rate (INR)": li.daily_rate,
         "Amount (INR)": li.amount,

@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/select";
 import { downloadMonthlyBillsXlsx } from "@/lib/monthly-bill-export";
 import { GeneralBillViewDialog } from "@/components/documents/GeneralBillViewDialog";
+import { formatDateWithTime } from "@/components/documents/document-utils";
 import type { Customer } from "@/types/models";
 
 const rupee = (n?: number | null) => `₹${(n ?? 0).toLocaleString("en-IN")}`;
@@ -501,7 +502,13 @@ export function MonthlyBillsPage() {
                                         {li.shift_label}
                                       </td>
                                       <td className="py-2 font-mono text-[11px]">
-                                        {li.from} → {li.to}
+                                        {formatDateWithTime(li.from, li.from_time ?? li.start_time)}{" "}
+                                        →{" "}
+                                        {formatDateWithTime(
+                                          li.to,
+                                          li.to_time ?? (li.is_ongoing ? null : li.end_time)
+                                        )}
+                                        {li.is_ongoing ? " (Till Date)" : ""}
                                       </td>
                                       <td className="py-2 text-center font-semibold">
                                         {li.days}

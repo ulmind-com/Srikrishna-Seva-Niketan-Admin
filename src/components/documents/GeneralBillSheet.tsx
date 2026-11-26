@@ -1,25 +1,27 @@
 import React from "react";
 import type { MonthlyBillGroup, MonthlyBillLineItem } from "@/services/billing.service";
-import { ORG_LOGO, ORG_NAME, formatDate } from "./document-utils";
+import { ORG_LOGO, ORG_NAME, formatDate, formatDateWithTime, formatTime12h } from "./document-utils";
 
 const FALLBACK_LINE = "ARAMBAGH ★ 712601";
 const FALLBACK_MOB = "9239701265";
 
 const inr = (n?: number | null) => (n != null ? n.toLocaleString("en-IN") : "");
 
-function fmtTime(t?: string | null): string {
-  if (!t) return "";
-  const [h, m] = t.split(":");
-  const hi = Number(h);
-  const mi = Number(m);
-  if (Number.isNaN(hi) || Number.isNaN(mi)) return t;
-  const suffix = hi < 12 ? "AM" : "PM";
-  return `${hi % 12 || 12}:${String(mi).padStart(2, "0")} ${suffix}`;
-}
+const SHIFT_TITLE: Record<string, string> = {
+  morning: "Morning",
+  day: "Day",
+  night: "Night",
+  full_24h: "24 Hours",
+  custom: "Custom",
+};
 
 function lineItemTiming(li: MonthlyBillLineItem): string {
+  if (li.shift === "custom" && li.shift_label) return li.shift_label;
   if (li.start_time && li.end_time) {
-    return `${fmtTime(li.start_time)} – ${fmtTime(li.end_time)}`;
+    return `${formatTime12h(li.start_time)} – ${formatTime12h(li.end_time)}`;
+  }
+  if (li.start_time) {
+    return `From ${formatTime12h(li.start_time)}`;
   }
   if (li.shift_label) return li.shift_label;
   if (li.shift === "full_24h") return "Round-the-clock (24 Hours)";
@@ -125,9 +127,13 @@ export const GeneralBillSheet = React.forwardRef<HTMLDivElement, GeneralBillShee
             {bill.line_items.map((item, idx) => {
               const timing = lineItemTiming(item);
               const role = lineItemRole(item);
-              const dateRangeStr = `${formatDate(item.from)} → ${formatDate(item.to)}${
-                item.is_ongoing ? " (Till Date)" : ""
-              }`;
+              const shiftName = SHIFT_TITLE[item.shift] || item.shift_label;
+              const fromTime = item.from_time ?? item.start_time;
+              const toTime = item.to_time ?? (item.is_ongoing ? null : item.end_time);
+              const dateRangeStr = `${formatDateWithTime(item.from, fromTime)} → ${formatDateWithTime(
+                item.to,
+                toTime
+              )}${item.is_ongoing ? " (Till Date)" : ""}`;
 
               let note: string | null = null;
               if (item.is_replacement) {
@@ -156,7 +162,9 @@ export const GeneralBillSheet = React.forwardRef<HTMLDivElement, GeneralBillShee
                       </p>
                       <p>
                         <span className="font-bold text-gray-900">Timing:</span> {timing}{" "}
-                        <span className="text-gray-500 font-medium">({item.shift_label})</span>
+                        {shiftName && (
+                          <span className="text-gray-500 font-medium">({shiftName})</span>
+                        )}
                       </p>
                     </div>
                     {note && (

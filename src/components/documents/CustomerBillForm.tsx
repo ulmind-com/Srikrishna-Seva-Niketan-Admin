@@ -1,5 +1,5 @@
 import type { Assignment, Customer, Location } from "@/types/models";
-import { ORG_LOGO, ORG_NAME, formatDate } from "./document-utils";
+import { ORG_LOGO, ORG_NAME, formatDate, formatDateWithTime, formatTime12h } from "./document-utils";
 
 /** Fallback header details matching the printed bill pad. */
 const FALLBACK_LINE = "ARAMBAGH ★ HOOGHLY ★ 712601";
@@ -15,16 +15,7 @@ const SHIFT_NAME: Record<string, string> = {
   custom: "Custom",
 };
 
-/** "18:00" -> "6:00 PM", "06:00" -> "6:00 AM". */
-function fmtTime(t?: string | null): string {
-  if (!t) return "?";
-  const [h, m] = t.split(":");
-  const hi = Number(h);
-  const mi = Number(m);
-  if (Number.isNaN(hi) || Number.isNaN(mi)) return t;
-  const suffix = hi < 12 ? "AM" : "PM";
-  return `${hi % 12 || 12}:${String(mi).padStart(2, "0")} ${suffix}`;
-}
+const fmtTime = (t?: string | null): string => formatTime12h(t) || "?";
 
 export interface BillDutyItem {
   id: string;
@@ -97,22 +88,16 @@ function buildDutyItems(
 
     // Days calculation
     let days = 0;
-    let isOngoing = false;
-    let endDateStr = "";
+    const isOngoing = !a.end_date;
+    const endDateStr = a.end_date
+      ? formatDateWithTime(a.end_date, a.end_time)
+      : `${formatDate(billDate.toISOString())} (Till Date)`;
 
     if (a.days_worked != null && a.days_worked >= 0) {
       days = a.days_worked;
-      isOngoing = !a.end_date;
-      endDateStr = a.end_date
-        ? formatDate(a.end_date)
-        : `${formatDate(billDate.toISOString())} (Till Date)`;
     } else {
       const s = new Date(a.start_date);
       const targetEnd = a.end_date ? new Date(a.end_date) : billDate;
-      isOngoing = !a.end_date;
-      endDateStr = a.end_date
-        ? formatDate(a.end_date)
-        : `${formatDate(targetEnd.toISOString())} (Till Date)`;
 
       let grossDays = 0;
       const sCal = new Date(s.getFullYear(), s.getMonth(), s.getDate());
@@ -214,7 +199,7 @@ function buildDutyItems(
       startDate: a.start_date,
       endDate: a.end_date || billDate.toISOString(),
       isOngoing,
-      dateStr: `${formatDate(a.start_date)} → ${endDateStr}`,
+      dateStr: `${formatDateWithTime(a.start_date, a.start_time)} → ${endDateStr}`,
       shiftLabel,
       timeStr,
       days,

@@ -9,6 +9,8 @@ export interface MonthlyBillLineItem {
   employee_category?: string | null;
   from: string;
   to: string;
+  from_time?: string | null;
+  to_time?: string | null;
   shift: string;
   shift_label: string;
   start_time?: string | null;
