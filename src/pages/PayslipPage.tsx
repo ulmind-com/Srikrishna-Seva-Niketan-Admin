@@ -171,20 +171,24 @@ export function PayslipPage() {
       </div>
 
       {/* Totals */}
-      <div className="no-print grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="no-print grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-2xl border border-border bg-card p-4">
           <p className="text-sm text-muted-foreground">Month</p>
           <p className="mt-1 text-xl font-bold">{prettyMonth(month)}</p>
         </div>
         <div className="rounded-2xl border border-border bg-card p-4">
-          <p className="text-sm text-muted-foreground">Staff</p>
-          <p className="mt-1 text-3xl font-bold">{run?.totals.employees ?? 0}</p>
+          <p className="text-sm text-muted-foreground">Total Salary Earned</p>
+          <p className="mt-1 text-2xl font-bold tracking-tight">{inr(run?.totals.total_gross_pay ?? 0)}</p>
+        </div>
+        <div className="rounded-2xl border border-border bg-card p-4">
+          <p className="text-sm text-muted-foreground">Paid</p>
+          <p className="mt-1 text-2xl font-bold tracking-tight text-emerald-500">{inr(run?.totals.total_paid ?? 0)}</p>
         </div>
         <div className="rounded-2xl border border-border bg-card p-4">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Total payout</p>
-              <p className="mt-1 text-3xl font-bold tracking-tight">{inr(run?.totals.total_gross_pay ?? 0)}</p>
+              <p className="text-sm text-muted-foreground">Remaining Balance</p>
+              <p className="mt-1 text-2xl font-bold tracking-tight text-rose-500">{inr(run?.totals.total_remaining ?? 0)}</p>
             </div>
             <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary">
               <Wallet className="h-5 w-5" />
@@ -206,15 +210,17 @@ export function PayslipPage() {
                 <th className="px-3 py-3 text-center font-medium">Off</th>
                 <th className="px-3 py-3 text-center font-medium">Payable</th>
                 <th className="px-3 py-3 text-right font-medium">Rate</th>
-                <th className="px-4 py-3 text-right font-medium">Gross</th>
+                <th className="px-3 py-3 text-right font-medium">Earned</th>
+                <th className="px-3 py-3 text-right font-medium">Paid</th>
+                <th className="px-4 py-3 text-right font-medium">Remaining</th>
                 <th className="px-3 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {isLoading ? (
-                <tr><td colSpan={9} className="py-12 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" /></td></tr>
+                <tr><td colSpan={11} className="py-12 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" /></td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={9} className="py-12 text-center text-muted-foreground">No staff for this period.</td></tr>
+                <tr><td colSpan={11} className="py-12 text-center text-muted-foreground">No staff for this period.</td></tr>
               ) : (
                 rows.map((r) => {
                   const effectiveRate = r.daily_rate || (r.payable_days > 0 && r.gross_pay > 0 ? Math.round(r.gross_pay / r.payable_days) : null);
@@ -235,7 +241,9 @@ export function PayslipPage() {
                       <td className="px-3 py-3 text-center text-slate-500">{(r.off_days ?? 0) + (r.leave_days ?? 0)}</td>
                       <td className="px-3 py-3 text-center font-bold text-foreground">{r.payable_days}</td>
                       <td className="px-3 py-3 text-right text-muted-foreground">{effectiveRate ? inr(effectiveRate) : "—"}</td>
-                      <td className="px-4 py-3 text-right font-semibold">{inr(r.gross_pay)}</td>
+                      <td className="px-3 py-3 text-right font-semibold">{inr(r.gross_pay)}</td>
+                      <td className="px-3 py-3 text-right font-semibold text-emerald-500">{inr(r.paid_amount ?? 0)}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-rose-500">{inr(r.remaining_amount ?? Math.max(0, r.gross_pay - (r.paid_amount ?? 0)))}</td>
                       <td className="px-3 py-3 text-right">
                         <Button variant="outline" size="sm" onClick={() => setSelected(r.employee_id)}>
                           <ReceiptText className="mr-1 h-3.5 w-3.5" /> Slip
@@ -313,8 +321,13 @@ export function PayslipPage() {
                         </div>
                       ))}
                       <div className="col-span-2 rounded-xl border border-primary bg-primary/5 p-3 sm:col-span-2">
-                        <p className="text-xs text-muted-foreground">Net Payable Salary</p>
-                        <p className="text-2xl font-bold text-primary">{inr(slip.summary.net_payable)}</p>
+                        <p className="text-xs text-muted-foreground">Net Payable Salary · Paid {inr(slip.summary.paid_amount ?? 0)}</p>
+                        <div className="flex items-baseline justify-between gap-2">
+                          <p className="text-2xl font-bold text-primary">{inr(slip.summary.net_payable)}</p>
+                          <span className="text-xs font-semibold text-rose-500">
+                            Balance: {inr(slip.summary.remaining_amount ?? Math.max(0, slip.summary.net_payable - (slip.summary.paid_amount ?? 0)))}
+                          </span>
+                        </div>
                         {slip.summary.leave_deduction > 0 && (
                           <p className="mt-0.5 text-[11px] text-muted-foreground">
                             after {inr(slip.summary.leave_deduction)} deduction

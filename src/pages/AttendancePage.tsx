@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import {
   CalendarDays,
+  CalendarOff,
   Clock,
   Download,
   Loader2,
@@ -12,6 +14,7 @@ import {
   UserCheck,
   Users,
 } from "lucide-react";
+import { LeaveRecordDialog } from "@/components/assignments/LeaveRecordDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { http } from "@/services/api/http";
 import { endpoints } from "@/services/api/endpoints";
@@ -37,8 +40,6 @@ import {
   formatShiftWindowsIST,
   nowIST,
 } from "@/lib/ist-datetime";
-
-const inr = (n?: number | null) => `₹${(n ?? 0).toLocaleString("en-IN")}`;
 
 const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
   present: {
@@ -80,13 +81,15 @@ const getCurrentMonthRange = currentMonthRangeIST;
 
 export function AttendancePage() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const defaultRange = useMemo(() => getCurrentMonthRange(), []);
 
-  const [employeeId, setEmployeeId] = useState<string>("");
+  const [employeeId, setEmployeeId] = useState<string>(searchParams.get("employee_id") || "");
   const [startDate, setStartDate] = useState<string>(defaultRange.start);
   const [endDate, setEndDate] = useState<string>(defaultRange.end);
   const [branchFilter, setBranchFilter] = useState<string>("all");
   const [staffSearch, setStaffSearch] = useState<string>("");
+  const [leaveModalOpen, setLeaveModalOpen] = useState(false);
 
   const { data: empData, isLoading: empLoading } = useQuery({
     queryKey: ["statement-employees"],
@@ -208,12 +211,22 @@ export function AttendancePage() {
       {/* Header bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 no-print">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Staff Duty & Attendance Statement</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Staff Attendance &amp; Leave Register</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Auto-synced from client assignments. View and print the bank-statement register of duties, timings, and daily payouts.
+            Daily attendance log, shift windows, and leave management synced from assignments (for salary payouts, see Payslips).
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setLeaveModalOpen(true)}
+            disabled={!selectedEmp}
+            className="h-9 border-amber-500/40 text-amber-500 hover:bg-amber-500/10"
+          >
+            <CalendarOff className="mr-2 h-4 w-4" />
+            Record Leave
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -457,9 +470,9 @@ export function AttendancePage() {
                 </p>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Daily Pay Rate</p>
+                <p className="text-xs text-muted-foreground">Duty Status</p>
                 <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                  {inr(slip.employee.daily_rate)} / day
+                  {s?.worked_days ?? 0} Worked · {(s?.off_days ?? 0) + (s?.leave_days ?? 0)} Off/Leave
                 </p>
               </div>
             </div>
@@ -469,7 +482,7 @@ export function AttendancePage() {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
               <div className="flex items-center justify-between">
-                <p className="text-xs font-medium text-muted-foreground">Payable Days</p>
+                <p className="text-xs font-medium text-muted-foreground">Present / Worked Days</p>
                 <CalendarDays className="h-4 w-4 text-emerald-500" />
               </div>
               <p className="mt-2 text-2xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
@@ -504,26 +517,27 @@ export function AttendancePage() {
                 {(s?.off_days ?? 0) + (s?.leave_days ?? 0)}
                 <span className="ml-1 text-xs font-normal text-muted-foreground">days</span>
               </p>
-              <p className="mt-1 text-[11px] text-muted-foreground">Unpaid days</p>
+              <p className="mt-1 text-[11px] text-muted-foreground">Leave / off marked</p>
             </div>
 
             <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
               <div className="flex items-center justify-between">
-                <p className="text-xs font-medium text-muted-foreground">Gross Payout</p>
-                <UserCheck className="h-4 w-4 text-primary" />
+                <p className="text-xs font-medium text-muted-foreground">Absent Days</p>
+                <UserCheck className="h-4 w-4 text-rose-500" />
               </div>
-              <p className="mt-2 text-2xl font-bold tracking-tight text-primary">
-                {inr(s?.gross_pay)}
+              <p className="mt-2 text-2xl font-bold tracking-tight text-rose-500">
+                {s?.absent_days ?? 0}
+                <span className="ml-1 text-xs font-normal text-muted-foreground">days</span>
               </p>
-              <p className="mt-1 text-[11px] text-muted-foreground">Total payable amount</p>
+              <p className="mt-1 text-[11px] text-muted-foreground">Absent in period</p>
             </div>
           </div>
 
-          {/* Bank-Statement Style Duty Register Table */}
+          {/* Daily Attendance Register Table */}
           <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
             <div className="border-b border-border/80 bg-muted/40 px-4 py-3">
               <h3 className="text-sm font-semibold tracking-wide text-foreground">
-                Daily Duty & Payout Ledger
+                Daily Attendance &amp; Shift Register
               </h3>
             </div>
 
@@ -537,8 +551,7 @@ export function AttendancePage() {
                     <th className="py-3 px-3">Duration</th>
                     <th className="py-3 px-3">Shift Type</th>
                     <th className="py-3 px-3">Customer / Patient</th>
-                    <th className="py-3 px-3 text-center">Status</th>
-                    <th className="py-3 pl-3 pr-4 text-right">Pay Amount</th>
+                    <th className="py-3 px-3 pr-4 text-center">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/60">
@@ -573,8 +586,6 @@ export function AttendancePage() {
                               ? "12 hrs"
                               : "—");
 
-                    const isPayable = d.status === "present" || d.status === "half_day";
-
                     return (
                       <tr
                         key={`${d.date}-${index}`}
@@ -606,21 +617,12 @@ export function AttendancePage() {
                             <span className="text-muted-foreground italic">No duty assigned</span>
                           )}
                         </td>
-                        <td className="py-3 px-3 text-center whitespace-nowrap">
+                        <td className="py-3 px-3 pr-4 text-center whitespace-nowrap">
                           <span
                             className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusInfo.cls}`}
                           >
                             {statusInfo.label}
                           </span>
-                        </td>
-                        <td className="py-3 pl-3 pr-4 text-right whitespace-nowrap font-semibold">
-                          {isPayable && d.amount > 0 ? (
-                            <span className="text-emerald-600 dark:text-emerald-400 font-mono">
-                              {inr(d.amount)}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground font-mono text-xs">—</span>
-                          )}
                         </td>
                       </tr>
                     );
@@ -629,14 +631,11 @@ export function AttendancePage() {
                 {/* Statement Summary Table Footer */}
                 <tfoot>
                   <tr className="border-t-2 border-border bg-muted/40 font-bold text-foreground">
-                    <td colSpan={3} className="py-3.5 pl-4 pr-2 text-sm">
-                      Total Payable Duties: {s?.payable_days ?? s?.worked_days ?? 0} Days ({s?.total_shifts ?? s?.present_days ?? 0} Shifts)
+                    <td colSpan={4} className="py-3.5 pl-4 pr-2 text-sm">
+                      Total Attendance: {s?.payable_days ?? s?.worked_days ?? 0} Days Worked ({s?.total_shifts ?? s?.present_days ?? 0} Shifts)
                     </td>
-                    <td colSpan={4} className="py-3.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">
-                      Net Total Gross Pay:
-                    </td>
-                    <td className="py-3.5 pl-3 pr-4 text-right text-base text-primary font-mono font-bold">
-                      {inr(s?.gross_pay)}
+                    <td colSpan={3} className="py-3.5 pl-3 pr-4 text-right text-xs uppercase tracking-wider text-muted-foreground">
+                      Off / Leave: {(s?.off_days ?? 0) + (s?.leave_days ?? 0)}d · Absent: {s?.absent_days ?? 0}d
                     </td>
                   </tr>
                 </tfoot>
@@ -646,7 +645,7 @@ export function AttendancePage() {
             {/* Statement footer note */}
             <div className="border-t border-border/80 bg-muted/20 p-4 text-xs text-muted-foreground flex flex-wrap items-center justify-between gap-2">
               <p>
-                Certified official duty statement issued by Shri Krishna Nursing Care Services. For discrepancies, contact branch operations at 9239701265.
+                Certified attendance &amp; shift register issued by Shri Krishna Nursing Care Services. For discrepancies, contact branch operations at 9239701265.
               </p>
               <p className="font-mono text-[11px]">
                 Authorized Signatory: _________________________
@@ -655,6 +654,12 @@ export function AttendancePage() {
           </div>
         </div>
       ) : null}
+
+      <LeaveRecordDialog
+        employee={selectedEmp ? { id: selectedEmp.id, name: selectedEmp.name } : null}
+        open={leaveModalOpen}
+        onClose={() => setLeaveModalOpen(false)}
+      />
     </div>
   );
 }

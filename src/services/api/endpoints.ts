@@ -120,7 +120,14 @@ export const endpoints = {
     issueMonthly: "/billing/monthly/issue",
   },
   expenses: { root: "/expenses" },
-  payments: { root: "/payments" },
+  payments: {
+    root: "/payments",
+    clientLedger: "/payments/client-ledger",
+    staffLedger: "/payments/staff-ledger",
+    staff: "/payments/staff",
+    staffItem: (id: string) => `/payments/staff/${id}`,
+    history: "/payments/history",
+  },
   payroll: {
     attendance: "/payroll/attendance",
     attendanceDay: "/payroll/attendance/day",
@@ -129,6 +136,8 @@ export const endpoints = {
     attendanceItem: (id: string) => `/payroll/attendance/${id}`,
     payslip: "/payroll/payslip",
     payslips: "/payroll/payslips",
+    leaves: "/payroll/leaves",
+    leaveItem: (id: string) => `/payroll/leaves/${id}`,
   },
   reports: {
     profitLoss: "/reports/profit-loss",

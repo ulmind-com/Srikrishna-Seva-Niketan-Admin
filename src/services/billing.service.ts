@@ -46,13 +46,22 @@ export interface MonthlyBillGroup {
   line_items: MonthlyBillLineItem[];
   total_days: number;
   total_amount: number;
+  paid_amount?: number;
+  outstanding_amount?: number;
+  payment_status?: "paid" | "partial" | "pending" | string;
   bill_no?: number | null;
 }
 
 export interface MonthlyBillsResponse {
   month?: string;
   period?: { start: string; end: string; label: string };
-  totals: { bills: number; total_days: number; total_amount: number };
+  totals: {
+    bills: number;
+    total_days: number;
+    total_amount: number;
+    total_paid?: number;
+    total_outstanding?: number;
+  };
   bills: MonthlyBillGroup[];
 }
 

@@ -1,11 +1,21 @@
 import { useState } from "react";
-import { BellRing, CheckCircle2, Loader2, PauseCircle, UserCheck } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import {
+  BellRing,
+  CalendarCheck,
+  CalendarOff,
+  CheckCircle2,
+  Loader2,
+  PauseCircle,
+  UserCheck,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { ReplaceStaffDialog } from "@/components/assignments/ReplaceStaffDialog";
 import { AdminCompleteDutyDialog } from "@/components/assignments/AdminCompleteDutyDialog";
 import { DutyBreakDialog } from "@/components/assignments/DutyBreakDialog";
+import { LeaveRecordDialog } from "@/components/assignments/LeaveRecordDialog";
 import type { Assignment } from "@/types/models";
 import { pushNotificationService } from "@/services/push-notification.service";
 import { ResourceView } from "@/components/resource/ResourceView";
@@ -40,10 +50,12 @@ export const EmployeesPage = () => <ResourceView config={employeesConfig} />;
 export const CustomersPage = () => <ResourceView config={customersConfig} />;
 
 export const AssignmentsPage = () => {
+  const navigate = useNavigate();
   const [pushingId, setPushingId] = useState<string | null>(null);
   const [replaceAssignment, setReplaceAssignment] = useState<Assignment | null>(null);
   const [completeAssignment, setCompleteAssignment] = useState<Assignment | null>(null);
   const [breakAssignment, setBreakAssignment] = useState<Assignment | null>(null);
+  const [leaveAssignment, setLeaveAssignment] = useState<Assignment | null>(null);
 
   const handleSendPush = async (assignment: Assignment) => {
     setPushingId(assignment.id);
@@ -123,6 +135,18 @@ export const AssignmentsPage = () => {
               <PauseCircle className="h-4 w-4 text-amber-400" /> সাময়িক বন্ধ / ছুটি (Duty Pause / Break)
             </DropdownMenuItem>
             <DropdownMenuItem
+              onClick={() => setLeaveAssignment(assignment)}
+              className="gap-2 cursor-pointer font-medium text-orange-400 focus:text-orange-300"
+            >
+              <CalendarOff className="h-4 w-4 text-orange-400" /> Apply / Record Staff Leave
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => navigate(`/attendance?employee_id=${assignment.employee_id}`)}
+              className="gap-2 cursor-pointer font-medium text-sky-400 focus:text-sky-300"
+            >
+              <CalendarCheck className="h-4 w-4 text-sky-400" /> Mark Attendance
+            </DropdownMenuItem>
+            <DropdownMenuItem
               onClick={() => setReplaceAssignment(assignment)}
               className="gap-2 cursor-pointer font-medium text-blue-400 focus:text-blue-300"
             >
@@ -151,6 +175,12 @@ export const AssignmentsPage = () => {
       <DutyBreakDialog
         assignment={breakAssignment}
         onClose={() => setBreakAssignment(null)}
+      />
+
+      <LeaveRecordDialog
+        assignment={leaveAssignment}
+        open={!!leaveAssignment}
+        onClose={() => setLeaveAssignment(null)}
       />
     </>
   );

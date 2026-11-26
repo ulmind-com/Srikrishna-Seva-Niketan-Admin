@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { LoginPage } from "@/pages/LoginPage";
@@ -23,7 +23,9 @@ import { EmployeeDocumentsPage } from "@/pages/EmployeeDocumentsPage";
 import { StaffVerificationPage } from "@/pages/StaffVerificationPage";
 import { LocationStaffOverviewPage } from "@/pages/LocationStaffOverviewPage";
 import { StaffDeploymentPage } from "@/pages/StaffDeploymentPage";
+import { AttendancePage } from "@/pages/AttendancePage";
 import { PayslipPage } from "@/pages/PayslipPage";
+import { PaymentsReceiptsPage } from "@/pages/PaymentsReceiptsPage";
 import { CustomerAgreementPage } from "@/pages/CustomerAgreementPage";
 import { CustomerBillPage } from "@/pages/CustomerBillPage";
 import { MonthlyBillsPage } from "@/pages/MonthlyBillsPage";
@@ -92,12 +94,12 @@ export function AppRoutes() {
           <Route path="/assignments" element={<AssignmentsPage />} />
           <Route path="/staff-deployment" element={<StaffDeploymentPage />} />
           <Route path="/assignments/:id/bill" element={<CustomerBillPage />} />
-          <Route path="/attendance" element={<Navigate to="/payslips" replace />} />
+          <Route path="/attendance" element={<AttendancePage />} />
           <Route path="/monthly-bills" element={<MonthlyBillsPage />} />
           <Route path="/general-bills" element={<MonthlyBillsPage />} />
           <Route path="/payslips" element={<PayslipPage />} />
           <Route path="/expenses" element={<ExpensesPage />} />
-          <Route path="/payments" element={<Navigate to="/monthly-bills" replace />} />
+          <Route path="/payments" element={<PaymentsReceiptsPage />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/applications" element={<ApplicationsPage />} />
           <Route path="/blogs" element={<BlogsPage />} />

@@ -17,6 +17,11 @@ export interface ProfitLossReport {
   expense: number; // total expense
   profit: number;
   margin_pct: number;
+  cash_received?: number;
+  outstanding_receivable?: number;
+  collection_rate_pct?: number;
+  staff_salary_paid?: number;
+  staff_salary_remaining?: number;
   expense_by_category: Record<string, number>;
   assignment_count: number;
   expense_count: number;
@@ -45,15 +50,21 @@ export interface CustomerPaymentRow {
   customer_id: string;
   customer_name: string;
   phone?: string | null;
+  bill_no?: number | null;
+  bill_no_formatted?: string | null;
+  invoiced_amount?: number;
   total_paid: number;
   pending: number;
+  status?: string;
   payment_count: number;
   last_payment?: string | null;
 }
 
 export interface CustomerPaymentsReport {
+  total_billed?: number;
   total_paid: number;
   total_pending: number;
+  collection_rate_pct?: number;
   customers: CustomerPaymentRow[];
 }
 

@@ -164,15 +164,27 @@ export function downloadPayslipPdf(slip: Payslip) {
   startY = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 14;
 
   // Net payable banner
+  const paidAmt = s.paid_amount ?? 0;
+  const remAmt = s.remaining_amount ?? Math.max(0, s.net_payable - paidAmt);
   doc.setFillColor(236, 253, 245);
-  doc.rect(marginX, startY, pageWidth - marginX * 2, 34, "F");
+  doc.rect(marginX, startY, pageWidth - marginX * 2, paidAmt > 0 ? 44 : 34, "F");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.setTextColor(...SLATE);
-  doc.text("NET PAYABLE", marginX + 10, startY + 21);
+  doc.text("NET PAYABLE", marginX + 10, startY + 20);
   doc.setFontSize(16);
   doc.setTextColor(...EMERALD);
   doc.text(rupee(s.net_payable), pageWidth - marginX - 10, startY + 22, { align: "right" });
+  if (paidAmt > 0) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(...MUTED);
+    doc.text(
+      `Paid: ${rupee(paidAmt)}   |   Balance Remaining: ${rupee(remAmt)}`,
+      marginX + 10,
+      startY + 36
+    );
+  }
   startY += 34 + 14;
 
   // Day-by-day breakdown

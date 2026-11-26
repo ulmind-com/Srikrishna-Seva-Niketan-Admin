@@ -133,8 +133,8 @@ export function ReportsPage() {
     refetchInterval: LIVE_MS,
   });
   const pay = useQuery({
-    queryKey: ["report", "pay", loc],
-    queryFn: () => reportsService.customerPayments({ location_id: loc }),
+    queryKey: ["report", "pay", start, end, loc],
+    queryFn: () => reportsService.customerPayments({ start, end, location_id: loc }),
     refetchInterval: LIVE_MS,
   });
   const daily = useQuery({
@@ -823,7 +823,7 @@ export function ReportsPage() {
             </Button>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-            <Stat label="Revenue" value={rupee(pnl.data?.revenue)} tone="text-success" />
+            <Stat label="Revenue (Billed)" value={rupee(pnl.data?.revenue)} tone="text-sky-500" />
             <Stat label="Staff Payout" value={rupee(pnl.data?.staff_payout)} tone="text-destructive" />
             <Stat label="Other Expense" value={rupee((pnl.data?.assignment_expense ?? 0) + (pnl.data?.general_expense ?? 0))} tone="text-destructive" />
             <Stat label="Total Expense" value={rupee(pnl.data?.expense)} tone="text-destructive" />
@@ -836,6 +836,33 @@ export function ReportsPage() {
               label="Margin"
               value={`${pnl.data?.margin_pct ?? 0}%`}
               tone={(pnl.data?.profit ?? 0) >= 0 ? "text-success" : "text-destructive"}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            <Stat
+              label="Actual Cash Received"
+              value={rupee(pnl.data?.cash_received ?? 0)}
+              tone="text-emerald-500"
+            />
+            <Stat
+              label="Outstanding Receivable"
+              value={rupee(pnl.data?.outstanding_receivable ?? 0)}
+              tone="text-rose-500"
+            />
+            <Stat
+              label="Collection Rate"
+              value={`${(pnl.data?.collection_rate_pct ?? 0).toFixed(1)}%`}
+              tone="text-primary"
+            />
+            <Stat
+              label="Staff Salary Paid"
+              value={rupee(pnl.data?.staff_salary_paid ?? 0)}
+              tone="text-indigo-400"
+            />
+            <Stat
+              label="Staff Salary Balance"
+              value={rupee(pnl.data?.staff_salary_remaining ?? 0)}
+              tone="text-amber-500"
             />
           </div>
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -953,20 +980,51 @@ export function ReportsPage() {
 
         {/* Customer payments */}
         <TabsContent value="pay" className="space-y-4">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Stat label="Total Collected" value={rupee(pay.data?.total_paid)} tone="text-success" />
-            <Stat label="Total Pending" value={rupee(pay.data?.total_pending)} tone="text-destructive" />
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1.5">
+              <Label>From</Label>
+              <Input
+                type="date"
+                value={start}
+                onChange={(e) => {
+                  setStart(e.target.value);
+                  setPeriodState("custom");
+                }}
+                className="w-40"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>To</Label>
+              <Input
+                type="date"
+                value={end}
+                onChange={(e) => {
+                  setEnd(e.target.value);
+                  setPeriodState("custom");
+                }}
+                className="w-40"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Stat label="Total Billed (Invoiced)" value={rupee(pay.data?.total_billed ?? 0)} tone="text-sky-500" />
+            <Stat label="Actual Cash Collected" value={rupee(pay.data?.total_paid)} tone="text-success" />
+            <Stat label="Total Outstanding" value={rupee(pay.data?.total_pending)} tone="text-destructive" />
+            <Stat label="Collection Rate" value={`${(pay.data?.collection_rate_pct ?? 0).toFixed(1)}%`} tone="text-primary" />
           </div>
           <Card>
-            <CardHeader><CardTitle className="text-sm">Payments by customer</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-sm">Billing vs Actual Collection by Customer</CardTitle></CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Customer</TableHead>
                     <TableHead>Phone</TableHead>
-                    <TableHead className="text-right">Paid</TableHead>
-                    <TableHead className="text-right">Pending</TableHead>
+                    <TableHead>Bill No</TableHead>
+                    <TableHead className="text-right">Invoiced</TableHead>
+                    <TableHead className="text-right">Received</TableHead>
+                    <TableHead className="text-right">Outstanding</TableHead>
+                    <TableHead className="text-center">Status</TableHead>
                     <TableHead>Last payment</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -975,15 +1033,28 @@ export function ReportsPage() {
                     <TableRow key={c.customer_id}>
                       <TableCell className="font-medium">{c.customer_name}</TableCell>
                       <TableCell>{c.phone || "—"}</TableCell>
-                      <TableCell className="text-right">{rupee(c.total_paid)}</TableCell>
-                      <TableCell className={`text-right ${c.pending > 0 ? "text-destructive font-medium" : ""}`}>
+                      <TableCell>{c.bill_no_formatted ? `#${c.bill_no_formatted}` : "—"}</TableCell>
+                      <TableCell className="text-right font-medium">{rupee(c.invoiced_amount ?? 0)}</TableCell>
+                      <TableCell className="text-right text-emerald-500 font-semibold">{rupee(c.total_paid)}</TableCell>
+                      <TableCell className={`text-right ${c.pending > 0 ? "text-destructive font-semibold" : ""}`}>
                         {rupee(c.pending)}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${
+                          c.status === "paid"
+                            ? "bg-emerald-500/15 text-emerald-500"
+                            : c.status === "partial"
+                            ? "bg-amber-500/15 text-amber-500"
+                            : "bg-rose-500/15 text-rose-500"
+                        }`}>
+                          {c.status || (c.pending > 0 ? "pending" : "paid")}
+                        </span>
                       </TableCell>
                       <TableCell>{c.last_payment || "—"}</TableCell>
                     </TableRow>
                   ))}
                   {!pay.data?.customers?.length && (
-                    <TableRow><TableCell colSpan={5} className="text-muted-foreground">No customers.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={8} className="text-muted-foreground">No billed customers for this period.</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>

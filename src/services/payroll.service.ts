@@ -73,6 +73,9 @@ export interface PayslipSummary {
   gross_pay: number;
   leave_deduction: number;
   net_payable: number;
+  paid_amount?: number;
+  remaining_amount?: number;
+  payment_status?: "paid" | "partial" | "pending" | "no_due" | string;
   by_shift: Record<string, number>;
   off_dates: string[];
   absent_dates: string[];
@@ -113,13 +116,53 @@ export interface PayrollRunRow {
   gross_pay: number;
   leave_deduction: number;
   net_payable: number;
+  paid_amount?: number;
+  remaining_amount?: number;
+  payment_status?: "paid" | "partial" | "pending" | "no_due" | string;
   by_shift: Record<string, number>;
 }
 
 export interface PayrollRun {
   period: { month: string; start: string; end: string; days_in_month: number };
-  totals: { employees: number; total_gross_pay: number };
+  totals: {
+    employees: number;
+    total_gross_pay: number;
+    total_paid?: number;
+    total_remaining?: number;
+  };
   rows: PayrollRunRow[];
+}
+
+export type LeaveType = "unpaid" | "paid" | "sick" | "casual" | "emergency";
+export type LeaveApprovalStatus = "pending" | "approved" | "rejected";
+
+export interface StaffLeave {
+  id: string;
+  employee_id: string;
+  employee_name: string;
+  assignment_id?: string | null;
+  customer_name?: string | null;
+  location_id?: string | null;
+  leave_date: string;
+  end_date?: string | null;
+  leave_type: LeaveType;
+  deduct_pay: boolean;
+  approval_status: LeaveApprovalStatus;
+  reason?: string | null;
+  approved_by?: string | null;
+  linked_break_id?: string | null;
+  created_at?: string;
+}
+
+export interface StaffLeaveCreatePayload {
+  employee_id: string;
+  assignment_id?: string | null;
+  leave_date: string;
+  end_date?: string | null;
+  leave_type: LeaveType;
+  deduct_pay: boolean;
+  approval_status: LeaveApprovalStatus;
+  reason?: string;
 }
 
 /** Payroll: daily attendance marking + monthly payslip reads. */
@@ -156,4 +199,24 @@ export const payrollService = {
 
   payrollRun: (month: string, location_id?: string) =>
     http.get<PayrollRun>(endpoints.payroll.payslips, { month, location_id }),
+
+  listLeaves: (params?: {
+    employee_id?: string;
+    assignment_id?: string;
+    approval_status?: string;
+    start_date?: string;
+    end_date?: string;
+    location_id?: string;
+  }) => http.list<StaffLeave>(endpoints.payroll.leaves, params),
+
+  createLeave: (payload: StaffLeaveCreatePayload) =>
+    http.post<StaffLeave>(endpoints.payroll.leaves, payload),
+
+  updateLeave: (
+    leave_id: string,
+    payload: Partial<Pick<StaffLeave, "leave_type" | "deduct_pay" | "approval_status" | "reason">>,
+  ) => http.put<StaffLeave>(endpoints.payroll.leaveItem(leave_id), payload),
+
+  deleteLeave: (leave_id: string) =>
+    http.del<{ success: boolean }>(endpoints.payroll.leaveItem(leave_id)),
 };
