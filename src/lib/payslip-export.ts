@@ -82,9 +82,18 @@ export function downloadPayslipPdf(slip: Payslip) {
   doc.setTextColor(220, 245, 240);
   doc.text("Salary Slip", marginX, 40);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
+  doc.setFontSize(11);
   doc.setTextColor(255, 255, 255);
-  doc.text(monthLabelIST(slip.period.month), pageWidth - marginX, 30, { align: "right" });
+  const fullMonth = `${slip.period.month}-01`;
+  const [my, mm] = slip.period.month.split("-").map(Number);
+  const lastOfMonth = new Date(my, mm, 0).getDate();
+  const isWholeMonth =
+    slip.period.start === fullMonth &&
+    slip.period.end === `${slip.period.month}-${String(lastOfMonth).padStart(2, "0")}`;
+  const periodLabel = isWholeMonth
+    ? monthLabelIST(slip.period.month)
+    : `${formatSlashDateIST(slip.period.start)} - ${formatSlashDateIST(slip.period.end)}`;
+  doc.text(periodLabel, pageWidth - marginX, 30, { align: "right" });
 
   // Employee block
   let y = 78;
@@ -246,6 +255,7 @@ export function downloadPayslipPdf(slip: Payslip) {
     doc.text("Authorised Signature", pageWidth - marginX, afterY + 12, { align: "right" });
   }
 
-  const name = `payslip_${slip.employee.name.replace(/\s+/g, "_")}_${slip.period.month}.pdf`;
+  const periodSlug = isWholeMonth ? slip.period.month : `${slip.period.start}_to_${slip.period.end}`;
+  const name = `payslip_${slip.employee.name.replace(/\s+/g, "_")}_${periodSlug}.pdf`;
   doc.save(name);
 }

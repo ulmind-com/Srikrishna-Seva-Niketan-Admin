@@ -197,8 +197,18 @@ export const payrollService = {
       end_date: end_date || undefined,
     }),
 
-  payrollRun: (month: string, location_id?: string) =>
-    http.get<PayrollRun>(endpoints.payroll.payslips, { month, location_id }),
+  payrollRun: (
+    month?: string,
+    location_id?: string,
+    start_date?: string,
+    end_date?: string,
+  ) =>
+    http.get<PayrollRun>(endpoints.payroll.payslips, {
+      month: month || undefined,
+      start_date: start_date || undefined,
+      end_date: end_date || undefined,
+      location_id,
+    }),
 
   listLeaves: (params?: {
     employee_id?: string;

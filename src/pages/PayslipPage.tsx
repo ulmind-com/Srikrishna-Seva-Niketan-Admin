@@ -1,13 +1,14 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
-import { FileDown, Loader2, Printer, ReceiptText, Wallet, X } from "lucide-react";
+import { FileDown, Loader2, Printer, ReceiptText, Search, Wallet, X } from "lucide-react";
 import { downloadPayslipPdf } from "@/lib/payslip-export";
 import {
-  currentMonthIST,
+  currentMonthRangeIST,
   formatAttendanceWindowIST,
   formatShiftWindowsIST,
-  monthLabelIST,
+  formatSlashDateIST,
+  nowIST,
 } from "@/lib/ist-datetime";
 import { useAuth } from "@/contexts/AuthContext";
 import { http } from "@/services/api/http";
@@ -91,21 +92,56 @@ function dayShiftText(d: {
   return detailedMap[d.shift] ?? SHIFT_LABEL[d.shift] ?? d.shift;
 }
 
-const currentMonth = currentMonthIST;
 const inr = (n: number) => `₹${(n ?? 0).toLocaleString("en-IN")}`;
-const prettyMonth = monthLabelIST;
 
 /**
- * Monthly payroll run and printable payslips. The table is the whole month's
- * run for every staff member (payable days × daily rate, leave/off excluded);
- * picking a row opens that staff member's day-by-day slip, which prints on its
- * own via the print styles below.
+ * Bank-statement style payroll run & printable payslips for any custom From Date → To Date
+ * (or month preset). Picking any staff row generates their day-by-day payslip & PDF for
+ * that exact date range.
  */
 export function PayslipPage() {
   const { user } = useAuth();
-  const [month, setMonth] = useState(currentMonth());
+  const defaultRange = useMemo(() => currentMonthRangeIST(), []);
+  const [startDate, setStartDate] = useState(defaultRange.start);
+  const [endDate, setEndDate] = useState(defaultRange.end);
+  const [monthPick, setMonthPick] = useState(defaultRange.start.slice(0, 7));
+  const [staffSearch, setStaffSearch] = useState("");
   const [branch, setBranch] = useState("all");
   const [selected, setSelected] = useState<string | null>(null);
+
+  const applyMonthPreset = (ym: string) => {
+    if (!ym) return;
+    setMonthPick(ym);
+    const [y, m] = ym.split("-").map(Number);
+    const lastDay = new Date(y, m, 0).getDate();
+    setStartDate(`${ym}-01`);
+    setEndDate(`${ym}-${String(lastDay).padStart(2, "0")}`);
+  };
+
+  const applyRangePreset = (preset: "this_month" | "last_month" | "last_15" | "last_7") => {
+    const today = nowIST();
+    if (preset === "this_month") {
+      const r = currentMonthRangeIST();
+      setStartDate(r.start);
+      setEndDate(r.end);
+      setMonthPick(r.start.slice(0, 7));
+    } else if (preset === "last_month") {
+      const prev = today.minus({ months: 1 });
+      setStartDate(prev.startOf("month").toISODate() || "");
+      setEndDate(prev.endOf("month").toISODate() || "");
+      setMonthPick(prev.toFormat("yyyy-MM"));
+    } else if (preset === "last_15") {
+      setStartDate(today.minus({ days: 14 }).toISODate() || "");
+      setEndDate(today.toISODate() || "");
+      setMonthPick("");
+    } else if (preset === "last_7") {
+      setStartDate(today.minus({ days: 6 }).toISODate() || "");
+      setEndDate(today.toISODate() || "");
+      setMonthPick("");
+    }
+  };
+
+  const validRange = !!startDate && !!endDate && endDate >= startDate;
 
   const { data: locData } = useQuery({
     queryKey: ["payroll-locations"],
@@ -116,18 +152,37 @@ export function PayslipPage() {
   const locations = locData?.items ?? [];
 
   const { data: run, isLoading } = useQuery({
-    queryKey: ["payroll-run", month, branch],
-    queryFn: () => payrollService.payrollRun(month, branch === "all" ? undefined : branch),
+    queryKey: ["payroll-run", startDate, endDate, branch],
+    queryFn: () =>
+      payrollService.payrollRun(
+        undefined,
+        branch === "all" ? undefined : branch,
+        startDate,
+        endDate
+      ),
+    enabled: validRange,
     staleTime: 5_000,
   });
 
   const { data: slip, isFetching: slipFetching } = useQuery({
-    queryKey: ["payslip", selected, month],
-    queryFn: () => payrollService.payslip(selected as string, month),
-    enabled: !!selected,
+    queryKey: ["payslip", selected, startDate, endDate],
+    queryFn: () =>
+      payrollService.payslip(selected as string, undefined, startDate, endDate),
+    enabled: !!selected && validRange,
   });
 
-  const rows = run?.rows ?? [];
+  const rows = useMemo(() => {
+    const all = run?.rows ?? [];
+    const q = staffSearch.trim().toLowerCase();
+    if (!q) return all;
+    return all.filter((r) =>
+      [r.name, r.code, r.category].filter(Boolean).some((v) => String(v).toLowerCase().includes(q))
+    );
+  }, [run?.rows, staffSearch]);
+
+  const periodRangeText = validRange
+    ? `${formatSlashDateIST(startDate)} – ${formatSlashDateIST(endDate)}`
+    : "Select valid range";
 
   return (
     <div className="space-y-6">
@@ -145,27 +200,109 @@ export function PayslipPage() {
 
       <div className="no-print flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Payslips</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Payslips &amp; Salary Statements</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Monthly payroll run — pay is payable days (present + half) × daily rate.
-            Leave and off days are unpaid.
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground/80">
-            Auto-filled from duties — mark Absent / Off in Attendance to adjust a day.
+            Generate bank-statement style payslips for any custom date range (From Date → To Date) or month.
+            Payable days (present + half) × daily rate.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Input type="month" value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} className="w-auto" />
+      </div>
+
+      {/* Bank-Statement Style Date Range & Filter Bar */}
+      <div className="no-print rounded-2xl border border-border bg-card p-4 space-y-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              From Date
+            </label>
+            <Input
+              type="date"
+              value={startDate}
+              onChange={(e) => {
+                setStartDate(e.target.value);
+                setMonthPick("");
+              }}
+              className="mt-1 h-10"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              To Date
+            </label>
+            <Input
+              type="date"
+              min={startDate}
+              value={endDate}
+              onChange={(e) => {
+                setEndDate(e.target.value);
+                setMonthPick("");
+              }}
+              className="mt-1 h-10"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Quick Month
+            </label>
+            <Input
+              type="month"
+              value={monthPick}
+              onChange={(e) => applyMonthPreset(e.target.value)}
+              className="mt-1 h-10"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Search Staff
+            </label>
+            <div className="relative mt-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={staffSearch}
+                onChange={(e) => setStaffSearch(e.target.value)}
+                placeholder="Name, code, role…"
+                className="h-10 pl-9"
+              />
+            </div>
+          </div>
           {user?.is_superuser && locations.length > 0 && (
-            <Select value={branch} onValueChange={setBranch}>
-              <SelectTrigger className="w-[180px]"><SelectValue placeholder="All branches" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All branches</SelectItem>
-                {locations.map((l) => (
-                  <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Branch Office
+              </label>
+              <Select value={branch} onValueChange={setBranch}>
+                <SelectTrigger className="mt-1 h-10">
+                  <SelectValue placeholder="All branches" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All branches</SelectItem>
+                  {locations.map((l) => (
+                    <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          <span className="text-xs font-medium text-muted-foreground">Statement Presets:</span>
+          <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => applyRangePreset("this_month")}>
+            This Month
+          </Button>
+          <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => applyRangePreset("last_month")}>
+            Previous Month
+          </Button>
+          <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => applyRangePreset("last_15")}>
+            Last 15 Days
+          </Button>
+          <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => applyRangePreset("last_7")}>
+            Last 7 Days
+          </Button>
+          {!validRange && (
+            <span className="text-xs font-medium text-rose-500 ml-2">
+              To Date must be on or after From Date.
+            </span>
           )}
         </div>
       </div>
@@ -173,8 +310,11 @@ export function PayslipPage() {
       {/* Totals */}
       <div className="no-print grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-2xl border border-border bg-card p-4">
-          <p className="text-sm text-muted-foreground">Month</p>
-          <p className="mt-1 text-xl font-bold">{prettyMonth(month)}</p>
+          <p className="text-sm text-muted-foreground">Statement Period</p>
+          <p className="mt-1 text-lg font-bold leading-snug">{periodRangeText}</p>
+          {run?.period?.days_in_month ? (
+            <p className="text-xs text-muted-foreground mt-0.5">{run.period.days_in_month} days</p>
+          ) : null}
         </div>
         <div className="rounded-2xl border border-border bg-card p-4">
           <p className="text-sm text-muted-foreground">Total Salary Earned</p>
@@ -292,7 +432,9 @@ export function PayslipPage() {
                     <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-4">
                       <div>
                         <h2 className="text-lg font-bold">Shri Krishna Nursing</h2>
-                        <p className="text-sm text-muted-foreground">Salary slip · {prettyMonth(slip.period.month)}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Salary slip · {formatSlashDateIST(slip.period.start)} – {formatSlashDateIST(slip.period.end)}
+                        </p>
                       </div>
                       <div className="text-right">
                         <p className="font-semibold">{slip.employee.name}</p>
@@ -313,7 +455,7 @@ export function PayslipPage() {
                         { label: "Payable days", value: slip.summary.payable_days },
                         { label: "Per Day Salary", value: inr(slipRate ?? 0) },
                         { label: "Deduction", value: inr(slip.summary.leave_deduction) },
-                        { label: "Days in month", value: slip.period.days_in_month },
+                        { label: "Period days", value: slip.period.days_in_month },
                       ].map((s) => (
                         <div key={s.label} className="rounded-xl border border-border p-3">
                           <p className="text-xs text-muted-foreground">{s.label}</p>
