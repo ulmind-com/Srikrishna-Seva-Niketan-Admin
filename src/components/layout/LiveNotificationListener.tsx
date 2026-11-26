@@ -6,7 +6,7 @@ import { BellRing, CalendarCheck, CheckCircle2, AlertTriangle, ArrowRight } from
 import { toast } from "sonner";
 import { env } from "@/config/env";
 import { tokenStore } from "@/services/api/tokens";
-import { playDutyAlertSound } from "@/utils/audioAlert";
+import { playSynthesizedChime, stopAnyActiveAudio } from "@/utils/audioAlert";
 
 /**
  * LiveNotificationListener
@@ -16,14 +16,15 @@ import { playDutyAlertSound } from "@/utils/audioAlert";
  * User preference:
  * - Nurse duty ACCEPT and duty COMPLETE must NOT play any sound or interrupt admin with a ringing modal.
  *   (Shows a discreet toast so admin is kept informed silently).
- * - Only brand new patient bookings and urgent duty declines ring the admin.
+ * - Only brand new patient bookings and urgent duty declines alert the admin with a clean chime
+ *   (never the "new assignment" nurse voice MP3).
  */
 
 // ─── Sound ───────────────────────────────────────────────────
 let ringTimer: ReturnType<typeof setInterval> | null = null;
 
 function playSound() {
-  playDutyAlertSound();
+  playSynthesizedChime();
 }
 
 function startRinging() {
@@ -33,6 +34,7 @@ function startRinging() {
 }
 
 function stopRinging() {
+  stopAnyActiveAudio();
   if (ringTimer) {
     clearInterval(ringTimer);
     ringTimer = null;
