@@ -1,4 +1,4 @@
-import { useState, useId } from "react";
+import { useState, useId, useEffect, useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Loader2,
@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { assignmentService } from "@/services/resources";
 import type { Assignment, DutyBreak } from "@/types/models";
 import { formatDate } from "@/lib/utils";
+import { combineDateTimeIST, parseIST } from "@/lib/ist-datetime";
 
 interface DutyBreakDialogProps {
   assignment: Assignment | null;
@@ -49,9 +50,54 @@ export function DutyBreakDialog({
 
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
-  const [startTime, setStartTime] = useState<string>("07:00");
-  const [endTime, setEndTime] = useState<string>("07:00");
+  const [startTime, setStartTime] = useState<string>("08:00");
+  const [endTime, setEndTime] = useState<string>("08:00");
   const [reason, setReason] = useState<string>("");
+
+  useEffect(() => {
+    if (assignment) {
+      const defTime =
+        assignment.start_time ||
+        (assignment.shift === "night"
+          ? "20:00"
+          : assignment.shift === "morning"
+            ? "07:00"
+            : "08:00");
+      setStartTime(defTime);
+      setEndTime(
+        assignment.shift === "full_24h"
+          ? defTime
+          : assignment.end_time ||
+              (assignment.shift === "night" ? "08:00" : assignment.shift === "morning" ? "15:00" : "20:00")
+      );
+    }
+  }, [assignment]);
+
+  const breakPreview = useMemo(() => {
+    if (!startDate || !endDate) return null;
+    const sD = parseIST(startDate);
+    const eD = parseIST(endDate);
+    if (!sD || !eD || eD < sD) return null;
+    if (startTime && endTime) {
+      const bs = combineDateTimeIST(startDate, startTime);
+      let be = combineDateTimeIST(endDate, endTime);
+      if (!bs || !be) return null;
+      if (be.toMillis() === bs.toMillis() && sD.hasSame(eD, "day")) {
+        be = bs.plus({ days: 1 });
+      } else if (be <= bs) {
+        be = be.plus({ days: 1 });
+      }
+      const hrs = Math.round(be.diff(bs, "hours").hours * 10) / 10;
+      const days = Math.round((hrs / 24) * 2) / 2;
+      return {
+        label: `${bs.toFormat("dd MMM, hh:mm a")} → ${be.toFormat("dd MMM, hh:mm a")}`,
+        days,
+        hrs,
+      };
+    }
+    const days = Math.round(eD.diff(sD, "days").days) + 1;
+    return { label: `${sD.toFormat("dd MMM")} → ${eD.toFormat("dd MMM")}`, days, hrs: days * 24 };
+  }, [startDate, endDate, startTime, endTime]);
 
   const breaks: DutyBreak[] = assignment?.duty_breaks ?? [];
 
@@ -286,11 +332,18 @@ export function DutyBreakDialog({
                 />
               </div>
 
-              <div className="rounded-md bg-blue-500/10 p-2.5 text-[11px] text-blue-800 dark:text-blue-300 flex items-start gap-1.5">
-                <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                <span>
-                  Break days are automatically marked as <strong>Off</strong> (unpaid) on attendance and deducted from billable/payable days.
-                </span>
+              <div className="rounded-md bg-blue-500/10 p-2.5 text-[11px] text-blue-800 dark:text-blue-300 flex flex-col gap-1">
+                {breakPreview && (
+                  <div className="font-semibold text-foreground">
+                    IST Pause Span: {breakPreview.label} ({breakPreview.days} Day{breakPreview.days === 1 ? "" : "s"} / {breakPreview.hrs} hrs)
+                  </div>
+                )}
+                <div className="flex items-start gap-1.5">
+                  <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                  <span>
+                    Break intervals are automatically deducted in IST and marked <strong>Off</strong> on attendance &amp; payslips.
+                  </span>
+                </div>
               </div>
 
               <Button

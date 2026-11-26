@@ -1,66 +1,31 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { formatDistanceToNow, parseISO } from "date-fns";
+import { IST_ZONE, parseIST } from "@/lib/ist-datetime";
 
 /** Merge Tailwind class names, resolving conflicts. */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export const IST_TIMEZONE = "Asia/Kolkata";
+export const IST_TIMEZONE = IST_ZONE;
 
 /** Format an ISO date string as a readable date in Indian Standard Time (IST). */
 export function formatDate(value?: string | Date | null, _pattern = "dd MMM yyyy"): string {
-  if (!value) return "—";
-  try {
-    const d = typeof value === "string" ? new Date(value) : value;
-    if (isNaN(d.getTime())) return "—";
-    return new Intl.DateTimeFormat("en-IN", {
-      timeZone: IST_TIMEZONE,
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    }).format(d);
-  } catch {
-    return "—";
-  }
+  const dt = parseIST(value);
+  return dt ? dt.toFormat("dd MMM yyyy") : "—";
 }
 
 /** Format an ISO date string as date + time in Indian Standard Time (IST). */
 export function formatDateTime(value?: string | Date | null): string {
-  if (!value) return "—";
-  try {
-    const d = typeof value === "string" ? new Date(value) : value;
-    if (isNaN(d.getTime())) return "—";
-    return new Intl.DateTimeFormat("en-IN", {
-      timeZone: IST_TIMEZONE,
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    }).format(d);
-  } catch {
-    return "—";
-  }
+  const dt = parseIST(value);
+  return dt ? dt.toFormat("dd MMM yyyy, hh:mm a") : "—";
 }
 
 /** Format time only in Indian Standard Time (IST). */
 export function formatTime(value?: string | Date | null): string {
-  if (!value) return "—";
-  try {
-    const d = typeof value === "string" ? new Date(value) : value;
-    if (isNaN(d.getTime())) return "—";
-    return new Intl.DateTimeFormat("en-IN", {
-      timeZone: IST_TIMEZONE,
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    }).format(d);
-  } catch {
-    return "—";
-  }
+  const dt = parseIST(value);
+  return dt ? dt.toFormat("hh:mm a") : "—";
 }
 
 /** Relative time e.g. "3 hours ago". */

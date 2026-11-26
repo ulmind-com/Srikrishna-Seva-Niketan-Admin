@@ -3,7 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import { FileDown, Loader2, Printer, ReceiptText, Wallet, X } from "lucide-react";
 import { downloadPayslipPdf } from "@/lib/payslip-export";
-import { formatAttendanceWindow } from "@/components/documents/document-utils";
+import {
+  currentMonthIST,
+  formatAttendanceWindowIST,
+  formatShiftWindowsIST,
+  monthLabelIST,
+} from "@/lib/ist-datetime";
 import { useAuth } from "@/contexts/AuthContext";
 import { http } from "@/services/api/http";
 import { endpoints } from "@/services/api/endpoints";
@@ -44,24 +49,7 @@ const SHIFT_LABEL: Record<string, string> = {
   custom: "Custom",
 };
 
-/** "18:00" -> "6:00 PM". */
-function fmtTime(t?: string | null): string {
-  if (!t) return "?";
-  const [h, m] = t.split(":");
-  const hi = Number(h);
-  const mi = Number(m);
-  if (Number.isNaN(hi) || Number.isNaN(mi)) return t;
-  const suffix = hi < 12 ? "AM" : "PM";
-  const h12 = hi % 12 || 12;
-  return `${h12}:${String(mi).padStart(2, "0")} ${suffix}`;
-}
-
-function isWindowOvernight(start?: string | null, end?: string | null): boolean {
-  if (!start || !end) return false;
-  return end <= start;
-}
-
-/** Shift cell for a payslip day — time window(s) for custom shifts with overnight tag. */
+/** Shift cell for a payslip day — shows exact IST dates & times (including next-day checkout). */
 function dayShiftText(d: {
   date?: string;
   status?: string;
@@ -71,6 +59,9 @@ function dayShiftText(d: {
   shift_windows?: { start?: string | null; end?: string | null }[] | null;
 }): string {
   if (!d.shift) return "—";
+  if (d.status === "off" || d.status === "leave" || d.status === "absent" || d.status === "unmarked") {
+    return STATUS_LABEL[d.status] ?? "—";
+  }
   const shiftTitle =
     d.shift === "morning"
       ? "Morning"
@@ -82,23 +73,12 @@ function dayShiftText(d: {
       ? "24 Hours"
       : "Custom";
 
-  if (d.shift_windows && d.shift_windows.length) {
-    return d.shift_windows
-      .map(
-        (w) =>
-          `${fmtTime(w.start)} – ${fmtTime(w.end)}${
-            isWindowOvernight(w.start, w.end) ? " (Overnight)" : ""
-          }`
-      )
-      .join(", ");
+  if (d.shift_windows && d.shift_windows.length && d.date) {
+    return `${shiftTitle} (${formatShiftWindowsIST(d.date, d.shift_windows)})`;
   }
 
-  if (d.start_time && d.end_time) {
-    if (d.date) {
-      return `${shiftTitle} (${formatAttendanceWindow(d.date, d.shift, d.start_time, d.end_time, d.status)})`;
-    }
-    const on = isWindowOvernight(d.start_time, d.end_time) ? " (Overnight)" : "";
-    return `${shiftTitle} (${fmtTime(d.start_time)} – ${fmtTime(d.end_time)})${on}`;
+  if ((d.start_time || d.end_time) && d.date) {
+    return `${shiftTitle} (${formatAttendanceWindowIST(d.date, d.shift, d.start_time, d.end_time, d.status)})`;
   }
 
   const detailedMap: Record<string, string> = {
@@ -111,20 +91,9 @@ function dayShiftText(d: {
   return detailedMap[d.shift] ?? SHIFT_LABEL[d.shift] ?? d.shift;
 }
 
-function currentMonth(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-  })
-    .format(new Date())
-    .slice(0, 7);
-}
+const currentMonth = currentMonthIST;
 const inr = (n: number) => `₹${(n ?? 0).toLocaleString("en-IN")}`;
-function prettyMonth(m: string): string {
-  const [y, mo] = m.split("-").map(Number);
-  return new Date(y, mo - 1, 1).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
-}
+const prettyMonth = monthLabelIST;
 
 /**
  * Monthly payroll run and printable payslips. The table is the whole month's

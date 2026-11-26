@@ -32,6 +32,7 @@ import {
 } from "@/components/resource/fields/ShiftWindowsField";
 import type { Assignment, ShiftType } from "@/types/models";
 import { formatDate } from "@/lib/utils";
+import { calculateDutyScheduleIST, todayIST } from "@/lib/ist-datetime";
 
 interface ReplaceStaffDialogProps {
   assignment: Assignment | null;
@@ -39,14 +40,7 @@ interface ReplaceStaffDialogProps {
   onSuccess?: () => void;
 }
 
-function getTodayIST(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-}
+const getTodayIST = todayIST;
 
 export function ReplaceStaffDialog({
   assignment,
@@ -87,12 +81,17 @@ export function ReplaceStaffDialog({
         ]);
       }
 
-      if (assignment.start_time) setStartTime(assignment.start_time);
-      else if (asgShift === "day") setStartTime("08:00");
-      else if (asgShift === "night") setStartTime("20:00");
-      else if (asgShift === "morning") setStartTime("07:00");
+      const effStart =
+        assignment.start_time ||
+        (asgShift === "night"
+          ? "20:00"
+          : asgShift === "morning"
+            ? "07:00"
+            : "08:00");
+      setStartTime(effStart);
 
       if (assignment.end_time) setEndTime(assignment.end_time);
+      else if (asgShift === "full_24h") setEndTime(effStart);
       else if (asgShift === "day") setEndTime("20:00");
       else if (asgShift === "night") setEndTime("08:00");
       else if (asgShift === "morning") setEndTime("15:00");
@@ -149,15 +148,38 @@ export function ReplaceStaffDialog({
     }
   };
 
-  // Compute handoff summary dates
+  // Compute handoff summary dates + live IST duty day counts
   const handoffDates = useMemo(() => {
     if (!assignment || !effectiveDate) return null;
+    const prevSummary = calculateDutyScheduleIST({
+      startDate: String(assignment.start_date).slice(0, 10),
+      endDate: effectiveDate,
+      startTime: assignment.start_time || "08:00",
+      endTime: startTime,
+      shift: assignment.shift,
+      dutyBreaks: assignment.duty_breaks,
+      shiftWindows: assignment.shift_windows,
+      isHandover: true,
+    });
+    const newSummary =
+      hasEndDate && endDate
+        ? calculateDutyScheduleIST({
+            startDate: effectiveDate,
+            endDate,
+            startTime,
+            endTime,
+            shift,
+            shiftWindows: shift === "custom" ? shiftWindows : undefined,
+          })
+        : null;
     return {
       prevEnd: effectiveDate,
       newStart: effectiveDate,
       newEnd: hasEndDate && endDate ? endDate : "Ongoing (চলমান — প্রতি মাসে বিলিং)",
+      prevDays: prevSummary?.days ?? null,
+      newDays: newSummary?.days ?? null,
     };
-  }, [assignment, effectiveDate, hasEndDate, endDate]);
+  }, [assignment, effectiveDate, hasEndDate, endDate, startTime, endTime, shift, shiftWindows]);
 
   const customWindowsText = useMemo(() => {
     if (shift !== "custom" || !shiftWindows.length) return "";
@@ -355,7 +377,14 @@ export function ReplaceStaffDialog({
                   <Input
                     type="time"
                     value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      const prev = startTime;
+                      setStartTime(next);
+                      if (shift === "full_24h" && (!endTime || endTime === prev)) {
+                        setEndTime(next);
+                      }
+                    }}
                     className="h-9"
                   />
                 </div>
@@ -477,14 +506,15 @@ export function ReplaceStaffDialog({
                     1. {assignment.employee_name} (Previous Nurse):
                   </span>
                   <span>
-                    {formatDate(assignment.start_date)} → {formatDate(handoffDates.prevEnd)} ({startTime}) (Completed / Handed Over)
+                    {formatDate(assignment.start_date)} → {formatDate(handoffDates.prevEnd)} ({startTime})
+                    {handoffDates.prevDays != null ? ` · ${handoffDates.prevDays}d` : ""} (Completed / Handed Over)
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-emerald-500 font-semibold">
                   <ArrowRight className="h-4 w-4 shrink-0" />
                   <span>2. {selectedNewEmp.name} (New Replacement):</span>
                   <span>
-                    {formatDate(handoffDates.newStart)} ({startTime}) → {hasEndDate && endDate ? `${formatDate(endDate)} (${endTime})` : "Ongoing (চলমান ডিউটি)"}
+                    {formatDate(handoffDates.newStart)} ({startTime}) → {hasEndDate && endDate ? `${formatDate(endDate)} (${endTime})${handoffDates.newDays != null ? ` · ${handoffDates.newDays}d` : ""}` : "Ongoing (চলমান ডিউটি)"}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground pl-6 text-[11px]">

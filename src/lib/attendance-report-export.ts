@@ -1,7 +1,15 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { Payslip } from "@/services/payroll.service";
-import { formatAttendanceWindow } from "@/components/documents/document-utils";
+import {
+  formatAttendanceWindowIST,
+  formatShiftWindowsIST,
+  formatSlashDateIST,
+  formatTime12hIST,
+  monthLabelIST,
+  nowIST,
+  weekdayIST,
+} from "@/lib/ist-datetime";
 
 const EMERALD: [number, number, number] = [15, 118, 110];
 const SLATE: [number, number, number] = [30, 41, 59];
@@ -19,35 +27,19 @@ const STATUS_LABEL: Record<string, string> = {
   unmarked: "—",
 };
 
-function monthLabel(month: string): string {
-  const [y, m] = month.split("-");
-  const d = new Date(Number(y), Number(m) - 1, 1);
-  return d.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
-}
-
-function fmtTime(t?: string | null): string {
-  if (!t) return "";
-  const [h, m] = t.split(":");
-  const hi = Number(h);
-  const mi = Number(m);
-  if (Number.isNaN(hi) || Number.isNaN(mi)) return t;
-  const suffix = hi < 12 ? "AM" : "PM";
-  return `${hi % 12 || 12}:${String(mi).padStart(2, "0")} ${suffix}`;
-}
-
 function shiftText(d: Payslip["days"][number]): string {
   if (!d.shift) return "";
   if (d.shift === "custom") {
-    if (d.shift_windows && d.shift_windows.length) {
-      return d.shift_windows.map((w) => `${fmtTime(w.start)}-${fmtTime(w.end)}`).join(", ");
+    if (d.shift_windows && d.shift_windows.length && d.date) {
+      return formatShiftWindowsIST(d.date, d.shift_windows, true);
     }
-    if (d.start_time || d.end_time) return `${fmtTime(d.start_time)}-${fmtTime(d.end_time)}`;
+    if (d.start_time || d.end_time) {
+      return `${formatTime12hIST(d.start_time)}-${formatTime12hIST(d.end_time)}`;
+    }
   }
   const map: Record<string, string> = { morning: "Morning", day: "Day", night: "Night", full_24h: "24h", custom: "Custom" };
   return map[d.shift] ?? d.shift;
 }
-
-const WEEKDAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 /**
  * Premium monthly attendance report for one staff member: a day-by-day table
@@ -63,7 +55,7 @@ export function downloadAttendanceReportPdf(slip: Payslip) {
   const dateRangeLabel =
     slip.period.start && slip.period.end
       ? `${slip.period.start} to ${slip.period.end}`
-      : monthLabel(slip.period.month);
+      : monthLabelIST(slip.period.month);
 
   // Header banner
   doc.setFillColor(...EMERALD);
@@ -96,7 +88,7 @@ export function downloadAttendanceReportPdf(slip: Payslip) {
     y + 14
   );
   doc.text(
-    `Statement Generated: ${new Date().toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })}`,
+    `Statement Generated: ${formatSlashDateIST(nowIST().toJSDate())}`,
     pageWidth - marginX,
     y + 14,
     { align: "right" }
@@ -144,17 +136,27 @@ export function downloadAttendanceReportPdf(slip: Payslip) {
     startY,
     head: [["Date", "Day", "Duty Hours / Window", "Duration", "Shift", "Customer / Patient", "Status", "Amount"]],
     body: slip.days.map((d) => {
-      const wd = WEEKDAY[new Date(d.date).getDay()];
-      const timing = formatAttendanceWindow(d.date, d.shift, d.start_time, d.end_time, d.status, true);
-      const dur =
-        d.duration ||
-        (d.status === "half_day"
-          ? "12 hrs"
-          : d.shift === "full_24h"
-            ? "24 hrs"
-            : d.shift
-              ? "12 hrs"
-              : "—");
+      const wd = weekdayIST(d.date);
+      const isInactive =
+        d.status === "off" ||
+        d.status === "leave" ||
+        d.status === "absent" ||
+        d.status === "unmarked";
+      const timing = isInactive
+        ? "-"
+        : d.shift_windows && d.shift_windows.length
+          ? formatShiftWindowsIST(d.date, d.shift_windows, true)
+          : formatAttendanceWindowIST(d.date, d.shift, d.start_time, d.end_time, d.status, true);
+      const dur = isInactive
+        ? "-"
+        : d.duration ||
+          (d.status === "half_day"
+            ? "12 hrs"
+            : d.shift === "full_24h"
+              ? "24 hrs"
+              : d.shift
+                ? "12 hrs"
+                : "—");
       return [
         d.date,
         wd,

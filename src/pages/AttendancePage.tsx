@@ -30,7 +30,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { downloadAttendanceReportPdf } from "@/lib/attendance-report-export";
-import { formatAttendanceWindow } from "@/components/documents/document-utils";
+import {
+  currentMonthRangeIST,
+  formatAttendanceWindowIST,
+  formatDateWithDayIST,
+  formatShiftWindowsIST,
+  nowIST,
+} from "@/lib/ist-datetime";
 
 const inr = (n?: number | null) => `₹${(n ?? 0).toLocaleString("en-IN")}`;
 
@@ -69,33 +75,8 @@ const SHIFT_LABEL: Record<string, string> = {
   custom: "Custom",
 };
 
-function toISODate(d: Date): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(d);
-}
-
-function formatDateWithDay(iso: string): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  const dt = new Date(y, m - 1, d);
-  return dt.toLocaleDateString("en-IN", {
-    timeZone: "Asia/Kolkata",
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    weekday: "short",
-  });
-}
-
-function getCurrentMonthRange(): { start: string; end: string } {
-  const now = new Date();
-  const first = new Date(now.getFullYear(), now.getMonth(), 1);
-  const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  return { start: toISODate(first), end: toISODate(last) };
-}
+const formatDateWithDay = formatDateWithDayIST;
+const getCurrentMonthRange = currentMonthRangeIST;
 
 export function AttendancePage() {
   const { user } = useAuth();
@@ -165,28 +146,23 @@ export function AttendancePage() {
     staleTime: 5_000,
   });
 
-  // Presets
+  // Presets in IST
   const applyPreset = (preset: "this_month" | "last_15" | "last_30" | "last_month") => {
-    const now = new Date();
+    const now = nowIST();
     if (preset === "this_month") {
       const r = getCurrentMonthRange();
       setStartDate(r.start);
       setEndDate(r.end);
     } else if (preset === "last_15") {
-      const past = new Date();
-      past.setDate(past.getDate() - 14);
-      setStartDate(toISODate(past));
-      setEndDate(toISODate(now));
+      setStartDate(now.minus({ days: 14 }).toISODate() || "");
+      setEndDate(now.toISODate() || "");
     } else if (preset === "last_30") {
-      const past = new Date();
-      past.setDate(past.getDate() - 29);
-      setStartDate(toISODate(past));
-      setEndDate(toISODate(now));
+      setStartDate(now.minus({ days: 29 }).toISODate() || "");
+      setEndDate(now.toISODate() || "");
     } else if (preset === "last_month") {
-      const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const last = new Date(now.getFullYear(), now.getMonth(), 0);
-      setStartDate(toISODate(first));
-      setEndDate(toISODate(last));
+      const prev = now.minus({ months: 1 });
+      setStartDate(prev.startOf("month").toISODate() || "");
+      setEndDate(prev.endOf("month").toISODate() || "");
     }
   };
 
@@ -569,23 +545,33 @@ export function AttendancePage() {
                   {daysList.map((d: PayslipDay, index: number) => {
                     const statusInfo = STATUS_BADGE[d.status] || STATUS_BADGE.unmarked;
                     const shiftName = d.shift ? (SHIFT_LABEL[d.shift] || d.shift) : "—";
-                    const dutyTiming = formatAttendanceWindow(
-                      d.date,
-                      d.shift,
-                      d.start_time,
-                      d.end_time,
-                      d.status
-                    );
+                    const isInactiveDay =
+                      d.status === "off" ||
+                      d.status === "leave" ||
+                      d.status === "absent" ||
+                      d.status === "unmarked";
+                    const dutyTiming = isInactiveDay
+                      ? "—"
+                      : d.shift_windows && d.shift_windows.length
+                        ? formatShiftWindowsIST(d.date, d.shift_windows)
+                        : formatAttendanceWindowIST(
+                            d.date,
+                            d.shift,
+                            d.start_time,
+                            d.end_time,
+                            d.status
+                          );
 
-                    const dur =
-                      d.duration ||
-                      (d.status === "half_day"
-                        ? "12 hrs"
-                        : d.shift === "full_24h"
-                          ? "24 hrs"
-                          : d.shift
-                            ? "12 hrs"
-                            : "—");
+                    const dur = isInactiveDay
+                      ? "—"
+                      : d.duration ||
+                        (d.status === "half_day"
+                          ? "12 hrs"
+                          : d.shift === "full_24h"
+                            ? "24 hrs"
+                            : d.shift
+                              ? "12 hrs"
+                              : "—");
 
                     const isPayable = d.status === "present" || d.status === "half_day";
 

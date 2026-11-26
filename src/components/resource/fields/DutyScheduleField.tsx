@@ -1,18 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Calendar, Clock, UserCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ShiftWindowsField, type ShiftWindow } from "./ShiftWindowsField";
 import { cn } from "@/lib/utils";
-
-function getTodayIST(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-}
+import { calculateDutyScheduleIST, todayIST } from "@/lib/ist-datetime";
 
 export interface DutyScheduleFieldProps {
   watch: (name?: string) => any;
@@ -33,22 +25,44 @@ export function DutyScheduleField({
   setValue,
 }: DutyScheduleFieldProps) {
   const currentShift = watch("shift") || "full_24h";
-  const startDate = watch("start_date") || getTodayIST();
+  const startDate = watch("start_date") || todayIST();
   const startTime = watch("start_time") || "08:00";
   const endDate = watch("end_date");
-  const endTime = watch("end_time") || "20:00";
+  const endTime = watch("end_time") || (currentShift === "full_24h" ? startTime : "20:00");
   const shiftWindows = watch("shift_windows") || [];
+  const dutyBreaks = watch("duty_breaks") || [];
 
-  // Track ON/OFF state for End Date & Time. If endDate has a value, default to ON.
+  // Track ON/OFF state for End Date & Time synced to form reset / edits.
   const [hasEndDate, setHasEndDate] = useState<boolean>(() => Boolean(endDate && String(endDate).trim()));
+
+  useEffect(() => {
+    setHasEndDate(Boolean(endDate && String(endDate).trim()));
+  }, [endDate]);
 
   // Ensure initial values in react-hook-form
   useEffect(() => {
     if (!watch("shift")) setValue("shift", "full_24h", { shouldDirty: false });
-    if (!watch("start_date")) setValue("start_date", getTodayIST(), { shouldDirty: false });
+    if (!watch("start_date")) setValue("start_date", todayIST(), { shouldDirty: false });
     if (!watch("start_time")) setValue("start_time", "08:00", { shouldDirty: false });
-    if (hasEndDate && !watch("end_time")) setValue("end_time", "20:00", { shouldDirty: false });
+    if (hasEndDate && !watch("end_time")) {
+      const st = watch("start_time") || "08:00";
+      setValue("end_time", (watch("shift") || "full_24h") === "full_24h" ? st : "20:00", { shouldDirty: false });
+    }
   }, []);
+
+  const liveSummary = useMemo(() => {
+    if (!hasEndDate || !startDate || !endDate) return null;
+    return calculateDutyScheduleIST({
+      startDate: String(startDate).slice(0, 10),
+      endDate: String(endDate).slice(0, 10),
+      startTime,
+      endTime,
+      shift: currentShift,
+      shiftWindows,
+      dutyBreaks,
+      isHandover: watch("status") === "replaced",
+    });
+  }, [hasEndDate, startDate, endDate, startTime, endTime, currentShift, shiftWindows, dutyBreaks, watch]);
 
   const handleShiftChange = (shiftId: string) => {
     setValue("shift", shiftId, { shouldDirty: true });
@@ -59,6 +73,14 @@ export function DutyScheduleField({
     }
   };
 
+  const handleStartTimeChange = (nextStart: string) => {
+    const prevStart = startTime;
+    setValue("start_time", nextStart, { shouldDirty: true });
+    if (currentShift === "full_24h" && (!watch("end_time") || endTime === prevStart)) {
+      setValue("end_time", nextStart, { shouldDirty: true });
+    }
+  };
+
   const handleToggleEndDate = () => {
     const nextState = !hasEndDate;
     setHasEndDate(nextState);
@@ -66,10 +88,14 @@ export function DutyScheduleField({
       setValue("end_date", null, { shouldDirty: true });
       setValue("end_time", null, { shouldDirty: true });
     } else {
-      const defEnd = startDate || getTodayIST();
+      const defEnd = startDate || todayIST();
       setValue("end_date", defEnd, { shouldDirty: true });
       const opt = SHIFT_OPTIONS.find((s) => s.id === currentShift);
-      setValue("end_time", opt?.defEnd || "20:00", { shouldDirty: true });
+      setValue(
+        "end_time",
+        currentShift === "full_24h" ? startTime || "08:00" : opt?.defEnd || "20:00",
+        { shouldDirty: true }
+      );
     }
   };
 
@@ -133,7 +159,7 @@ export function DutyScheduleField({
             <Input
               type="time"
               value={startTime || "08:00"}
-              onChange={(e) => setValue("start_time", e.target.value, { shouldDirty: true })}
+              onChange={(e) => handleStartTimeChange(e.target.value)}
               className="h-9"
             />
           </div>
@@ -163,30 +189,43 @@ export function DutyScheduleField({
         </div>
 
         {hasEndDate ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-            <div className="space-y-1">
-              <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
-                <Calendar className="h-3 w-3 text-primary" /> End Date (ক্যালেন্ডার থেকে শেষ তারিখ)
-              </span>
-              <Input
-                type="date"
-                value={endDate ? String(endDate).slice(0, 10) : ""}
-                min={startDate ? String(startDate).slice(0, 10) : undefined}
-                onChange={(e) => setValue("end_date", e.target.value, { shouldDirty: true })}
-                className="h-9"
-              />
+          <div className="space-y-2.5 pt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
+                  <Calendar className="h-3 w-3 text-primary" /> End Date (ক্যালেন্ডার থেকে শেষ তারিখ)
+                </span>
+                <Input
+                  type="date"
+                  value={endDate ? String(endDate).slice(0, 10) : ""}
+                  min={startDate ? String(startDate).slice(0, 10) : undefined}
+                  onChange={(e) => setValue("end_date", e.target.value, { shouldDirty: true })}
+                  className="h-9"
+                />
+              </div>
+              <div className="space-y-1">
+                <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
+                  <Clock className="h-3 w-3 text-primary" /> End Time (ক্লক / সমাপ্তির সময়)
+                </span>
+                <Input
+                  type="time"
+                  value={endTime || (currentShift === "full_24h" ? startTime : "20:00")}
+                  onChange={(e) => setValue("end_time", e.target.value, { shouldDirty: true })}
+                  className="h-9"
+                />
+              </div>
             </div>
-            <div className="space-y-1">
-              <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
-                <Clock className="h-3 w-3 text-primary" /> End Time (ক্লক / সমাপ্তির সময়)
-              </span>
-              <Input
-                type="time"
-                value={endTime || "20:00"}
-                onChange={(e) => setValue("end_time", e.target.value, { shouldDirty: true })}
-                className="h-9"
-              />
-            </div>
+            {liveSummary && (
+              <div className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-1.5 text-[11px] flex flex-wrap items-center justify-between gap-2">
+                <span className="text-muted-foreground">
+                  IST: <strong className="text-foreground">{liveSummary.startLabel}</strong> →{" "}
+                  <strong className="text-foreground">{liveSummary.endLabel}</strong>
+                </span>
+                <span className="font-bold text-primary">
+                  {liveSummary.days} Day{liveSummary.days === 1 ? "" : "s"} ({liveSummary.hours} hrs)
+                </span>
+              </div>
+            )}
           </div>
         ) : (
           <div className="rounded-xl border border-dashed border-border bg-card/60 p-2.5 text-center">

@@ -1,7 +1,14 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { Payslip, PayslipDay } from "@/services/payroll.service";
-import { formatAttendanceWindow } from "@/components/documents/document-utils";
+import {
+  formatAttendanceWindowIST,
+  formatShiftWindowsIST,
+  formatSlashDateIST,
+  monthLabelIST,
+  nowIST,
+  weekdayIST,
+} from "@/lib/ist-datetime";
 
 const EMERALD: [number, number, number] = [15, 118, 110];
 const SLATE: [number, number, number] = [30, 41, 59];
@@ -9,7 +16,6 @@ const MUTED: [number, number, number] = [100, 116, 139];
 const ROSE: [number, number, number] = [190, 18, 60];
 
 const rupee = (n?: number | null) => `Rs ${(n ?? 0).toLocaleString("en-IN")}`;
-const WEEKDAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const STATUS_LABEL: Record<string, string> = {
   present: "Present",
   half_day: "Half day",
@@ -19,30 +25,11 @@ const STATUS_LABEL: Record<string, string> = {
   unmarked: "—",
 };
 
-function monthLabel(month: string): string {
-  const [y, m] = month.split("-");
-  return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString("en-IN", {
-    month: "long",
-    year: "numeric",
-  });
-}
-
-function fmtTime(t?: string | null): string {
-  if (!t) return "";
-  const [h, m] = t.split(":");
-  const hi = Number(h);
-  const mi = Number(m);
-  if (Number.isNaN(hi) || Number.isNaN(mi)) return t;
-  return `${hi % 12 || 12}:${String(mi).padStart(2, "0")} ${hi < 12 ? "AM" : "PM"}`;
-}
-
-function isWindowOvernight(start?: string | null, end?: string | null): boolean {
-  if (!start || !end) return false;
-  return end <= start;
-}
-
 function shiftText(d: PayslipDay): string {
   if (!d.shift) return "";
+  if (d.status === "off" || d.status === "leave" || d.status === "absent") {
+    return STATUS_LABEL[d.status] ?? "";
+  }
   const shiftTitle =
     d.shift === "morning"
       ? "Morning"
@@ -54,29 +41,18 @@ function shiftText(d: PayslipDay): string {
       ? "24 Hours"
       : "Custom";
 
-  if (d.shift_windows && d.shift_windows.length) {
-    return d.shift_windows
-      .map(
-        (w) =>
-          `${fmtTime(w.start)}–${fmtTime(w.end)}${
-            isWindowOvernight(w.start, w.end) ? " (Overnight)" : ""
-          }`
-      )
-      .join(", ");
+  if (d.shift_windows && d.shift_windows.length && d.date) {
+    return `${shiftTitle} (${formatShiftWindowsIST(d.date, d.shift_windows, true)})`;
   }
 
-  if (d.start_time && d.end_time) {
-    if (d.date) {
-      return `${shiftTitle} (${formatAttendanceWindow(d.date, d.shift, d.start_time, d.end_time, d.status, true)})`;
-    }
-    const on = isWindowOvernight(d.start_time, d.end_time) ? " (Next Day)" : "";
-    return `${shiftTitle} (${fmtTime(d.start_time)} - ${fmtTime(d.end_time)})${on}`;
+  if ((d.start_time || d.end_time) && d.date) {
+    return `${shiftTitle} (${formatAttendanceWindowIST(d.date, d.shift, d.start_time, d.end_time, d.status, true)})`;
   }
 
   const map: Record<string, string> = {
-    morning: "Morning (07:00 AM – 03:00 PM)",
-    day: "Day Shift (08:00 AM – 08:00 PM)",
-    night: "Night Shift (08:00 PM – 08:00 AM)",
+    morning: "Morning (07:00 AM - 03:00 PM)",
+    day: "Day Shift (08:00 AM - 08:00 PM)",
+    night: "Night Shift (08:00 PM - 08:00 AM)",
     full_24h: "24h (Round-the-clock)",
     custom: "Custom",
   };
@@ -108,7 +84,7 @@ export function downloadPayslipPdf(slip: Payslip) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
   doc.setTextColor(255, 255, 255);
-  doc.text(monthLabel(slip.period.month), pageWidth - marginX, 30, { align: "right" });
+  doc.text(monthLabelIST(slip.period.month), pageWidth - marginX, 30, { align: "right" });
 
   // Employee block
   let y = 78;
@@ -133,7 +109,7 @@ export function downloadPayslipPdf(slip: Payslip) {
     { align: "right" }
   );
   doc.text(
-    `Generated: ${new Date().toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })}`,
+    `Generated: ${formatSlashDateIST(nowIST().toJSDate())}`,
     pageWidth - marginX,
     y,
     { align: "right" }
@@ -205,7 +181,7 @@ export function downloadPayslipPdf(slip: Payslip) {
     head: [["Date", "Day", "Status", "Duty Timing & Shift", "Customer", "Daily Rate", "Payable Amount"]],
     body: slip.days.map((d) => [
       d.date,
-      WEEKDAY[new Date(d.date).getDay()],
+      weekdayIST(d.date),
       STATUS_LABEL[d.status] ?? d.status,
       shiftText(d),
       d.customer_name ?? "",

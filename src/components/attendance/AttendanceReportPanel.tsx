@@ -20,7 +20,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { downloadAttendanceReportPdf } from "@/lib/attendance-report-export";
-import { formatAttendanceWindow } from "@/components/documents/document-utils";
+import {
+  currentMonthIST,
+  formatAttendanceWindowIST,
+  formatDateWithDayIST,
+  formatShiftWindowsIST,
+  formatTime12hIST,
+  parseIST,
+} from "@/lib/ist-datetime";
 
 const inr = (n?: number | null) => `₹${(n ?? 0).toLocaleString("en-IN")}`;
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -34,45 +41,27 @@ const STATUS_LABEL: Record<string, string> = {
   unmarked: "Not marked",
 };
 
-/** "18:00" -> "6:00 PM". */
-function fmtTime(t?: string | null): string {
-  if (!t) return "?";
-  const [h, m] = t.split(":");
-  const hi = Number(h);
-  const mi = Number(m);
-  if (Number.isNaN(hi) || Number.isNaN(mi)) return t;
-  return `${hi % 12 || 12}:${String(mi).padStart(2, "0")} ${hi < 12 ? "AM" : "PM"}`;
-}
-
 /** Shift time window(s) for a day entry. */
 function dayShiftText(d: PayslipDay): string {
   if (!d.shift) return "—";
+  if (d.status === "off" || d.status === "leave" || d.status === "absent") {
+    return STATUS_LABEL[d.status] ?? "—";
+  }
   const label = SHIFT_LABEL[d.shift] ?? d.shift;
   if (d.shift_windows && d.shift_windows.length) {
-    return d.shift_windows.map((w) => `${fmtTime(w.start)}–${fmtTime(w.end)}`).join(", ");
+    return `${label} (${formatShiftWindowsIST(d.date, d.shift_windows)})`;
   }
   if (d.start_time && d.end_time) {
-    return `${label} (${formatAttendanceWindow(d.date, d.shift, d.start_time, d.end_time, d.status)})`;
+    return `${label} (${formatAttendanceWindowIST(d.date, d.shift, d.start_time, d.end_time, d.status)})`;
   }
   if (d.start_time) {
-    return `${label} (${fmtTime(d.start_time)})`;
+    return `${label} (${formatTime12hIST(d.start_time)})`;
   }
   return label;
 }
 
-function prettyDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-IN", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-}
-
-function currentMonth(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
+const prettyDate = formatDateWithDayIST;
+const currentMonth = currentMonthIST;
 
 type DayKind = "worked" | "absent" | "off" | "unmarked";
 
@@ -150,10 +139,10 @@ export function AttendanceReportPanel() {
   }, [slip]);
 
   const cells = useMemo(() => {
-    const [y, m] = month.split("-").map(Number);
-    if (!y || !m) return [];
-    const firstWeekday = new Date(y, m - 1, 1).getDay();
-    const daysInMonth = new Date(y, m, 0).getDate();
+    const first = parseIST(`${month}-01`);
+    if (!first) return [];
+    const firstWeekday = first.weekday % 7; // Sunday=0 .. Saturday=6
+    const daysInMonth = first.daysInMonth ?? 30;
     const out: ({ day: number; iso: string } | null)[] = [];
     for (let i = 0; i < firstWeekday; i++) out.push(null);
     for (let d = 1; d <= daysInMonth; d++) {
