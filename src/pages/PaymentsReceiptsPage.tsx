@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import {
@@ -26,7 +27,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { http } from "@/services/api/http";
 import { endpoints } from "@/services/api/endpoints";
-import type { Location } from "@/types/models";
+import type { Customer, Employee, Location } from "@/types/models";
 import {
   financeService,
   type ClientLedgerRow,
@@ -112,9 +113,25 @@ export function PaymentsReceiptsPage() {
   const { user, hasPermission } = useAuth();
   const can = hasPermission;
   const qc = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const monthRange = useMemo(() => currentMonthRangeIST(), []);
 
-  const [activeTab, setActiveTab] = useState<"client" | "staff" | "history">("client");
+  const urlTab = searchParams.get("tab");
+  const initialTab: "client" | "staff" | "history" =
+    urlTab === "staff" || urlTab === "history" ? urlTab : "client";
+
+  const [activeTab, setActiveTabState] = useState<"client" | "staff" | "history">(initialTab);
+  useEffect(() => {
+    const t = searchParams.get("tab");
+    if (t === "client" || t === "staff" || t === "history") {
+      setActiveTabState(t);
+    }
+  }, [searchParams]);
+
+  const setActiveTab = (t: "client" | "staff" | "history") => {
+    setActiveTabState(t);
+    setSearchParams({ tab: t }, { replace: true });
+  };
   const [branch, setBranch] = useState("all");
   const [startDate, setStartDate] = useState(monthRange.start);
   const [endDate, setEndDate] = useState(monthRange.end);
@@ -154,6 +171,32 @@ export function PaymentsReceiptsPage() {
   });
   const locations = locData?.items ?? [];
   const locParam = branch !== "all" ? branch : undefined;
+
+  const { data: customersListData } = useQuery({
+    queryKey: ["payments-customers-all"],
+    queryFn: () => http.list<Customer>(endpoints.customers.root, { page_size: 200 }),
+    staleTime: 60_000,
+  });
+  const allCustomers = customersListData?.items ?? [];
+
+  const { data: employeesListData } = useQuery({
+    queryKey: ["payments-employees-all"],
+    queryFn: () => http.list<Employee>(endpoints.employees.root, { page_size: 200 }),
+    staleTime: 60_000,
+  });
+  const allVerifiedStaff = useMemo(
+    () =>
+      (employeesListData?.items ?? []).filter(
+        (e) => (e.verification_status ?? "verified") === "verified"
+      ),
+    [employeesListData]
+  );
+
+  // Quick Client / Staff picker modal state
+  const [quickClientOpen, setQuickClientOpen] = useState(false);
+  const [quickCustId, setQuickCustId] = useState("");
+  const [quickStaffOpen, setQuickStaffOpen] = useState(false);
+  const [quickEmpId, setQuickEmpId] = useState("");
 
   const clientLedgerQ = useQuery({
     queryKey: ["client-ledger", startDate, endDate, branch],
@@ -404,6 +447,34 @@ export function PaymentsReceiptsPage() {
                 ))}
               </SelectContent>
             </Select>
+          )}
+
+          {can("payments:create") && activeTab === "client" && (
+            <Button
+              size="sm"
+              onClick={() => {
+                setQuickCustId(
+                  filteredClients[0]?.customer_id || allCustomers[0]?.id || ""
+                );
+                setQuickClientOpen(true);
+              }}
+            >
+              <Plus className="mr-1.5 h-4 w-4" /> New Client Payment
+            </Button>
+          )}
+
+          {can("payments:create") && activeTab === "staff" && (
+            <Button
+              size="sm"
+              onClick={() => {
+                setQuickEmpId(
+                  filteredStaff[0]?.employee_id || allVerifiedStaff[0]?.id || ""
+                );
+                setQuickStaffOpen(true);
+              }}
+            >
+              <Plus className="mr-1.5 h-4 w-4" /> Pay Staff Salary
+            </Button>
           )}
         </div>
       </div>
@@ -1376,6 +1447,142 @@ export function PaymentsReceiptsPage() {
             >
               {recordStaffMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Pay &amp; Download Voucher
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Client Selector Dialog -> launches Receive Modal */}
+      <Dialog open={quickClientOpen} onOpenChange={setQuickClientOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Select Client</DialogTitle>
+            <DialogDescription>
+              Choose any client to record a full, partial, or advance payment receipt.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>Client Name</Label>
+            <Select value={quickCustId} onValueChange={setQuickCustId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Choose client..." />
+              </SelectTrigger>
+              <SelectContent className="max-h-72">
+                {allCustomers.map((c) => {
+                  const ledgerMatch = (clientLedgerQ.data?.clients ?? []).find(
+                    (row) => row.customer_id === c.id
+                  );
+                  return (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                      {ledgerMatch && ledgerMatch.outstanding_amount > 0
+                        ? ` (Due: ${inr(ledgerMatch.outstanding_amount)})`
+                        : ""}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setQuickClientOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!quickCustId}
+              onClick={() => {
+                const existing = (clientLedgerQ.data?.clients ?? []).find(
+                  (r) => r.customer_id === quickCustId
+                );
+                const c = allCustomers.find((x) => x.id === quickCustId);
+                const targetRow: ClientLedgerRow = existing || {
+                  customer_id: quickCustId,
+                  customer_name: c?.name || "Client",
+                  phone: c?.phone,
+                  location_id: c?.location_id,
+                  location_name: "Branch",
+                  invoiced_amount: 0,
+                  received_amount: 0,
+                  outstanding_amount: 0,
+                  payment_count: 0,
+                  status: "advance",
+                  invoices: [],
+                  receipts: [],
+                };
+                setQuickClientOpen(false);
+                openReceiveModal(targetRow);
+              }}
+            >
+              Continue
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Staff Selector Dialog -> launches Pay Staff Modal */}
+      <Dialog open={quickStaffOpen} onOpenChange={setQuickStaffOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Select Staff Member</DialogTitle>
+            <DialogDescription>
+              Choose any verified staff member to pay salary or advance for {monthLabelIST(staffMonth)}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>Staff Name</Label>
+            <Select value={quickEmpId} onValueChange={setQuickEmpId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Choose staff..." />
+              </SelectTrigger>
+              <SelectContent className="max-h-72">
+                {allVerifiedStaff.map((e) => {
+                  const ledgerMatch = (staffLedgerQ.data?.staff ?? []).find(
+                    (row) => row.employee_id === e.id
+                  );
+                  return (
+                    <SelectItem key={e.id} value={e.id}>
+                      {e.name}
+                      {ledgerMatch && ledgerMatch.remaining_amount > 0
+                        ? ` (Bal: ${inr(ledgerMatch.remaining_amount)})`
+                        : ""}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setQuickStaffOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!quickEmpId}
+              onClick={() => {
+                const existing = (staffLedgerQ.data?.staff ?? []).find(
+                  (r) => r.employee_id === quickEmpId
+                );
+                const e = allVerifiedStaff.find((x) => x.id === quickEmpId);
+                const targetRow: StaffLedgerRow = existing || {
+                  employee_id: quickEmpId,
+                  employee_name: e?.name || "Staff",
+                  code: e?.code || "",
+                  category: e?.category || "",
+                  location_id: e?.location_id || "",
+                  daily_rate: e?.daily_rate,
+                  worked_days: 0,
+                  payable_days: 0,
+                  salary_due: 0,
+                  paid_amount: 0,
+                  remaining_amount: 0,
+                  status: "no_due",
+                  payment_count: 0,
+                  payments: [],
+                };
+                setQuickStaffOpen(false);
+                openPayStaffModal(targetRow);
+              }}
+            >
+              Continue
             </Button>
           </DialogFooter>
         </DialogContent>

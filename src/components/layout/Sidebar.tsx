@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ChevronsLeft } from "lucide-react";
 import { NAV_SECTIONS } from "@/config/navigation";
@@ -21,6 +21,7 @@ interface SidebarProps {
 export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
   const { hasPermission } = useAuth();
   const { data: unread } = useUnreadCount();
+  const { pathname, search } = useLocation();
 
   return (
     <div className="flex h-full flex-col bg-sidebar">
@@ -65,6 +66,10 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
                   const Icon = item.icon;
                   const badge =
                     item.badgeKey === "notifications" && unread ? unread : 0;
+                  const hasQuery = item.to.includes("?");
+                  const normalizedCurrent =
+                    pathname === "/payments" && !search ? "/payments?tab=client" : `${pathname}${search}`;
+                  const queryActive = hasQuery ? normalizedCurrent === item.to : false;
 
                   const link = (
                     <NavLink
@@ -72,19 +77,22 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
                       to={item.to}
                       end={item.to === "/"}
                       onClick={onNavigate}
-                      className={({ isActive }) =>
-                        cn(
+                      className={({ isActive }) => {
+                        const active = hasQuery ? queryActive : isActive;
+                        return cn(
                           "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
                           collapsed && "justify-center px-0",
-                          isActive
+                          active
                             ? "bg-primary/10 text-accent"
                             : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-                        )
-                      }
+                        );
+                      }}
                     >
-                      {({ isActive }) => (
+                      {({ isActive }) => {
+                        const active = hasQuery ? queryActive : isActive;
+                        return (
                         <>
-                          {isActive && (
+                          {active && (
                             <motion.span
                               layoutId="active-nav"
                               className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-primary"
@@ -101,7 +109,8 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
                             <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-primary" />
                           )}
                         </>
-                      )}
+                        );
+                      }}
                     </NavLink>
                   );
 

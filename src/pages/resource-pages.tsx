@@ -5,6 +5,7 @@ import {
   CalendarCheck,
   CalendarOff,
   CheckCircle2,
+  History,
   Loader2,
   PauseCircle,
   UserCheck,
@@ -16,6 +17,7 @@ import { ReplaceStaffDialog } from "@/components/assignments/ReplaceStaffDialog"
 import { AdminCompleteDutyDialog } from "@/components/assignments/AdminCompleteDutyDialog";
 import { DutyBreakDialog } from "@/components/assignments/DutyBreakDialog";
 import { LeaveRecordDialog } from "@/components/assignments/LeaveRecordDialog";
+import { AssignmentHistoryDialog } from "@/components/assignments/AssignmentHistoryDialog";
 import type { Assignment } from "@/types/models";
 import { pushNotificationService } from "@/services/push-notification.service";
 import { ResourceView } from "@/components/resource/ResourceView";
@@ -56,6 +58,8 @@ export const AssignmentsPage = () => {
   const [completeAssignment, setCompleteAssignment] = useState<Assignment | null>(null);
   const [breakAssignment, setBreakAssignment] = useState<Assignment | null>(null);
   const [leaveAssignment, setLeaveAssignment] = useState<Assignment | null>(null);
+
+  const [historyAssignment, setHistoryAssignment] = useState<Assignment | null>(null);
 
   const handleSendPush = async (assignment: Assignment) => {
     setPushingId(assignment.id);
@@ -147,6 +151,12 @@ export const AssignmentsPage = () => {
               <CalendarCheck className="h-4 w-4 text-sky-400" /> Mark Attendance
             </DropdownMenuItem>
             <DropdownMenuItem
+              onClick={() => setHistoryAssignment(assignment)}
+              className="gap-2 cursor-pointer font-medium text-purple-400 focus:text-purple-300"
+            >
+              <History className="h-4 w-4 text-purple-400" /> View Assignment History
+            </DropdownMenuItem>
+            <DropdownMenuItem
               onClick={() => setReplaceAssignment(assignment)}
               className="gap-2 cursor-pointer font-medium text-blue-400 focus:text-blue-300"
             >
@@ -181,6 +191,11 @@ export const AssignmentsPage = () => {
         assignment={leaveAssignment}
         open={!!leaveAssignment}
         onClose={() => setLeaveAssignment(null)}
+      />
+
+      <AssignmentHistoryDialog
+        assignment={historyAssignment}
+        onClose={() => setHistoryAssignment(null)}
       />
     </>
   );

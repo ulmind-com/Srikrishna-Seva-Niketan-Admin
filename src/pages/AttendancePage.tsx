@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import {
+  CalendarCheck,
   CalendarDays,
   CalendarOff,
   Clock,
@@ -14,13 +15,25 @@ import {
   UserCheck,
   Users,
 } from "lucide-react";
+import { toast } from "sonner";
 import { LeaveRecordDialog } from "@/components/assignments/LeaveRecordDialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
 import { http } from "@/services/api/http";
 import { endpoints } from "@/services/api/endpoints";
 import {
   payrollService,
+  type AttendanceStatus,
   type PayslipDay,
+  type ShiftKind,
 } from "@/services/payroll.service";
 import type { Employee, Location } from "@/types/models";
 import { Button } from "@/components/ui/button";
@@ -39,6 +52,7 @@ import {
   formatDateWithDayIST,
   formatShiftWindowsIST,
   nowIST,
+  todayIST,
 } from "@/lib/ist-datetime";
 
 const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
@@ -81,6 +95,7 @@ const getCurrentMonthRange = currentMonthRangeIST;
 
 export function AttendancePage() {
   const { user } = useAuth();
+  const qc = useQueryClient();
   const [searchParams] = useSearchParams();
   const defaultRange = useMemo(() => getCurrentMonthRange(), []);
 
@@ -90,6 +105,34 @@ export function AttendancePage() {
   const [branchFilter, setBranchFilter] = useState<string>("all");
   const [staffSearch, setStaffSearch] = useState<string>("");
   const [leaveModalOpen, setLeaveModalOpen] = useState(false);
+
+  const [markModalOpen, setMarkModalOpen] = useState(false);
+  const [markDate, setMarkDate] = useState(todayIST());
+  const [markStatus, setMarkStatus] = useState<AttendanceStatus>("present");
+  const [markShift, setMarkShift] = useState<ShiftKind>("full_24h");
+  const [markNote, setMarkNote] = useState("");
+
+  const markMut = useMutation({
+    mutationFn: () =>
+      payrollService.markBulk(markDate, [
+        {
+          employee_id: activeEmployeeId,
+          status: markStatus,
+          shift: markShift,
+          note: markNote || undefined,
+        },
+      ]),
+    onSuccess: () => {
+      toast.success("Attendance marked & synced with Payslips");
+      setMarkModalOpen(false);
+      setMarkNote("");
+      qc.invalidateQueries({ queryKey: ["attendance-statement"] });
+      qc.invalidateQueries({ queryKey: ["payslip"] });
+      qc.invalidateQueries({ queryKey: ["payroll-run"] });
+      qc.invalidateQueries({ queryKey: ["staff-ledger"] });
+    },
+    onError: (err: Error) => toast.error(err.message || "Failed to mark attendance"),
+  });
 
   const { data: empData, isLoading: empLoading } = useQuery({
     queryKey: ["statement-employees"],
@@ -217,6 +260,20 @@ export function AttendancePage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setMarkDate(todayIST());
+              setMarkStatus("present");
+              setMarkModalOpen(true);
+            }}
+            disabled={!selectedEmp}
+            className="h-9 border-emerald-500/40 text-emerald-500 hover:bg-emerald-500/10"
+          >
+            <CalendarCheck className="mr-2 h-4 w-4" />
+            Mark Attendance
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -660,6 +717,85 @@ export function AttendancePage() {
         open={leaveModalOpen}
         onClose={() => setLeaveModalOpen(false)}
       />
+
+      <Dialog open={markModalOpen} onOpenChange={setMarkModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Mark Daily Attendance</DialogTitle>
+            <DialogDescription>
+              {selectedEmp?.name} · Updates daily register and syncs with Payslips.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Date</Label>
+              <Input
+                type="date"
+                value={markDate}
+                onChange={(e) => setMarkDate(e.target.value)}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Status</Label>
+                <Select
+                  value={markStatus}
+                  onValueChange={(v) => setMarkStatus(v as AttendanceStatus)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="present">Present</SelectItem>
+                    <SelectItem value="half_day">Half Day</SelectItem>
+                    <SelectItem value="leave">Leave</SelectItem>
+                    <SelectItem value="off">Off</SelectItem>
+                    <SelectItem value="absent">Absent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Shift</Label>
+                <Select
+                  value={markShift}
+                  onValueChange={(v) => setMarkShift(v as ShiftKind)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="full_24h">24 Hours</SelectItem>
+                    <SelectItem value="day">Day Shift</SelectItem>
+                    <SelectItem value="night">Night Shift</SelectItem>
+                    <SelectItem value="morning">Morning</SelectItem>
+                    <SelectItem value="custom">Custom</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Note</Label>
+              <Input
+                value={markNote}
+                onChange={(e) => setMarkNote(e.target.value)}
+                placeholder="Optional note"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMarkModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={markMut.isPending || !activeEmployeeId || !markDate}
+              onClick={() => markMut.mutate()}
+            >
+              {markMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save Attendance
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
