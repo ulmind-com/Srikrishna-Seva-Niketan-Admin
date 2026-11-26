@@ -1,7 +1,7 @@
-import type { FieldConfig } from "./types";
+import type { FieldConfig, FieldOption } from "./types";
 import type { ImageAsset } from "@/types/models";
 
-export type { FieldConfig, ImageAsset };
+export type { FieldConfig, FieldOption, ImageAsset };
 
 /** Get a nested value by dot path. */
 function getPath(obj: unknown, path: string): unknown {

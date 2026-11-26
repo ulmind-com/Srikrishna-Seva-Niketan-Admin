@@ -137,6 +137,7 @@ export function ResourceView<T extends { id: string }>({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [config.queryKey] });
       if (config.queryKey === "assignments") {
+        qc.invalidateQueries({ queryKey: ["field-options"] });
         qc.invalidateQueries({ queryKey: ["monthly-bills"] });
         qc.invalidateQueries({ queryKey: ["reports"] });
         qc.invalidateQueries({ queryKey: ["dashboard"] });

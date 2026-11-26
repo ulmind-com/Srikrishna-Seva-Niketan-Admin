@@ -3,10 +3,15 @@ import { AlertTriangle, Check, ChevronDown, Loader2, Search } from "lucide-react
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { STAFF_BADGE_CLASSES, type StaffBadgeTone } from "@/lib/staff-status";
 
 export interface AsyncOption {
   label: string;
   value: string;
+  badgeText?: string;
+  badgeTone?: StaffBadgeTone;
+  sublabel?: string;
+  keywords?: string;
 }
 
 /**
@@ -46,7 +51,11 @@ export function AsyncSelect({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return options;
-    return options.filter((o) => o.label.toLowerCase().includes(q));
+    return options.filter((o) =>
+      `${o.label} ${o.sublabel ?? ""} ${o.badgeText ?? ""} ${o.keywords ?? ""}`
+        .toLowerCase()
+        .includes(q)
+    );
   }, [options, query]);
 
   return (
@@ -67,10 +76,22 @@ export function AsyncSelect({
             !selected && "text-muted-foreground",
           )}
         >
-          <span className="truncate">
-            {isLoading && !options.length
-              ? "Loading…"
-              : (selected?.label ?? placeholder)}
+          <span className="flex min-w-0 flex-1 items-center gap-2">
+            <span className="truncate">
+              {isLoading && !options.length
+                ? "Loading…"
+                : (selected?.label ?? placeholder)}
+            </span>
+            {selected?.badgeText && (
+              <span
+                className={cn(
+                  "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none",
+                  STAFF_BADGE_CLASSES[selected.badgeTone ?? "slate"]
+                )}
+              >
+                {selected.badgeText}
+              </span>
+            )}
           </span>
           {isLoading && !options.length ? (
             <Loader2 className="h-4 w-4 shrink-0 animate-spin opacity-50" />
@@ -82,7 +103,7 @@ export function AsyncSelect({
 
       <PopoverContent
         align="start"
-        className="w-[--radix-popover-trigger-width] p-0"
+        className="min-w-[320px] w-[--radix-popover-trigger-width] p-0"
       >
         {/* Search */}
         <div className="relative border-b border-border">
@@ -146,7 +167,26 @@ export function AsyncSelect({
                     opt.value === value ? "opacity-100" : "opacity-0",
                   )}
                 />
-                <span className="truncate">{opt.label}</span>
+                <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="truncate font-medium">{opt.label}</div>
+                    {opt.sublabel && (
+                      <div className="truncate text-[11px] text-muted-foreground">
+                        {opt.sublabel}
+                      </div>
+                    )}
+                  </div>
+                  {opt.badgeText && (
+                    <span
+                      className={cn(
+                        "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none whitespace-nowrap",
+                        STAFF_BADGE_CLASSES[opt.badgeTone ?? "slate"]
+                      )}
+                    >
+                      {opt.badgeText}
+                    </span>
+                  )}
+                </div>
               </button>
             ))
           )}

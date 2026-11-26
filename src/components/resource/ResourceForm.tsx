@@ -23,7 +23,7 @@ import { ImageUpload } from "@/components/common/ImageUpload";
 import { VideoUpload } from "@/components/common/VideoUpload";
 import { TagsInput } from "@/components/common/TagsInput";
 import { cn } from "@/lib/utils";
-import type { FieldConfig, ImageAsset } from "./form-helpers";
+import type { FieldConfig, FieldOption, ImageAsset } from "./form-helpers";
 import { buildDefaults, groupSections } from "./form-helpers";
 import type { FileAsset, IdentityDocument, ImageAsset as ImageAssetModel } from "@/types/models";
 
@@ -72,7 +72,8 @@ export function ResourceForm<T>({
     queries: dynamicFields.map((f) => ({
       queryKey: ["field-options", f.dynamicOptions!.queryKey],
       queryFn: () => f.dynamicOptions!.fetch(),
-      staleTime: 60_000,
+      staleTime: 5_000,
+      refetchOnMount: "always" as const,
     })),
   });
   // Carry the whole query state, not just the rows: a dynamic picker has to be
@@ -179,7 +180,7 @@ export function ResourceForm<T>({
 
 /** Live state of one API-backed option list. */
 interface DynamicFieldState {
-  options: { label: string; value: string }[];
+  options: FieldOption[];
   isLoading: boolean;
   isError: boolean;
   refetch: () => void;

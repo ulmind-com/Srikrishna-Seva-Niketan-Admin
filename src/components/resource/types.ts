@@ -21,9 +21,15 @@ export type FieldType =
   | "divider"
   | "duty_schedule";
 
+import type { StaffBadgeTone } from "@/lib/staff-status";
+
 export interface FieldOption {
   label: string;
   value: string;
+  badgeText?: string;
+  badgeTone?: StaffBadgeTone;
+  sublabel?: string;
+  keywords?: string;
 }
 
 export interface FieldConfig {

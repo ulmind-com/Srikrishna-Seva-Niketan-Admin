@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { resolveStaffDutyBadge, STAFF_BADGE_CLASSES } from "@/lib/staff-status";
 import type { Employee } from "@/types/models";
 
 interface SearchableStaffSelectProps {
@@ -316,6 +317,18 @@ export function SearchableStaffSelect({
                     </div>
 
                     <div className="shrink-0 flex items-center gap-1.5">
+                      {(() => {
+                        const b = resolveStaffDutyBadge(emp);
+                        return (
+                          <span
+                            className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none whitespace-nowrap ${
+                              STAFF_BADGE_CLASSES[b.tone]
+                            }`}
+                          >
+                            {b.text}
+                          </span>
+                        );
+                      })()}
                       {isSelected && (
                         <Check className="h-4 w-4 text-primary shrink-0" />
                       )}

@@ -1,6 +1,8 @@
 import { resourceServices } from "@/services/resources";
-import type { FieldConfig } from "@/components/resource/types";
+import type { FieldConfig, FieldOption } from "@/components/resource/types";
 import { STORAGE_KEYS } from "@/config/env";
+import { resolveStaffDutyBadge } from "@/lib/staff-status";
+import type { Assignment } from "@/types/models";
 
 /** The signed-in user's scoping, read from storage (no React context needed). */
 function currentScope(): { isSuper: boolean; locationIds: string[] } {
@@ -63,20 +65,39 @@ export async function loadCustomerOptions() {
     .sort((a, b) => a.label.localeCompare(b.label));
 }
 
-/** Loader for employee select options (assignments forms). */
-export async function loadEmployeeOptions() {
-  const [res, names] = await Promise.all([
-    resourceServices.employees.list({ page_size: 100 }),
+/** Loader for employee select options (assignments forms) with live duty/availability status. */
+export async function loadEmployeeOptions(): Promise<FieldOption[]> {
+  const [res, names, assignmentItems] = await Promise.all([
+    resourceServices.employees.list({ page_size: 300 }),
     branchNames(),
+    resourceServices.assignments
+      .list({ page_size: 400, sort_by: "start_date", sort_order: "desc" })
+      .then((r) => r.items)
+      .catch((): Assignment[] => []),
   ]);
+
+  const byEmployee = new Map<string, Assignment[]>();
+  for (const a of assignmentItems) {
+    const list = byEmployee.get(a.employee_id) ?? [];
+    list.push(a);
+    byEmployee.set(a.employee_id, list);
+  }
+
   return res.items
     .filter((e) => (e.verification_status ?? "verified") === "verified")
-    .map((e) => ({
-      label: [`${e.name} (${e.code})`, e.category, names[e.location_id]]
-        .filter(Boolean)
-        .join(" · "),
-      value: e.id,
-    }))
+    .map((e) => {
+      const empAssignments = byEmployee.get(e.id) ?? [];
+      const badge = resolveStaffDutyBadge(e, empAssignments);
+      const subParts = [e.category, names[e.location_id], badge.detail].filter(Boolean);
+      return {
+        label: e.code ? `${e.name} (${e.code})` : e.name,
+        sublabel: subParts.join(" · "),
+        badgeText: badge.text,
+        badgeTone: badge.tone,
+        keywords: `${e.phone ?? ""} ${e.category ?? ""} ${badge.text}`,
+        value: e.id,
+      };
+    })
     .sort((a, b) => a.label.localeCompare(b.label));
 }
 
