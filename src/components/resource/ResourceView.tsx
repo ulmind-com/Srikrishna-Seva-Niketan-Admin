@@ -152,11 +152,14 @@ export function ResourceView<T extends { id: string }>({
     mutationFn: (id: string) => config.service.remove(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [config.queryKey] });
-      if (config.queryKey === "locations") {
-        qc.invalidateQueries({ queryKey: ["payroll-locations"] });
-        qc.invalidateQueries({ queryKey: ["field-options"] });
-        qc.invalidateQueries({ queryKey: ["branches"] });
-        qc.invalidateQueries({ queryKey: ["staff-portal"] });
+      if (
+        config.queryKey === "locations" ||
+        config.queryKey === "employees" ||
+        config.queryKey === "customers" ||
+        config.queryKey === "assignments"
+      ) {
+        // Cascading delete affects dashboard, staff, customers, duties, attendance, payslips, bills, and reports
+        qc.invalidateQueries();
       }
       toast.success(`${config.name} deleted`);
       setDeleteTarget(null);
@@ -437,9 +440,21 @@ export function ResourceView<T extends { id: string }>({
         title={`Delete ${config.name}?`}
         description={
           deleteTarget
-            ? `"${
-                config.getRowTitle?.(deleteTarget) ?? "This item"
-              }" will be permanently removed. This cannot be undone.`
+            ? config.queryKey === "locations"
+              ? `"${
+                  config.getRowTitle?.(deleteTarget) ?? "This branch"
+                }" and ALL data under this branch (staff, customers, assignments, attendance, payslips, bills, expenses, payments, and reports) will be permanently deleted. This cannot be undone.`
+              : config.queryKey === "employees"
+                ? `"${
+                    config.getRowTitle?.(deleteTarget) ?? "This staff member"
+                  }" and all their assignments, attendance, and payslips will be permanently deleted. This cannot be undone.`
+                : config.queryKey === "customers"
+                  ? `"${
+                      config.getRowTitle?.(deleteTarget) ?? "This customer"
+                    }" and all their assignments, bills, payments, and related attendance records will be permanently deleted. This cannot be undone.`
+                  : `"${
+                      config.getRowTitle?.(deleteTarget) ?? "This item"
+                    }" will be permanently removed. This cannot be undone.`
             : ""
         }
         confirmLabel="Delete"
