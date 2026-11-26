@@ -100,7 +100,7 @@ function buildDutyItems(
     let isOngoing = false;
     let endDateStr = "";
 
-    if (a.days_worked != null && a.days_worked > 0) {
+    if (a.days_worked != null && a.days_worked >= 0) {
       days = a.days_worked;
       isOngoing = !a.end_date;
       endDateStr = a.end_date
@@ -115,20 +115,42 @@ function buildDutyItems(
         : `${formatDate(targetEnd.toISOString())} (Till Date)`;
 
       let grossDays = 0;
+      const sCal = new Date(s.getFullYear(), s.getMonth(), s.getDate());
+      const eCal = new Date(targetEnd.getFullYear(), targetEnd.getMonth(), targetEnd.getDate());
+      const calDiff = Math.round((eCal.getTime() - sCal.getTime()) / (1000 * 60 * 60 * 24));
+      const isHandover = a.status === "replaced";
+
       if (a.start_time && a.end_time) {
         try {
           const [sh, sm] = a.start_time.split(":").map(Number);
           const [eh, em] = a.end_time.split(":").map(Number);
-          const stDt = new Date(s.getFullYear(), s.getMonth(), s.getDate(), sh, sm);
-          const etDt = new Date(targetEnd.getFullYear(), targetEnd.getMonth(), targetEnd.getDate(), eh, em);
-          const diffHrs = (etDt.getTime() - stDt.getTime()) / (1000 * 60 * 60);
-          if (diffHrs > 0) {
-            if (a.shift === "full_24h") {
+          if (a.shift === "full_24h") {
+            const stDt = new Date(s.getFullYear(), s.getMonth(), s.getDate(), sh, sm);
+            const etDt = new Date(targetEnd.getFullYear(), targetEnd.getMonth(), targetEnd.getDate(), eh, em);
+            const diffHrs = (etDt.getTime() - stDt.getTime()) / (1000 * 60 * 60);
+            if (diffHrs > 0) {
               grossDays = Math.round((diffHrs / 24) * 2) / 2;
-            } else if (a.shift === "day" || a.shift === "night" || a.shift === "morning") {
-              grossDays = Math.round((diffHrs / 12) * 2) / 2;
-            } else {
-              grossDays = Math.round((diffHrs / 24) * 2) / 2;
+            } else if (isHandover && diffHrs === 0) {
+              grossDays = 0;
+            }
+          } else {
+            const stMins = sh * 60 + sm;
+            const etMins = eh * 60 + em;
+            if (calDiff === 0) {
+              grossDays = isHandover && etMins === stMins ? 0 : 1;
+            } else if (calDiff > 0) {
+              if (etMins === stMins || etMins < stMins) {
+                if (a.shift === "custom" && (a.shift_windows?.length ?? 0) >= 2 && calDiff === 1 && etMins < stMins) {
+                  grossDays = Math.max(calDiff + 1, a.shift_windows!.length);
+                } else {
+                  grossDays = calDiff;
+                }
+              } else {
+                grossDays =
+                  isHandover && (a.shift === "day" || a.shift === "night") && etMins - stMins <= 6 * 60
+                    ? calDiff + 0.5
+                    : calDiff + 1;
+              }
             }
           }
         } catch {
@@ -136,11 +158,8 @@ function buildDutyItems(
         }
       }
 
-      if (grossDays <= 0) {
-        const sCal = new Date(s.getFullYear(), s.getMonth(), s.getDate());
-        const eCal = new Date(targetEnd.getFullYear(), targetEnd.getMonth(), targetEnd.getDate());
-        const calDays = Math.round((eCal.getTime() - sCal.getTime()) / (1000 * 60 * 60 * 24));
-        grossDays = isOngoing ? Math.max(calDays, 1) : Math.max(calDays + 1, 1);
+      if (grossDays <= 0 && !(isHandover && calDiff === 0)) {
+        grossDays = isOngoing ? Math.max(calDiff, 1) : Math.max(calDiff + 1, 1);
       }
 
       // Deduct duty breaks dynamically if any
@@ -158,7 +177,7 @@ function buildDutyItems(
         }
       }
 
-      days = Math.max(0.5, Math.round((grossDays - breakDays) * 2) / 2);
+      days = Math.max(0, Math.round((grossDays - breakDays) * 2) / 2);
     }
 
     // Financials calculation (Rate & Amount)

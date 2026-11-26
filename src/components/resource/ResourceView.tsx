@@ -136,6 +136,14 @@ export function ResourceView<T extends { id: string }>({
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [config.queryKey] });
+      if (config.queryKey === "assignments") {
+        qc.invalidateQueries({ queryKey: ["monthly-bills"] });
+        qc.invalidateQueries({ queryKey: ["reports"] });
+        qc.invalidateQueries({ queryKey: ["dashboard"] });
+        qc.invalidateQueries({ queryKey: ["payroll-run"] });
+        qc.invalidateQueries({ queryKey: ["payslip"] });
+        qc.invalidateQueries({ queryKey: ["daily-roster"] });
+      }
       if (config.queryKey === "locations") {
         qc.invalidateQueries({ queryKey: ["payroll-locations"] });
         qc.invalidateQueries({ queryKey: ["field-options"] });

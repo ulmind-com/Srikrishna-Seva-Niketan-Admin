@@ -269,6 +269,7 @@ export interface Assignment extends BaseDoc {
   work_completed_at?: string | null;
   // Staff replacement / duty handover tracking:
   is_replacement?: boolean;
+  replacement_for_assignment_id?: string | null;
   replacement_for_employee_id?: string | null;
   replacement_for_employee_name?: string | null;
   replaced_by_employee_id?: string | null;
