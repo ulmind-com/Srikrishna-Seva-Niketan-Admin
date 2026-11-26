@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import type { MonthlyBillGroup } from "@/services/billing.service";
 import { GeneralBillSheet } from "./GeneralBillSheet";
 
+import { formatBillNo } from "@/lib/utils";
+
 interface GeneralBillViewDialogProps {
   bill: MonthlyBillGroup | null;
   onClose: () => void;
@@ -80,7 +82,7 @@ export function GeneralBillViewDialog({
       });
       const link = document.createElement("a");
       const cleanName = (bill.customer_name || "Client").replace(/\s+/g, "_");
-      link.download = `Bill_${cleanName}_${bill.bill_no || "SSN"}.png`;
+      link.download = `Bill_${cleanName}_${bill.bill_no != null ? formatBillNo(bill.bill_no) : "SSN"}.png`;
       link.href = dataUrl;
       link.click();
       toast.success("Bill downloaded as high-resolution image.");

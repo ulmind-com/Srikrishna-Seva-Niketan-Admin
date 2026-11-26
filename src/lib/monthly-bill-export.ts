@@ -2,6 +2,7 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import type { MonthlyBillGroup } from "@/services/billing.service";
+import { formatBillNo } from "@/lib/utils";
 import { formatDateWithTime } from "@/components/documents/document-utils";
 
 const EMERALD: [number, number, number] = [15, 118, 110];
@@ -58,7 +59,7 @@ export function downloadMonthlyBillsPdf(month: string, bills: MonthlyBillGroup[]
     doc.setFontSize(10);
     doc.setTextColor(...SLATE);
     doc.setFont("helvetica", "bold");
-    doc.text(`Bill No: ${bill.bill_no ?? "—"}`, marginX, y);
+    doc.text(`Bill No: ${formatBillNo(bill.bill_no)}`, marginX, y);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...MUTED);
     doc.text(
@@ -188,7 +189,7 @@ export function downloadMonthlyBillsXlsx(month: string, bills: MonthlyBillGroup[
   // Sheet 1: Customer Summary
   const summaryRows = bills.map((b, idx) => ({
     "Sl No": idx + 1,
-    "Bill No": b.bill_no ?? "(unissued)",
+    "Bill No": b.bill_no != null ? formatBillNo(b.bill_no) : "(unissued)",
     Month: month,
     "Customer / Patient Name": b.customer_name,
     "Customer Phone": [b.customer_phone, b.customer_alt_phone].filter(Boolean).join(" / "),
@@ -223,7 +224,7 @@ export function downloadMonthlyBillsXlsx(month: string, bills: MonthlyBillGroup[
     b.line_items.forEach((li) => {
       breakdownRows.push({
         "Sl No": rowIdx++,
-        "Bill No": b.bill_no ?? "(unissued)",
+        "Bill No": b.bill_no != null ? formatBillNo(b.bill_no) : "(unissued)",
         Month: month,
         "Customer Name": b.customer_name,
         "Attendant / Staff Name": li.employee_name || b.employee_name,

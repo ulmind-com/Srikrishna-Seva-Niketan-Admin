@@ -1,4 +1,5 @@
 import type { Assignment, Customer, Location } from "@/types/models";
+import { formatBillNo } from "@/lib/utils";
 import { ORG_LOGO, ORG_NAME, formatDate, formatDateWithTime, formatTime12h } from "./document-utils";
 
 /** Fallback header details matching the printed bill pad. */
@@ -273,7 +274,7 @@ export function CustomerBillForm({
       {/* ---- No. / Date ---- */}
       <div className="mt-4 flex items-end justify-between text-[13px]">
         <p>
-          No. – <span className="ml-1 font-bold">{billNo ?? "—"}</span>
+          No. – <span className="ml-1 font-bold">{formatBillNo(billNo)}</span>
         </p>
         <p>
           Date{" "}

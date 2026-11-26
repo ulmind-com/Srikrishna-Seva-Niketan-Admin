@@ -15,6 +15,7 @@ import {
 import { billingService, type MonthlyBillGroup } from "@/services/billing.service";
 import { resourceServices } from "@/services/resources";
 import { settingsService } from "@/services/settings.service";
+import { formatBillNo } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -431,7 +432,7 @@ export function MonthlyBillsPage() {
                       <TableCell className="text-center">
                         {b.bill_no != null ? (
                           <Badge variant="outline" className="font-mono">
-                            #{b.bill_no}
+                            #{formatBillNo(b.bill_no)}
                           </Badge>
                         ) : (
                           <span className="text-xs text-muted-foreground">—</span>

@@ -83,6 +83,15 @@ export function slugify(value: string): string {
     .replace(/-+/g, "-");
 }
 
+/** Format sequential invoice / bill numbers with leading zeros (1 -> "001"). */
+export function formatBillNo(value?: number | string | null): string {
+  if (value === null || value === undefined || value === "") return "—";
+  const raw = String(value).trim();
+  const num = Number(raw);
+  if (Number.isNaN(num)) return raw;
+  return String(Math.trunc(num)).padStart(3, "0");
+}
+
 /** Download a Blob as a file. */
 export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);

@@ -1,5 +1,6 @@
 import React from "react";
 import type { MonthlyBillGroup, MonthlyBillLineItem } from "@/services/billing.service";
+import { formatBillNo } from "@/lib/utils";
 import { ORG_LOGO, ORG_NAME, formatDate, formatDateWithTime, formatTime12h } from "./document-utils";
 
 const FALLBACK_LINE = "ARAMBAGH ★ 712601";
@@ -82,7 +83,7 @@ export const GeneralBillSheet = React.forwardRef<HTMLDivElement, GeneralBillShee
         {/* ---- No. / Date ---- */}
         <div className="mt-4 flex items-end justify-between text-[13px]">
           <p>
-            No. – <span className="ml-1 font-bold">{bill.bill_no ?? "—"}</span>
+            No. – <span className="ml-1 font-bold">{formatBillNo(bill.bill_no)}</span>
           </p>
           <p>
             Date{" "}
