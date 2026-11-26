@@ -40,7 +40,13 @@ export function AdminCompleteDutyDialog({
   const qc = useQueryClient();
 
   const isPostpaid = assignment?.payment_type === "postpaid";
-  const defaultAmount = assignment?.customer_rate ?? (assignment?.customer_daily_rate ? assignment.customer_daily_rate * (assignment.days_worked || 1) : 0);
+  const defaultAmount =
+    (assignment?.customer_daily_rate && assignment?.days_worked
+      ? Math.round(assignment.customer_daily_rate * assignment.days_worked)
+      : null) ??
+    assignment?.customer_rate ??
+    assignment?.contract_amount ??
+    (assignment?.customer_daily_rate ? assignment.customer_daily_rate * (assignment.days_worked || 1) : 0);
 
   const [dutyCompleted, setDutyCompleted] = useState(true);
   const [cashCollected, setCashCollected] = useState(isPostpaid);
@@ -53,7 +59,7 @@ export function AdminCompleteDutyDialog({
       setDutyCompleted(true);
       const isPost = assignment.payment_type === "postpaid";
       setCashCollected(isPost);
-      const amt = assignment.customer_rate ?? (assignment.customer_daily_rate ? assignment.customer_daily_rate * (assignment.days_worked || 1) : 0);
+      const amt = defaultAmount;
       setCashAmount(amt);
       setReceivedBy(
         isPost

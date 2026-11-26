@@ -120,8 +120,9 @@ export function CustomerAgreementPage() {
   useEffect(() => {
     if (!hasUserEditedAmount && customer) {
       const derived =
-        (current?.customer_rate && current.customer_rate > 0 ? current.customer_rate : null) ??
+        (current?.contract_amount && current.contract_amount > 0 ? current.contract_amount : null) ??
         (customer.billing_rate && customer.billing_rate > 0 ? customer.billing_rate : null) ??
+        (current?.customer_rate && current.customer_rate > 0 ? current.customer_rate : null) ??
         (current?.customer_daily_rate
           ? (current.total_days || customer.duration_days
               ? current.customer_daily_rate * (current.total_days || customer.duration_days!)

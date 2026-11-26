@@ -171,9 +171,12 @@ function buildDutyItems(
 
     if (a.customer_daily_rate != null && a.customer_daily_rate > 0) {
       rate = a.customer_daily_rate;
-      amount = a.customer_rate != null && a.customer_rate > 0 ? a.customer_rate : rate * days;
+      amount = Math.round(rate * days);
     } else if (a.customer_rate != null && a.customer_rate > 0) {
       amount = a.customer_rate;
+      rate = days > 0 ? Math.round(amount / days) : amount;
+    } else if (a.contract_amount != null && a.contract_amount > 0) {
+      amount = a.contract_amount;
       rate = days > 0 ? Math.round(amount / days) : amount;
     } else {
       rate = 0;

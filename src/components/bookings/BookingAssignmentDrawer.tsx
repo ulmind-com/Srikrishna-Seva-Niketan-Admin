@@ -178,6 +178,16 @@ export function BookingAssignmentDrawer({
         delete assignmentPayload.dest_lng;
       }
       if (
+        assignmentPayload.contract_amount !== undefined &&
+        assignmentPayload.contract_amount !== ""
+      ) {
+        const n = Number(assignmentPayload.contract_amount);
+        if (!Number.isNaN(n)) assignmentPayload.contract_amount = Math.round(n);
+        else delete assignmentPayload.contract_amount;
+      } else {
+        delete assignmentPayload.contract_amount;
+      }
+      if (
         assignmentPayload.customer_rate !== undefined &&
         assignmentPayload.customer_rate !== ""
       ) {

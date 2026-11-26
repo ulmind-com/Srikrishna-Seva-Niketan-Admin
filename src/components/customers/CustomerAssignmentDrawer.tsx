@@ -173,7 +173,7 @@ export function CustomerAssignmentDrawer({
       dest_lat: customer.lat != null ? customer.lat : undefined,
       dest_lng: customer.lng != null ? customer.lng : undefined,
       start_date: getTodayIST(),
-      customer_rate: customer.billing_rate ?? undefined,
+      contract_amount: customer.billing_rate ?? undefined,
       payment_type: "prepaid",
       payment_status: "pending",
       notes: customer.notes
@@ -209,6 +209,13 @@ export function CustomerAssignmentDrawer({
         Number.isNaN(cleanPayload.duration_days)
       ) {
         delete cleanPayload.duration_days;
+      }
+      if (
+        cleanPayload.contract_amount === "" ||
+        cleanPayload.contract_amount == null ||
+        Number.isNaN(cleanPayload.contract_amount)
+      ) {
+        delete cleanPayload.contract_amount;
       }
       if (
         cleanPayload.customer_rate === "" ||

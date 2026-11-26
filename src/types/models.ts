@@ -259,6 +259,7 @@ export interface Assignment extends BaseDoc {
   dest_lng?: number | null;
   customer_daily_rate?: number | null;
   employee_daily_rate?: number | null;
+  contract_amount?: number | null;
   customer_rate?: number | null;
   employee_payout?: number | null;
   other_expense?: number | null;

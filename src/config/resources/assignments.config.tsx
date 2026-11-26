@@ -154,8 +154,17 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
         const isWorkEnded =
           Boolean(r.end_date) || r.status === "completed" || r.status === "replaced";
         const days = r.days_worked ?? r.total_days;
-        const bill = r.customer_rate != null ? r.customer_rate : (r.customer_daily_rate && days ? Math.round(r.customer_daily_rate * days) : 0);
-        const pay = r.employee_payout != null ? r.employee_payout : (r.employee_daily_rate && days ? Math.round(r.employee_daily_rate * days) : 0);
+        const contractAmt = r.contract_amount ?? 0;
+        const dailyBill =
+          r.customer_daily_rate != null && days != null
+            ? Math.round(r.customer_daily_rate * days)
+            : null;
+        const bill = dailyBill ?? r.customer_rate ?? 0;
+        const dailyPay =
+          r.employee_daily_rate != null && days != null
+            ? Math.round(r.employee_daily_rate * days)
+            : null;
+        const pay = dailyPay ?? r.employee_payout ?? 0;
         const exp = r.other_expense ?? 0;
         const profit = bill - pay - exp;
         const isPostpaid = r.payment_type === "postpaid";
@@ -170,12 +179,35 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
           : "⏳ Pending Collection";
         return (
           <div className="flex flex-col gap-1.5">
+            {contractAmt > 0 && (
+              <div className="text-[11px] font-semibold text-sky-400 whitespace-nowrap tabular-nums">
+                Contract: ₹{contractAmt.toLocaleString()}
+              </div>
+            )}
             {isWorkEnded ? (
               <div className="flex flex-col gap-0.5 whitespace-nowrap text-xs tabular-nums text-muted-foreground">
-                {bill > 0 && <div>Bill: <span className="font-semibold text-foreground">₹{bill.toLocaleString()}</span></div>}
-                {pay > 0 && <div>Pay: ₹{pay.toLocaleString()}</div>}
-                {r.other_expense != null && r.other_expense > 0 && <div>Exp: ₹{r.other_expense.toLocaleString()}</div>}
                 {bill > 0 && (
+                  <div>
+                    Bill: <span className="font-semibold text-foreground">₹{bill.toLocaleString()}</span>
+                    {r.customer_daily_rate != null && days != null && (
+                      <span className="ml-1 text-[10px] text-muted-foreground/75">
+                        (₹{r.customer_daily_rate}×{days}d)
+                      </span>
+                    )}
+                  </div>
+                )}
+                {pay > 0 && (
+                  <div>
+                    Pay: ₹{pay.toLocaleString()}
+                    {r.employee_daily_rate != null && days != null && (
+                      <span className="ml-1 text-[10px] text-muted-foreground/75">
+                        (₹{r.employee_daily_rate}×{days}d)
+                      </span>
+                    )}
+                  </div>
+                )}
+                {r.other_expense != null && r.other_expense > 0 && <div>Exp: ₹{r.other_expense.toLocaleString()}</div>}
+                {(bill > 0 || pay > 0) && (
                   <div className={`font-semibold ${profit >= 0 ? "text-success" : "text-destructive"}`}>
                     Profit: ₹{profit.toLocaleString()}
                   </div>
@@ -186,8 +218,8 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
                 {r.customer_daily_rate != null && r.customer_daily_rate > 0 && (
                   <div>Rate: ₹{r.customer_daily_rate.toLocaleString()}/day</div>
                 )}
-                {r.customer_rate != null && r.customer_rate > 0 && (
-                  <div>Contract: ₹{r.customer_rate.toLocaleString()}</div>
+                {r.employee_daily_rate != null && r.employee_daily_rate > 0 && (
+                  <div>Staff: ₹{r.employee_daily_rate.toLocaleString()}/day</div>
                 )}
                 <span className="text-[10.5px] font-medium text-amber-400">
                   ⏳ Bill after work ends
@@ -383,7 +415,7 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
       section: "Billing",
     },
     { name: "customer_daily_rate", label: "Daily Rate — Customer (₹/day)", type: "number", min: 0, helper: "Charged to the customer per day.", section: "Billing" },
-    { name: "customer_rate", label: "Total Contract Amount (₹)", type: "number", min: 0, helper: "Total agreed contract amount for this engagement (e.g. 13500).", section: "Billing" },
+    { name: "contract_amount", label: "Total Contract Amount (₹)", type: "number", min: 0, helper: "Agreed customer contract amount — stays fixed while Bill calculates from Daily Rate × Days.", section: "Billing" },
     { name: "employee_daily_rate", label: "Daily Payout — Staff (₹/day)", type: "number", min: 0, helper: "Paid to the nurse per day — an expense.", section: "Billing" },
     { name: "other_expense", label: "Other Expense (₹)", type: "number", min: 0, helper: "Travel, kit, etc. for this engagement — an expense.", section: "Billing" },
     { name: "notes", label: "Notes", type: "textarea", section: "Billing", colSpan: 2 },

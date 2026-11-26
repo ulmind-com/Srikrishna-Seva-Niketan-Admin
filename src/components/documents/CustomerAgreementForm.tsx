@@ -65,10 +65,12 @@ export function CustomerAgreementForm({
   const amount =
     overrideAmount !== undefined && overrideAmount !== null
       ? overrideAmount
-      : (assignment?.customer_rate && assignment.customer_rate > 0)
-        ? assignment.customer_rate
+      : (assignment?.contract_amount && assignment.contract_amount > 0)
+        ? assignment.contract_amount
         : (customer.billing_rate && customer.billing_rate > 0)
           ? customer.billing_rate
+          : (assignment?.customer_rate && assignment.customer_rate > 0)
+            ? assignment.customer_rate
           : (assignment?.customer_daily_rate && assignment.customer_daily_rate > 0)
             ? (duration && duration > 1 && assignment.customer_daily_rate < 3000
                 ? assignment.customer_daily_rate * duration
