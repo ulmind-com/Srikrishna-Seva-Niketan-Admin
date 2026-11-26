@@ -257,6 +257,7 @@ export interface StaffAssignment {
   customer_phone?: string | null;
   place_type: "home" | "hospital" | "nursing_home" | "other";
   place_name?: string | null;
+  purpose?: string | null;
   address?: string | null;
   shift: string;
   start_time?: string | null;

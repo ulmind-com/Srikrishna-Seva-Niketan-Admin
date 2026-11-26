@@ -83,6 +83,11 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
               📍 {r.place_name}
             </span>
           )}
+          {r.purpose && (
+            <span className="text-[11px] text-primary/90 truncate max-w-[220px]">
+              🎯 {r.purpose}
+            </span>
+          )}
           <BranchName
             id={r.location_id}
             className="text-[11px] text-muted-foreground/70"
@@ -319,11 +324,21 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
       section: "Place",
     },
     {
-      name: "place_name",
-      label: "Hospital / Nursing Home Name",
+      name: "purpose",
+      label: "Purpose (কিসের জন্য পাঠানো হচ্ছে)",
       type: "text",
-      placeholder: "e.g. Apollo Gleneagles",
-      helper: "Leave blank for a home posting.",
+      placeholder: "e.g. Post-surgery care, Elderly care, Bedside support",
+      helper: "Specify why the staff is being assigned here.",
+      section: "Place",
+    },
+    {
+      name: "place_name",
+      label: "Hospital / Nursing Home / Place Name",
+      type: "text",
+      placeholder: "e.g. Apollo Gleneagles, Rehab Center, Clinic...",
+      helper: "Enter the hospital, nursing home, or other location name.",
+      showWhen: { field: "place_type", in: ["hospital", "nursing_home", "other"] },
+      colSpan: 2,
       section: "Place",
     },
     { name: "address", label: "Address", type: "textarea", section: "Place", colSpan: 2 },

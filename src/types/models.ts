@@ -235,6 +235,7 @@ export interface Assignment extends BaseDoc {
   location_id: string;
   place_type: AssignmentPlace;
   place_name?: string | null;
+  purpose?: string | null;
   address?: string | null;
   shift: ShiftType;
   /** Custom shift window as "HH:MM" (24h), used when shift === "custom". */

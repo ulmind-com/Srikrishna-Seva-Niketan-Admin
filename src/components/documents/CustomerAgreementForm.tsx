@@ -56,7 +56,7 @@ export function CustomerAgreementForm({
   overrideDocuments?: IdentityDocument[] | null;
 }) {
   const effectivePurpose =
-    overridePurpose !== undefined ? overridePurpose : customer.purpose;
+    overridePurpose !== undefined ? overridePurpose : (customer.purpose || assignment?.purpose);
   const effectiveDocs = (
     overrideDocuments ??
     (customer.documents && customer.documents.length > 0 ? customer.documents : null)

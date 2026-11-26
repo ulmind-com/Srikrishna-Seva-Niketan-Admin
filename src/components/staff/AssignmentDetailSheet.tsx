@@ -378,6 +378,11 @@ export function AssignmentDetailSheet({ assignment, open, onOpenChange }: Props)
                   {PLACE_LABEL[assignment.place_type] ?? assignment.place_type}
                   {assignment.place_name ? ` — ${assignment.place_name}` : ""}
                 </Row>
+                {assignment.purpose && (
+                  <Row icon={Sparkles} label="Purpose">
+                    {assignment.purpose}
+                  </Row>
+                )}
                 {assignment.address && (
                   <Row icon={MapPin} label="Address">
                     {assignment.address}
