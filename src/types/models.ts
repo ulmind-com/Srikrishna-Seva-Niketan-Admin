@@ -196,6 +196,8 @@ export interface Customer extends BaseDoc {
   id_proof_number?: string | null;
   documents?: IdentityDocument[];
   care_type: CareType;
+  purpose?: string | null;
+  agreement_date?: string | null;
   service_label?: string | null;
   duration_days?: number | null;
   one_to_one: boolean;

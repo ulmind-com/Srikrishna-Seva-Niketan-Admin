@@ -43,6 +43,7 @@ export function CustomerAgreementForm({
   authorizedSignatureUrl,
   agreementDate,
   overrideAmount,
+  overridePurpose,
   overrideDocuments,
 }: {
   customer: Customer;
@@ -51,8 +52,11 @@ export function CustomerAgreementForm({
   authorizedSignatureUrl?: string | null;
   agreementDate?: string;
   overrideAmount?: number | null;
+  overridePurpose?: string | null;
   overrideDocuments?: IdentityDocument[] | null;
 }) {
+  const effectivePurpose =
+    overridePurpose !== undefined ? overridePurpose : customer.purpose;
   const effectiveDocs = (
     overrideDocuments ??
     (customer.documents && customer.documents.length > 0 ? customer.documents : null)
@@ -115,6 +119,7 @@ export function CustomerAgreementForm({
       <FieldGrid>
         <Field label="Service Provided" value={service} wide />
         <Field label="Care Type" value={CARE_LABEL[customer.care_type] ?? customer.care_type} />
+        <Field label="Purpose" value={effectivePurpose || "—"} />
         <Field
           label="Posting"
           value={

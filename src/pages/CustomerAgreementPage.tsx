@@ -59,11 +59,27 @@ export function CustomerAgreementPage() {
   const [agreementDate, setAgreementDate] = useState<string>(() =>
     new Date().toISOString().slice(0, 10)
   );
+  const [hasUserEditedDate, setHasUserEditedDate] = useState(false);
+  const [purposeStr, setPurposeStr] = useState<string>("");
+  const [hasUserEditedPurpose, setHasUserEditedPurpose] = useState(false);
   const [amountStr, setAmountStr] = useState<string>("");
   const [hasUserEditedAmount, setHasUserEditedAmount] = useState(false);
   const [docsOpen, setDocsOpen] = useState(true);
   const [docs, setDocs] = useState<IdentityDocument[]>([]);
   const [hasEditedDocs, setHasEditedDocs] = useState(false);
+
+  // Sync saved agreementDate and purpose once customer loads
+  useEffect(() => {
+    if (customer) {
+      if (!hasUserEditedDate) {
+        const savedDate = customer.agreement_date || customer.created_at?.slice(0, 10);
+        if (savedDate) setAgreementDate(String(savedDate).slice(0, 10));
+      }
+      if (!hasUserEditedPurpose) {
+        setPurposeStr(customer.purpose ?? "");
+      }
+    }
+  }, [customer, hasUserEditedDate, hasUserEditedPurpose]);
 
   // Sync customer documents when loaded
   useEffect(() => {
@@ -117,17 +133,24 @@ export function CustomerAgreementPage() {
     }
   }, [customer, current, hasUserEditedAmount]);
 
-  const saveRateMutation = useMutation({
-    mutationFn: async (newRate: number) => {
-      await resourceServices.customers.update(id, { billing_rate: newRate });
+  const saveDetailsMutation = useMutation({
+    mutationFn: async (payload: {
+      billing_rate?: number | null;
+      agreement_date?: string | null;
+      purpose?: string | null;
+    }) => {
+      await resourceServices.customers.update(id, payload);
     },
     onSuccess: () => {
+      setHasUserEditedDate(false);
+      setHasUserEditedPurpose(false);
+      setHasUserEditedAmount(false);
       qc.invalidateQueries({ queryKey: ["customers", "detail", id] });
       qc.invalidateQueries({ queryKey: ["customers"] });
-      toast.success("Contract amount saved to customer record");
+      toast.success("Agreement details saved to customer record");
     },
     onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : "Failed to save contract amount";
+      const msg = err instanceof Error ? err.message : "Failed to save agreement details";
       toast.error(msg);
     },
   });
@@ -152,6 +175,12 @@ export function CustomerAgreementPage() {
   const branchName = locations?.items.find((b) => b.id === customer.location_id)?.name;
   const authorizedSignatureUrl = settings?.authorized_signature?.url ?? null;
   const parsedAmount = amountStr.trim() !== "" ? Number(amountStr) : null;
+  const trimmedPurpose = purposeStr.trim();
+  const savedDate = (customer.agreement_date || customer.created_at?.slice(0, 10) || "").slice(0, 10);
+  const detailsDirty =
+    agreementDate !== savedDate ||
+    trimmedPurpose !== (customer.purpose ?? "").trim() ||
+    (parsedAmount != null && parsedAmount !== customer.billing_rate);
 
   return (
     <div className="space-y-5">
@@ -167,14 +196,34 @@ export function CustomerAgreementPage() {
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
               <Label htmlFor="agreement-date" className="text-xs text-muted-foreground whitespace-nowrap">
-                Date:
+                Agreement Date:
               </Label>
               <Input
                 id="agreement-date"
                 type="date"
                 value={agreementDate}
-                onChange={(e) => setAgreementDate(e.target.value)}
+                onChange={(e) => {
+                  setHasUserEditedDate(true);
+                  setAgreementDate(e.target.value);
+                }}
                 className="h-8 w-36 text-xs"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Label htmlFor="agreement-purpose" className="text-xs text-muted-foreground whitespace-nowrap">
+                Purpose:
+              </Label>
+              <Input
+                id="agreement-purpose"
+                type="text"
+                placeholder="e.g. Post-surgery recovery"
+                value={purposeStr}
+                onChange={(e) => {
+                  setHasUserEditedPurpose(true);
+                  setPurposeStr(e.target.value);
+                }}
+                className="h-8 w-44 text-xs"
               />
             </div>
 
@@ -191,26 +240,33 @@ export function CustomerAgreementPage() {
                   setHasUserEditedAmount(true);
                   setAmountStr(e.target.value);
                 }}
-                className="h-8 w-32 text-xs font-semibold"
+                className="h-8 w-28 text-xs font-semibold"
               />
-              {parsedAmount != null && parsedAmount !== customer.billing_rate && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8 text-xs font-medium"
-                  disabled={saveRateMutation.isPending}
-                  onClick={() => saveRateMutation.mutate(parsedAmount)}
-                  title="Save this amount to the customer record"
-                >
-                  {saveRateMutation.isPending ? (
-                    <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Save className="mr-1 h-3.5 w-3.5" />
-                  )}
-                  Save Amount
-                </Button>
-              )}
             </div>
+
+            {detailsDirty && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs font-medium"
+                disabled={saveDetailsMutation.isPending}
+                onClick={() =>
+                  saveDetailsMutation.mutate({
+                    agreement_date: agreementDate || null,
+                    purpose: trimmedPurpose || null,
+                    ...(parsedAmount != null ? { billing_rate: parsedAmount } : {}),
+                  })
+                }
+                title="Save agreement date, purpose, and contract amount to customer record"
+              >
+                {saveDetailsMutation.isPending ? (
+                  <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Save className="mr-1 h-3.5 w-3.5" />
+                )}
+                Save Details
+              </Button>
+            )}
 
             <Button onClick={() => window.print()} className="h-8">
               <Printer className="mr-2 h-4 w-4" />
@@ -285,6 +341,7 @@ export function CustomerAgreementPage() {
               authorizedSignatureUrl={authorizedSignatureUrl}
               agreementDate={agreementDate}
               overrideAmount={parsedAmount}
+              overridePurpose={purposeStr}
               overrideDocuments={docs}
             />
           </div>
