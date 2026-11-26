@@ -1,4 +1,7 @@
-import { FileText, Plus, X } from "lucide-react";
+import { useCallback, useState } from "react";
+import { useDropzone } from "react-dropzone";
+import { ExternalLink, FileText, Loader2, Plus, Upload, X } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -8,7 +11,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ImageUpload } from "@/components/common/ImageUpload";
+import { uploadService } from "@/services/upload.service";
+import { normalizeError } from "@/services/api/client";
+import { cn } from "@/lib/utils";
 import type { IdentityDocument, ImageAsset } from "@/types/models";
 
 const DOC_TYPES: { label: string; value: string; placeholder: string }[] = [
@@ -21,10 +26,135 @@ const DOC_TYPES: { label: string; value: string; placeholder: string }[] = [
   { label: "Other", value: "Other", placeholder: "Document number" },
 ];
 
+export function isPdfAsset(asset?: ImageAsset | null): boolean {
+  if (!asset) return false;
+  if (asset.format?.toLowerCase() === "pdf") return true;
+  if (asset.resource_type === "raw") return true;
+  return asset.url.toLowerCase().split("?")[0].endsWith(".pdf");
+}
+
+function DocumentFileUpload({
+  value,
+  onChange,
+  folder,
+  docLabel,
+}: {
+  value?: ImageAsset | null;
+  onChange: (asset: ImageAsset | null) => void;
+  folder: string;
+  docLabel: string;
+}) {
+  const [uploading, setUploading] = useState(false);
+
+  const onDrop = useCallback(
+    async (files: File[]) => {
+      const file = files[0];
+      if (!file) return;
+      setUploading(true);
+      try {
+        const isPdf =
+          file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+        if (isPdf) {
+          const fileAsset = await uploadService.file(file, folder);
+          onChange({
+            url: fileAsset.url,
+            public_id: fileAsset.public_id,
+            format: fileAsset.format ?? "pdf",
+            original_filename: fileAsset.original_filename ?? file.name,
+            resource_type: fileAsset.resource_type ?? "raw",
+          });
+          toast.success(`${docLabel} PDF uploaded`);
+        } else {
+          const imgAsset = await uploadService.image(file, folder);
+          onChange({ ...imgAsset, original_filename: file.name });
+          toast.success(`${docLabel} image uploaded`);
+        }
+      } catch (err) {
+        toast.error(normalizeError(err).message);
+      } finally {
+        setUploading(false);
+      }
+    },
+    [folder, docLabel, onChange]
+  );
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      "image/*": [],
+      "application/pdf": [".pdf"],
+    },
+    maxFiles: 1,
+    disabled: uploading,
+  });
+
+  if (value?.url) {
+    const isPdf = isPdfAsset(value);
+    return (
+      <div className="group relative flex items-center gap-3 overflow-hidden rounded-xl border border-border bg-card p-2.5">
+        {isPdf ? (
+          <div className="grid h-14 w-14 shrink-0 place-items-center rounded-lg bg-rose-500/10 text-rose-600">
+            <FileText className="h-7 w-7" />
+          </div>
+        ) : (
+          <img
+            src={value.url}
+            alt={docLabel}
+            className="h-14 w-20 shrink-0 rounded-lg border border-border object-cover"
+          />
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-xs font-medium text-foreground">
+            {value.original_filename || (isPdf ? `${docLabel}.pdf` : `${docLabel} Image`)}
+          </p>
+          <a
+            href={value.url}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
+          >
+            <ExternalLink className="h-3 w-3" /> {isPdf ? "Open PDF" : "View Full"}
+          </a>
+        </div>
+        <button
+          type="button"
+          onClick={() => onChange(null)}
+          className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+          aria-label="Remove file"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      {...getRootProps()}
+      className={cn(
+        "flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-border bg-muted/30 px-4 py-4 text-center transition-colors hover:border-primary/50 hover:bg-secondary/40",
+        isDragActive && "border-primary bg-primary/5",
+        uploading && "pointer-events-none opacity-60"
+      )}
+    >
+      <input {...getInputProps()} />
+      {uploading ? (
+        <Loader2 className="h-5 w-5 animate-spin text-primary" />
+      ) : (
+        <Upload className="h-5 w-5 text-muted-foreground" />
+      )}
+      <p className="text-xs font-medium text-foreground">
+        {uploading ? "Uploading…" : `Drop image or PDF for ${docLabel}, or click to browse`}
+      </p>
+      <p className="text-[11px] text-muted-foreground">Supports JPG, PNG, WEBP, or PDF (max 10MB)</p>
+    </div>
+  );
+}
+
 /**
  * Multi-document KYC editor allowing any number of identity proofs
  * (Aadhaar, Voter ID, PAN, Driving License, Passport, etc.), each with
- * its own type dropdown, number input, and document photo upload.
+ * its own type dropdown, number input, and Image or PDF upload.
  */
 export function IdentityDocumentsField({
   value,
@@ -117,12 +247,13 @@ export function IdentityDocumentsField({
 
             <div className="space-y-1">
               <label className="block text-[11px] font-medium text-muted-foreground">
-                Upload {doc.doc_type || "Document"} Photo / Scan
+                Upload {doc.doc_type || "Document"} (Image or PDF)
               </label>
-              <ImageUpload
+              <DocumentFileUpload
                 value={doc.file ?? null}
                 onChange={(asset: ImageAsset | null) => updateRow(idx, { file: asset })}
                 folder={folder}
+                docLabel={doc.doc_type || "Document"}
               />
             </div>
           </div>

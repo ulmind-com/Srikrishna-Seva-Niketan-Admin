@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { Assignment, Customer } from "@/types/models";
+import type { Assignment, Customer, IdentityDocument } from "@/types/models";
 import {
   ORG_DEPARTMENT,
   ORG_LOGO,
@@ -43,6 +43,7 @@ export function CustomerAgreementForm({
   authorizedSignatureUrl,
   agreementDate,
   overrideAmount,
+  overrideDocuments,
 }: {
   customer: Customer;
   assignment?: Assignment | null;
@@ -50,7 +51,12 @@ export function CustomerAgreementForm({
   authorizedSignatureUrl?: string | null;
   agreementDate?: string;
   overrideAmount?: number | null;
+  overrideDocuments?: IdentityDocument[] | null;
 }) {
+  const effectiveDocs = (
+    overrideDocuments ??
+    (customer.documents && customer.documents.length > 0 ? customer.documents : null)
+  )?.filter((d) => d.doc_number?.trim() || d.file?.url);
   const duration = assignment?.total_days ?? customer.duration_days ?? null;
   const amount =
     overrideAmount !== undefined && overrideAmount !== null
@@ -83,12 +89,18 @@ export function CustomerAgreementForm({
         <Field label="Phone" value={customer.phone} />
         <Field label="Alternate Phone" value={customer.alt_phone} />
         <Field
-          label="ID Proof"
+          label={effectiveDocs && effectiveDocs.length > 1 ? "ID Proofs" : "ID Proof"}
+          wide={Boolean(effectiveDocs && effectiveDocs.length > 1)}
           value={
-            customer.documents && customer.documents.length > 0
-              ? customer.documents
-                  .map((d) => `${d.doc_type}${d.doc_number ? ` - ${d.doc_number}` : ""}`)
-                  .join(", ")
+            effectiveDocs && effectiveDocs.length > 0
+              ? effectiveDocs
+                  .map(
+                    (d) =>
+                      `${d.doc_type}${d.doc_number ? `: ${d.doc_number}` : ""}${
+                        d.file?.url ? " (Attached)" : ""
+                      }`
+                  )
+                  .join(" · ")
               : customer.id_proof_type
                 ? `${customer.id_proof_type}${customer.id_proof_number ? ` - ${customer.id_proof_number}` : ""}`
                 : null

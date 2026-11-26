@@ -469,11 +469,21 @@ function ReviewCard({
                               onClick={() => onPreview({ title: doc.title, url: doc.image!.url, number: doc.number })}
                               className="relative group h-28 w-full cursor-pointer overflow-hidden rounded-lg border border-border bg-muted/30 shadow-2xs"
                             >
-                              <img
-                                src={doc.image.url}
-                                alt={doc.title}
-                                className="h-full w-full object-contain p-1 transition duration-200 group-hover:scale-105"
-                              />
+                              {doc.image.format?.toLowerCase() === "pdf" ||
+                              doc.image.url.toLowerCase().split("?")[0].endsWith(".pdf") ? (
+                                <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-rose-600">
+                                  <FileText className="h-8 w-8" />
+                                  <span className="text-[11px] font-medium">
+                                    {doc.image.original_filename || "PDF Document"}
+                                  </span>
+                                </div>
+                              ) : (
+                                <img
+                                  src={doc.image.url}
+                                  alt={doc.title}
+                                  className="h-full w-full object-contain p-1 transition duration-200 group-hover:scale-105"
+                                />
+                              )}
                               <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-medium gap-1.5">
                                 <Eye className="h-4 w-4" /> Enlarge Document
                               </div>

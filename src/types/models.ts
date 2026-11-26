@@ -7,6 +7,8 @@ export interface ImageAsset {
   height?: number | null;
   format?: string | null;
   alt?: string | null;
+  original_filename?: string | null;
+  resource_type?: string | null;
 }
 
 export interface FileAsset {

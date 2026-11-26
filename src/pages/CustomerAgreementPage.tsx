@@ -2,15 +2,16 @@ import { useState, useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
-import { ArrowLeft, Loader2, Printer, Save } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, FileText, Loader2, Printer, Save } from "lucide-react";
 import { toast } from "sonner";
 import { resourceServices } from "@/services/resources";
 import { settingsService } from "@/services/settings.service";
 import { CustomerAgreementForm } from "@/components/documents/CustomerAgreementForm";
+import { IdentityDocumentsField } from "@/components/resource/fields/IdentityDocumentsField";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { Assignment } from "@/types/models";
+import type { Assignment, IdentityDocument } from "@/types/models";
 
 /** Occupying statuses — the engagement that is current for this customer. */
 const ACTIVE = new Set(["scheduled", "active"]);
@@ -60,6 +61,44 @@ export function CustomerAgreementPage() {
   );
   const [amountStr, setAmountStr] = useState<string>("");
   const [hasUserEditedAmount, setHasUserEditedAmount] = useState(false);
+  const [docsOpen, setDocsOpen] = useState(true);
+  const [docs, setDocs] = useState<IdentityDocument[]>([]);
+  const [hasEditedDocs, setHasEditedDocs] = useState(false);
+
+  // Sync customer documents when loaded
+  useEffect(() => {
+    if (!hasEditedDocs && customer) {
+      if (customer.documents && customer.documents.length > 0) {
+        setDocs(customer.documents);
+      } else if (customer.id_proof_type || customer.id_proof_number || customer.id_proof) {
+        setDocs([
+          {
+            doc_type: customer.id_proof_type || "Aadhaar",
+            doc_number: customer.id_proof_number || "",
+            file: customer.id_proof ?? null,
+          },
+        ]);
+      } else {
+        setDocs([{ doc_type: "Aadhaar", doc_number: "", file: null }]);
+      }
+    }
+  }, [customer, hasEditedDocs]);
+
+  const saveDocsMutation = useMutation({
+    mutationFn: async (nextDocs: IdentityDocument[]) => {
+      await resourceServices.customers.update(id, { documents: nextDocs });
+    },
+    onSuccess: () => {
+      setHasEditedDocs(false);
+      qc.invalidateQueries({ queryKey: ["customers", "detail", id] });
+      qc.invalidateQueries({ queryKey: ["customers"] });
+      toast.success("Customer documents saved");
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : "Failed to save documents";
+      toast.error(msg);
+    },
+  });
 
   // Sync initial amount once customer/assignment loads if user hasn't typed their own
   useEffect(() => {
@@ -181,6 +220,61 @@ export function CustomerAgreementPage() {
         </div>
       </div>
 
+      {/* Multi-document KYC upload panel (hidden during print) */}
+      <div className="no-print rounded-2xl border border-border bg-card shadow-sm">
+        <button
+          type="button"
+          onClick={() => setDocsOpen((o) => !o)}
+          className="flex w-full items-center justify-between px-4 py-3 text-left"
+        >
+          <div className="flex items-center gap-2.5">
+            <FileText className="h-4 w-4 text-primary" />
+            <div>
+              <p className="text-sm font-semibold">
+                Customer Documents (Aadhaar / Voter ID / PAN / Image or PDF)
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Upload one or multiple identity documents (image or PDF) for this customer&apos;s agreement.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+              {docs.filter((d) => d.doc_number?.trim() || d.file?.url).length} added
+            </span>
+            {docsOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+          </div>
+        </button>
+
+        {docsOpen && (
+          <div className="space-y-4 border-t border-border px-4 py-4">
+            <IdentityDocumentsField
+              value={docs}
+              onChange={(next) => {
+                setHasEditedDocs(true);
+                setDocs(next);
+              }}
+              folder="ssn/customers/id-proof"
+            />
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                size="sm"
+                disabled={saveDocsMutation.isPending}
+                onClick={() => saveDocsMutation.mutate(docs)}
+              >
+                {saveDocsMutation.isPending ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Save className="mr-1.5 h-3.5 w-3.5" />
+                )}
+                Save Customer Documents
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="overflow-x-auto rounded-2xl bg-muted/40 p-3 sm:p-5">
         <div className="flex justify-center">
           <div className="print-target">
@@ -191,6 +285,7 @@ export function CustomerAgreementPage() {
               authorizedSignatureUrl={authorizedSignatureUrl}
               agreementDate={agreementDate}
               overrideAmount={parsedAmount}
+              overrideDocuments={docs}
             />
           </div>
         </div>
