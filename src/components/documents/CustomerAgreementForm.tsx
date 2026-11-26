@@ -76,7 +76,7 @@ export function CustomerAgreementForm({
             : null;
 
   const service = customer.service_label || CARE_LABEL[customer.care_type] || "Home Health Care";
-  const dateToUse = agreementDate || new Date().toISOString();
+  const dateToUse = agreementDate || customer.agreement_date || new Date().toISOString();
 
   return (
     <div className="doc-sheet mx-auto w-[210mm] bg-white p-[14mm] text-[#111] shadow-soft">
@@ -148,6 +148,7 @@ export function CustomerAgreementForm({
       <div className="mt-4 rounded border border-slate-300 bg-[#fdf6ec]/60 p-3">
         <p className="text-[8.5px] font-bold uppercase tracking-wide text-[#8a1538]">Agreement</p>
         <p className="mt-1 text-[9px] leading-relaxed text-slate-700">
+          On <span className="font-semibold">{formatDate(dateToUse)}</span>,{" "}
           {ORG_NAME} agrees to provide the service described above to the customer
           named herein, for the agreed amount of{" "}
           <span className="font-semibold">
