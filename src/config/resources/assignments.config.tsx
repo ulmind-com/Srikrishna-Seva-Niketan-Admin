@@ -151,6 +151,8 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
       header: "Billing (₹)",
       headClassName: "min-w-[150px]",
       cell: (r) => {
+        const isWorkEnded =
+          Boolean(r.end_date) || r.status === "completed" || r.status === "replaced";
         const days = r.days_worked ?? r.total_days;
         const bill = r.customer_rate != null ? r.customer_rate : (r.customer_daily_rate && days ? Math.round(r.customer_daily_rate * days) : 0);
         const pay = r.employee_payout != null ? r.employee_payout : (r.employee_daily_rate && days ? Math.round(r.employee_daily_rate * days) : 0);
@@ -168,16 +170,30 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
           : "⏳ Pending Collection";
         return (
           <div className="flex flex-col gap-1.5">
-            <div className="flex flex-col gap-0.5 whitespace-nowrap text-xs tabular-nums text-muted-foreground">
-              {bill > 0 && <div>Bill: <span className="font-semibold text-foreground">₹{bill.toLocaleString()}</span></div>}
-              {pay > 0 && <div>Pay: ₹{pay.toLocaleString()}</div>}
-              {r.other_expense != null && r.other_expense > 0 && <div>Exp: ₹{r.other_expense.toLocaleString()}</div>}
-              {bill > 0 && (
-                <div className={`font-semibold ${profit >= 0 ? "text-success" : "text-destructive"}`}>
-                  Profit: ₹{profit.toLocaleString()}
-                </div>
-              )}
-            </div>
+            {isWorkEnded ? (
+              <div className="flex flex-col gap-0.5 whitespace-nowrap text-xs tabular-nums text-muted-foreground">
+                {bill > 0 && <div>Bill: <span className="font-semibold text-foreground">₹{bill.toLocaleString()}</span></div>}
+                {pay > 0 && <div>Pay: ₹{pay.toLocaleString()}</div>}
+                {r.other_expense != null && r.other_expense > 0 && <div>Exp: ₹{r.other_expense.toLocaleString()}</div>}
+                {bill > 0 && (
+                  <div className={`font-semibold ${profit >= 0 ? "text-success" : "text-destructive"}`}>
+                    Profit: ₹{profit.toLocaleString()}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-0.5 whitespace-nowrap text-xs tabular-nums text-muted-foreground">
+                {r.customer_daily_rate != null && r.customer_daily_rate > 0 && (
+                  <div>Rate: ₹{r.customer_daily_rate.toLocaleString()}/day</div>
+                )}
+                {r.customer_rate != null && r.customer_rate > 0 && (
+                  <div>Contract: ₹{r.customer_rate.toLocaleString()}</div>
+                )}
+                <span className="text-[10.5px] font-medium text-amber-400">
+                  ⏳ Bill after work ends
+                </span>
+              </div>
+            )}
             <div className="flex flex-col gap-0.5 items-start">
               <Badge
                 variant={isPostpaid ? "secondary" : "default"}

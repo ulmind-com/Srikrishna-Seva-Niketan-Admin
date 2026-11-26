@@ -69,23 +69,30 @@ export function CustomerBillPage() {
     staleTime: 300_000,
   });
 
+  const canGenerateBill = Boolean(
+    assignment &&
+      (assignment.end_date ||
+        assignment.status === "completed" ||
+        assignment.status === "replaced")
+  );
+
   // Allocate (or reuse) the bill number — idempotent on the backend.
   const { data: billData } = useQuery({
     queryKey: ["assignment-bill-no", id],
     queryFn: () => http.post<{ bill_no: number }>(endpoints.assignments.issueBill(id)),
-    enabled: Boolean(id),
+    enabled: Boolean(id) && canGenerateBill,
   });
 
   // When reached via the "Bill" link in Reports (?print=1), open the print
   // dialog automatically once the bill content + number are ready.
   useEffect(() => {
-    if (!autoPrint || printedRef.current) return;
+    if (!autoPrint || printedRef.current || !canGenerateBill) return;
     if (!assignment || !customer || !billData) return;
     printedRef.current = true;
     // Small delay so the signature image / layout settle before printing.
     const t = setTimeout(() => window.print(), 500);
     return () => clearTimeout(t);
-  }, [autoPrint, assignment, customer, billData]);
+  }, [autoPrint, canGenerateBill, assignment, customer, billData]);
 
   if (isLoading) {
     return (
@@ -106,6 +113,22 @@ export function CustomerBillPage() {
     );
   }
 
+  if (!canGenerateBill) {
+    return (
+      <div className="space-y-4">
+        <BackLink />
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-5 text-sm">
+          <p className="font-semibold text-amber-300">
+            Work is still ongoing — bill not generated yet (কাজ এখনও শেষ হয়নি)
+          </p>
+          <p className="mt-1 text-muted-foreground">
+            A bill can only be generated once an End Date is set or the assignment is marked Completed / Replaced.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const branch = locations?.items.find((b) => b.id === assignment.location_id) ?? null;
   const authorizedSignatureUrl = settings?.authorized_signature?.url ?? null;
 
@@ -114,9 +137,9 @@ export function CustomerBillPage() {
     (a) =>
       a.customer_id === assignment.customer_id &&
       a.status !== "cancelled" &&
+      (Boolean(a.end_date) || a.status === "completed" || a.status === "replaced") &&
       (String(a.start_date).slice(0, 7) === targetMonth ||
-        (a.end_date && String(a.end_date).slice(0, 7) === targetMonth) ||
-        (!a.end_date && String(a.start_date).slice(0, 7) <= targetMonth))
+        (a.end_date && String(a.end_date).slice(0, 7) === targetMonth))
   );
   matchingAssignments.sort((a, b) => (a.start_date > b.start_date ? 1 : -1));
 
