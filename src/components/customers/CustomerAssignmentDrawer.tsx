@@ -232,6 +232,13 @@ export function CustomerAssignmentDrawer({
         delete cleanPayload.employee_payout;
       }
       if (
+        cleanPayload.daily_other_expense === "" ||
+        cleanPayload.daily_other_expense == null ||
+        Number.isNaN(cleanPayload.daily_other_expense)
+      ) {
+        delete cleanPayload.daily_other_expense;
+      }
+      if (
         cleanPayload.other_expense === "" ||
         cleanPayload.other_expense == null ||
         Number.isNaN(cleanPayload.other_expense)

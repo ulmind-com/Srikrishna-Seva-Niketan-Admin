@@ -165,7 +165,11 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
             ? Math.round(r.employee_daily_rate * days)
             : null;
         const pay = dailyPay ?? r.employee_payout ?? 0;
-        const exp = r.other_expense ?? 0;
+        const dailyExp =
+          r.daily_other_expense != null && days != null
+            ? Math.round(r.daily_other_expense * days)
+            : null;
+        const exp = dailyExp ?? r.other_expense ?? 0;
         const profit = bill - pay - exp;
         const isPostpaid = r.payment_type === "postpaid";
         const collected = r.payment_status === "paid" || r.payment_status === "received";
@@ -206,8 +210,17 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
                     )}
                   </div>
                 )}
-                {r.other_expense != null && r.other_expense > 0 && <div>Exp: ₹{r.other_expense.toLocaleString()}</div>}
-                {(bill > 0 || pay > 0) && (
+                {exp > 0 && (
+                  <div>
+                    Exp: ₹{exp.toLocaleString()}
+                    {r.daily_other_expense != null && days != null && (
+                      <span className="ml-1 text-[10px] text-muted-foreground/75">
+                        (₹{r.daily_other_expense}×{days}d)
+                      </span>
+                    )}
+                  </div>
+                )}
+                {(bill > 0 || pay > 0 || exp > 0) && (
                   <div className={`font-semibold ${profit >= 0 ? "text-success" : "text-destructive"}`}>
                     Profit: ₹{profit.toLocaleString()}
                   </div>
@@ -220,6 +233,9 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
                 )}
                 {r.employee_daily_rate != null && r.employee_daily_rate > 0 && (
                   <div>Staff: ₹{r.employee_daily_rate.toLocaleString()}/day</div>
+                )}
+                {r.daily_other_expense != null && r.daily_other_expense > 0 && (
+                  <div>Exp: ₹{r.daily_other_expense.toLocaleString()}/day</div>
                 )}
                 <span className="text-[10.5px] font-medium text-amber-400">
                   ⏳ Bill after work ends
@@ -417,7 +433,7 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
     { name: "customer_daily_rate", label: "Daily Rate — Customer (₹/day)", type: "number", min: 0, helper: "Charged to the customer per day.", section: "Billing" },
     { name: "contract_amount", label: "Total Contract Amount (₹)", type: "number", min: 0, helper: "Agreed customer contract amount — stays fixed while Bill calculates from Daily Rate × Days.", section: "Billing" },
     { name: "employee_daily_rate", label: "Daily Payout — Staff (₹/day)", type: "number", min: 0, helper: "Paid to the nurse per day — an expense.", section: "Billing" },
-    { name: "other_expense", label: "Other Expense (₹)", type: "number", min: 0, helper: "Travel, kit, etc. for this engagement — an expense.", section: "Billing" },
+    { name: "daily_other_expense", label: "Daily Other Expense (₹/day)", type: "number", min: 0, helper: "Travel, kit, etc. per day — multiplied by duty days (e.g. ₹50 × 5d = ₹250).", section: "Billing" },
     { name: "notes", label: "Notes", type: "textarea", section: "Billing", colSpan: 2 },
   ],
 };

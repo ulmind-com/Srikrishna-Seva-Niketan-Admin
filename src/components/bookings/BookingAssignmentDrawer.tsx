@@ -208,6 +208,16 @@ export function BookingAssignmentDrawer({
         delete assignmentPayload.employee_payout;
       }
       if (
+        assignmentPayload.daily_other_expense !== undefined &&
+        assignmentPayload.daily_other_expense !== ""
+      ) {
+        const n = Number(assignmentPayload.daily_other_expense);
+        if (!Number.isNaN(n)) assignmentPayload.daily_other_expense = Math.round(n);
+        else delete assignmentPayload.daily_other_expense;
+      } else {
+        delete assignmentPayload.daily_other_expense;
+      }
+      if (
         assignmentPayload.other_expense !== undefined &&
         assignmentPayload.other_expense !== ""
       ) {
