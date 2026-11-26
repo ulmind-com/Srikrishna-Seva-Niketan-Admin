@@ -16,6 +16,7 @@ export type FieldType =
   | "date"
   | "time"
   | "shift_windows"
+  | "documents"
   | "geopoint"
   | "divider"
   | "duty_schedule";

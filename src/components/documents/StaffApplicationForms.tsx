@@ -80,8 +80,20 @@ export function ApplicationFormI({
 
       <SectionTitle>4. Identification (পরিচয়পত্র)</SectionTitle>
       <FieldGrid>
-        <Field label="ID Proof Type (পরিচয়পত্রের ধরন)" value={staff.id_proof_type} />
-        <Field label="ID Proof Number (পরিচয়পত্র নম্বর)" value={staff.id_proof_number} />
+        {staff.documents && staff.documents.length > 0 ? (
+          <Field
+            label="Identity Documents (পরিচয়পত্রসমূহ)"
+            value={staff.documents
+              .map((d) => `${d.doc_type}${d.doc_number ? `: ${d.doc_number}` : ""}`)
+              .join(" · ")}
+            wide
+          />
+        ) : (
+          <>
+            <Field label="ID Proof Type (পরিচয়পত্রের ধরন)" value={staff.id_proof_type} />
+            <Field label="ID Proof Number (পরিচয়পত্র নম্বর)" value={staff.id_proof_number} />
+          </>
+        )}
         <Field label="Branch (শাখা)" value={branchName} />
         <Field label="Staff Code (স্টাফ কোড)" value={staff.code} />
       </FieldGrid>

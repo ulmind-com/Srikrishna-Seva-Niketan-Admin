@@ -85,9 +85,13 @@ export function CustomerAgreementForm({
         <Field
           label="ID Proof"
           value={
-            customer.id_proof_type
-              ? `${customer.id_proof_type}${customer.id_proof_number ? ` - ${customer.id_proof_number}` : ""}`
-              : null
+            customer.documents && customer.documents.length > 0
+              ? customer.documents
+                  .map((d) => `${d.doc_type}${d.doc_number ? ` - ${d.doc_number}` : ""}`)
+                  .join(", ")
+              : customer.id_proof_type
+                ? `${customer.id_proof_type}${customer.id_proof_number ? ` - ${customer.id_proof_number}` : ""}`
+                : null
           }
         />
         <Field label="Address" value={customer.address} wide />

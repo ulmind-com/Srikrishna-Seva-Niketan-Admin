@@ -36,6 +36,7 @@ function fallbackForType(field: FieldConfig): unknown {
     case "tags":
       return [];
     case "shift_windows":
+    case "documents":
       return [];
     case "number":
     case "geopoint":
@@ -64,6 +65,41 @@ export function buildDefaults(
         ? existing
         : fallbackForType(field)
     );
+    if (field.type === "documents") {
+      const existingDocs = Array.isArray(out[field.name]) ? (out[field.name] as unknown[]) : [];
+      if (existingDocs.length === 0 && initial) {
+        const initObj = initial as Record<string, unknown>;
+        const hydrated: Record<string, unknown>[] = [];
+        if (initObj.id_proof_type || initObj.id_proof_number || initObj.id_proof) {
+          hydrated.push({
+            doc_type: (initObj.id_proof_type as string) || "Aadhaar",
+            doc_number: (initObj.id_proof_number as string) || "",
+            file: initObj.id_proof ?? null,
+          });
+        }
+        if (
+          (initObj.voter_number || initObj.voter_photo) &&
+          !hydrated.some((d) => String(d.doc_type).toLowerCase().includes("voter"))
+        ) {
+          hydrated.push({
+            doc_type: "Voter ID",
+            doc_number: (initObj.voter_number as string) || "",
+            file: initObj.voter_photo ?? null,
+          });
+        }
+        if (
+          (initObj.pan_number || initObj.pan_photo) &&
+          !hydrated.some((d) => String(d.doc_type).toLowerCase() === "pan")
+        ) {
+          hydrated.push({
+            doc_type: "PAN",
+            doc_number: (initObj.pan_number as string) || "",
+            file: initObj.pan_photo ?? null,
+          });
+        }
+        out[field.name] = hydrated;
+      }
+    }
     if (field.type === "duty_schedule") {
       const initObj = (initial || {}) as Record<string, unknown>;
       if (out.shift === undefined) out.shift = initObj.shift ?? "full_24h";

@@ -307,7 +307,25 @@ function ReviewCard({
     },
   ];
 
-  const presentDocs = kycDocs.filter((d) => d.image?.url || d.number);
+  const extraDocs = (staff.documents ?? [])
+    .filter((d) => {
+      const t = d.doc_type.toLowerCase();
+      const isPrimary = d.doc_type === staff.id_proof_type && d.doc_number === staff.id_proof_number;
+      const isVoter = t.includes("voter") && (staff.voter_number || staff.voter_photo?.url);
+      const isPan = t.split(/\s+/).includes("pan") && (staff.pan_number || staff.pan_photo?.url);
+      return !isPrimary && !isVoter && !isPan && (d.file?.url || d.doc_number);
+    })
+    .map((d, i) => ({
+      key: `extra_${i}_${d.doc_type}`,
+      title: d.doc_type,
+      badge: d.doc_type,
+      number: d.doc_number ?? null,
+      image: d.file ?? null,
+      icon: <FileText className="h-4 w-4 text-teal-500" />,
+      verification: undefined as Employee["document_verification"],
+    }));
+
+  const presentDocs = [...kycDocs, ...extraDocs].filter((d) => d.image?.url || d.number);
 
   const verify = useMutation({
     mutationFn: () =>

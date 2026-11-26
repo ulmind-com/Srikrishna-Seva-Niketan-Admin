@@ -87,6 +87,12 @@ export interface Location extends BaseDoc {
 export type Gender = "male" | "female" | "other";
 export type EmployeeStatus = "available" | "assigned" | "on_leave" | "inactive";
 
+export interface IdentityDocument {
+  doc_type: string;
+  doc_number?: string | null;
+  file?: ImageAsset | null;
+}
+
 export interface Employee extends BaseDoc {
   code: string;
   name: string;
@@ -112,6 +118,7 @@ export interface Employee extends BaseDoc {
   bank_account_number?: string | null;
   bank_ifsc?: string | null;
   bank_photo?: ImageAsset | null;
+  documents?: IdentityDocument[];
   location_id: string;
   status: EmployeeStatus;
   rating: number;
@@ -185,6 +192,7 @@ export interface Customer extends BaseDoc {
   id_proof?: ImageAsset | null;
   id_proof_type?: string | null;
   id_proof_number?: string | null;
+  documents?: IdentityDocument[];
   care_type: CareType;
   service_label?: string | null;
   duration_days?: number | null;

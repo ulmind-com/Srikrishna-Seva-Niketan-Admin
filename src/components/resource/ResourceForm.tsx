@@ -17,6 +17,7 @@ import { AsyncSelect } from "@/components/common/AsyncSelect";
 import { CustomerField } from "@/components/common/CustomerField";
 import { LocationPinField } from "@/components/resource/fields/LocationPinField";
 import { ShiftWindowsField, type ShiftWindow } from "@/components/resource/fields/ShiftWindowsField";
+import { IdentityDocumentsField } from "@/components/resource/fields/IdentityDocumentsField";
 import { DutyScheduleField } from "@/components/resource/fields/DutyScheduleField";
 import { ImageUpload } from "@/components/common/ImageUpload";
 import { VideoUpload } from "@/components/common/VideoUpload";
@@ -24,7 +25,7 @@ import { TagsInput } from "@/components/common/TagsInput";
 import { cn } from "@/lib/utils";
 import type { FieldConfig, ImageAsset } from "./form-helpers";
 import { buildDefaults, groupSections } from "./form-helpers";
-import type { FileAsset, ImageAsset as ImageAssetModel } from "@/types/models";
+import type { FileAsset, IdentityDocument, ImageAsset as ImageAssetModel } from "@/types/models";
 
 interface ResourceFormProps<T> {
   fields: FieldConfig[];
@@ -126,7 +127,7 @@ export function ResourceForm<T>({
                     key={field.name}
                     className={cn(
                       "space-y-1.5",
-                      field.colSpan === 2 || field.type === "image" || field.type === "video"
+                      field.colSpan === 2 || field.type === "image" || field.type === "video" || field.type === "documents"
                         ? "sm:col-span-2"
                         : field.type === "textarea" ||
                             field.type === "richtext" ||
@@ -394,6 +395,21 @@ function renderControl(
             <ShiftWindowsField
               value={(f.value as ShiftWindow[]) ?? []}
               onChange={f.onChange}
+            />
+          )}
+        />
+      );
+
+    case "documents":
+      return (
+        <Controller
+          control={control}
+          name={field.name}
+          render={({ field: f }) => (
+            <IdentityDocumentsField
+              value={(f.value as IdentityDocument[]) ?? []}
+              onChange={f.onChange}
+              folder={field.folder}
             />
           )}
         />
