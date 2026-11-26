@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { downloadAttendanceReportPdf } from "@/lib/attendance-report-export";
+import { formatAttendanceWindow } from "@/components/documents/document-utils";
 
 const inr = (n?: number | null) => `₹${(n ?? 0).toLocaleString("en-IN")}`;
 
@@ -67,16 +68,6 @@ const SHIFT_LABEL: Record<string, string> = {
   full_24h: "24 Hours",
   custom: "Custom",
 };
-
-function fmtTime(t?: string | null): string {
-  if (!t) return "";
-  const [h, m] = t.split(":");
-  const hi = Number(h);
-  const mi = Number(m);
-  if (Number.isNaN(hi) || Number.isNaN(mi)) return t;
-  const suffix = hi < 12 ? "AM" : "PM";
-  return `${hi % 12 || 12}:${String(mi).padStart(2, "0")} ${suffix}`;
-}
 
 function toISODate(d: Date): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -578,12 +569,13 @@ export function AttendancePage() {
                   {daysList.map((d: PayslipDay, index: number) => {
                     const statusInfo = STATUS_BADGE[d.status] || STATUS_BADGE.unmarked;
                     const shiftName = d.shift ? (SHIFT_LABEL[d.shift] || d.shift) : "—";
-                    const dutyTiming =
-                      d.start_time && d.end_time
-                        ? `${fmtTime(d.start_time)} – ${fmtTime(d.end_time)}`
-                        : d.start_time
-                          ? `from ${fmtTime(d.start_time)}`
-                          : "—";
+                    const dutyTiming = formatAttendanceWindow(
+                      d.date,
+                      d.shift,
+                      d.start_time,
+                      d.end_time,
+                      d.status
+                    );
 
                     const dur =
                       d.duration ||

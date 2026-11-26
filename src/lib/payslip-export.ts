@@ -1,6 +1,7 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { Payslip, PayslipDay } from "@/services/payroll.service";
+import { formatAttendanceWindow } from "@/components/documents/document-utils";
 
 const EMERALD: [number, number, number] = [15, 118, 110];
 const SLATE: [number, number, number] = [30, 41, 59];
@@ -65,8 +66,11 @@ function shiftText(d: PayslipDay): string {
   }
 
   if (d.start_time && d.end_time) {
-    const on = isWindowOvernight(d.start_time, d.end_time) ? " (Overnight)" : "";
-    return `${shiftTitle} (${fmtTime(d.start_time)} – ${fmtTime(d.end_time)})${on}`;
+    if (d.date) {
+      return `${shiftTitle} (${formatAttendanceWindow(d.date, d.shift, d.start_time, d.end_time, d.status, true)})`;
+    }
+    const on = isWindowOvernight(d.start_time, d.end_time) ? " (Next Day)" : "";
+    return `${shiftTitle} (${fmtTime(d.start_time)} - ${fmtTime(d.end_time)})${on}`;
   }
 
   const map: Record<string, string> = {

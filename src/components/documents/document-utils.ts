@@ -24,6 +24,60 @@ export function formatDateWithTime(dateStr?: string | null, timeStr?: string | n
   return t ? `${d} (${t})` : d;
 }
 
+function shortDayMonth(dateIso: string): string {
+  const [y, m, d] = dateIso.split("-").map(Number);
+  if (!y || !m || !d) return dateIso;
+  return new Date(y, m - 1, d).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+  });
+}
+
+function addOneDayIso(dateIso: string): string {
+  const [y, m, d] = dateIso.split("-").map(Number);
+  if (!y || !m || !d) return dateIso;
+  const next = new Date(y, m - 1, d + 1);
+  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-${String(
+    next.getDate()
+  ).padStart(2, "0")}`;
+}
+
+/**
+ * Format an attendance day's duty window clearly — for 24h and overnight shifts
+ * shows the explicit start date + time into the next day (e.g. "01 Nov 07:00 AM → 02 Nov 07:00 AM").
+ */
+export function formatAttendanceWindow(
+  dateIso: string,
+  shift?: string | null,
+  startTime?: string | null,
+  endTime?: string | null,
+  status?: string | null,
+  ascii = false
+): string {
+  const sep = ascii ? " -> " : " → ";
+  const dash = ascii ? " - " : " – ";
+  if (!startTime && !endTime) return ascii ? "-" : "—";
+  if (startTime && endTime) {
+    const isOvernight =
+      (shift === "full_24h" && status !== "half_day") || endTime <= startTime;
+    if (isOvernight && status !== "half_day") {
+      return `${shortDayMonth(dateIso)} ${formatTime12h(startTime)}${sep}${shortDayMonth(
+        addOneDayIso(dateIso)
+      )} ${formatTime12h(endTime)}`;
+    }
+    if (status === "half_day" && endTime <= startTime) {
+      return `from ${shortDayMonth(dateIso)} ${formatTime12h(startTime)} (12 hrs)`;
+    }
+    return `${formatTime12h(startTime)}${dash}${formatTime12h(endTime)}`;
+  }
+  if (startTime) {
+    return shift === "full_24h"
+      ? `${shortDayMonth(dateIso)} ${formatTime12h(startTime)} (24 hrs)`
+      : `from ${formatTime12h(startTime)}`;
+  }
+  return ascii ? "-" : "—";
+}
+
 /** Format an ISO date (or null) as `DD/MM/YYYY` for printed documents. */
 export function formatDate(value?: string | null): string {
   if (!value) return "—";

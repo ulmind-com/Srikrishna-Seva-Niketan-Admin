@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import { FileDown, Loader2, Printer, ReceiptText, Wallet, X } from "lucide-react";
 import { downloadPayslipPdf } from "@/lib/payslip-export";
+import { formatAttendanceWindow } from "@/components/documents/document-utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { http } from "@/services/api/http";
 import { endpoints } from "@/services/api/endpoints";
@@ -62,6 +63,8 @@ function isWindowOvernight(start?: string | null, end?: string | null): boolean 
 
 /** Shift cell for a payslip day — time window(s) for custom shifts with overnight tag. */
 function dayShiftText(d: {
+  date?: string;
+  status?: string;
   shift: string | null;
   start_time?: string | null;
   end_time?: string | null;
@@ -91,6 +94,9 @@ function dayShiftText(d: {
   }
 
   if (d.start_time && d.end_time) {
+    if (d.date) {
+      return `${shiftTitle} (${formatAttendanceWindow(d.date, d.shift, d.start_time, d.end_time, d.status)})`;
+    }
     const on = isWindowOvernight(d.start_time, d.end_time) ? " (Overnight)" : "";
     return `${shiftTitle} (${fmtTime(d.start_time)} – ${fmtTime(d.end_time)})${on}`;
   }

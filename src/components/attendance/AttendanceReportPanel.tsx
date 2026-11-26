@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { downloadAttendanceReportPdf } from "@/lib/attendance-report-export";
+import { formatAttendanceWindow } from "@/components/documents/document-utils";
 
 const inr = (n?: number | null) => `₹${(n ?? 0).toLocaleString("en-IN")}`;
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -51,7 +52,7 @@ function dayShiftText(d: PayslipDay): string {
     return d.shift_windows.map((w) => `${fmtTime(w.start)}–${fmtTime(w.end)}`).join(", ");
   }
   if (d.start_time && d.end_time) {
-    return `${label} (${fmtTime(d.start_time)} – ${fmtTime(d.end_time)})`;
+    return `${label} (${formatAttendanceWindow(d.date, d.shift, d.start_time, d.end_time, d.status)})`;
   }
   if (d.start_time) {
     return `${label} (${fmtTime(d.start_time)})`;
