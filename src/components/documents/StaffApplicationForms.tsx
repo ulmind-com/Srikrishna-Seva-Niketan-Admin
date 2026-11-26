@@ -170,7 +170,10 @@ export function ApplicationFormI({
           <Field
             label="Verified On (যাচাইয়ের তারিখ)"
             value={formatDate(
-              staff.verified_at ?? (staff.verification_status === "verified" ? effectiveJoinDate : null)
+              staff.verified_at ??
+                (staff.verification_status === "verified"
+                  ? (staff.created_at ?? staff.submitted_at)
+                  : null)
             )}
           />
           <Field label="Status (অবস্থা)" value={staff.verification_status} capitalize />
