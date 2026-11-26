@@ -23,7 +23,6 @@ import { EmployeeDocumentsPage } from "@/pages/EmployeeDocumentsPage";
 import { StaffVerificationPage } from "@/pages/StaffVerificationPage";
 import { LocationStaffOverviewPage } from "@/pages/LocationStaffOverviewPage";
 import { StaffDeploymentPage } from "@/pages/StaffDeploymentPage";
-import { AttendancePage } from "@/pages/AttendancePage";
 import { PayslipPage } from "@/pages/PayslipPage";
 import { CustomerAgreementPage } from "@/pages/CustomerAgreementPage";
 import { CustomerBillPage } from "@/pages/CustomerBillPage";
@@ -93,7 +92,7 @@ export function AppRoutes() {
           <Route path="/assignments" element={<AssignmentsPage />} />
           <Route path="/staff-deployment" element={<StaffDeploymentPage />} />
           <Route path="/assignments/:id/bill" element={<CustomerBillPage />} />
-          <Route path="/attendance" element={<AttendancePage />} />
+          <Route path="/attendance" element={<Navigate to="/payslips" replace />} />
           <Route path="/monthly-bills" element={<MonthlyBillsPage />} />
           <Route path="/general-bills" element={<MonthlyBillsPage />} />
           <Route path="/payslips" element={<PayslipPage />} />
