@@ -601,16 +601,36 @@ export function PaymentsReceiptsPage() {
                               className="px-4 py-3 text-right"
                               onClick={(e) => e.stopPropagation()}
                             >
-                              {can("payments:create") && (
+                              <div className="inline-flex items-center justify-end gap-2">
+                                {can("payments:create") && (
+                                  <Button
+                                    size="sm"
+                                    variant={row.outstanding_amount > 0 ? "default" : "outline"}
+                                    onClick={() => openReceiveModal(row)}
+                                  >
+                                    <Plus className="mr-1 h-3.5 w-3.5" />
+                                    {row.outstanding_amount > 0 ? "Add Payment" : "Add Payment"}
+                                  </Button>
+                                )}
                                 <Button
                                   size="sm"
-                                  variant={row.outstanding_amount > 0 ? "default" : "outline"}
-                                  onClick={() => openReceiveModal(row)}
+                                  variant={isOpen ? "secondary" : "outline"}
+                                  onClick={() =>
+                                    setExpandedClients((prev) => ({
+                                      ...prev,
+                                      [row.customer_id]: !prev[row.customer_id],
+                                    }))
+                                  }
                                 >
-                                  <Plus className="mr-1 h-3.5 w-3.5" />
-                                  {row.outstanding_amount > 0 ? "Receive" : "Add Entry"}
+                                  <Receipt className="mr-1 h-3.5 w-3.5" />
+                                  Slips ({row.receipts.length})
+                                  {isOpen ? (
+                                    <ChevronDown className="ml-1 h-3.5 w-3.5" />
+                                  ) : (
+                                    <ChevronRight className="ml-1 h-3.5 w-3.5" />
+                                  )}
                                 </Button>
-                              )}
+                              </div>
                             </td>
                           </tr>
                           {isOpen && (
@@ -671,10 +691,10 @@ export function PaymentsReceiptsPage() {
                                   </div>
                                 )}
 
-                                {/* Receipts Issued */}
+                                {/* Receipts Issued (Date-wise Slips) */}
                                 <div>
                                   <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                    Receipts Issued ({row.receipts.length})
+                                    Date-wise Payment Slips / Receipts ({row.receipts.length})
                                   </p>
                                   {row.receipts.length === 0 ? (
                                     <p className="text-xs text-muted-foreground italic">
@@ -685,22 +705,22 @@ export function PaymentsReceiptsPage() {
                                       <table className="w-full text-xs">
                                         <thead className="bg-muted/40 text-muted-foreground">
                                           <tr>
-                                            <th className="px-3 py-2 text-left">Receipt No</th>
-                                            <th className="px-3 py-2 text-left">Date</th>
+                                            <th className="px-3 py-2 text-left">Payment Date</th>
+                                            <th className="px-3 py-2 text-left">Slip / Receipt No</th>
                                             <th className="px-3 py-2 text-left">Mode / Ref</th>
                                             <th className="px-3 py-2 text-left">Note</th>
                                             <th className="px-3 py-2 text-right">Amount</th>
-                                            <th className="px-3 py-2 text-right">Actions</th>
+                                            <th className="px-3 py-2 text-right">Slip PDF</th>
                                           </tr>
                                         </thead>
                                         <tbody className="divide-y divide-border">
                                           {row.receipts.map((rcp) => (
                                             <tr key={rcp.id}>
+                                              <td className="px-3 py-2 tabular-nums font-medium">
+                                                {formatSlashDateIST(rcp.date)}
+                                              </td>
                                               <td className="px-3 py-2 font-semibold text-primary">
                                                 {rcp.receipt_no || "RCP"}
-                                              </td>
-                                              <td className="px-3 py-2 tabular-nums">
-                                                {formatSlashDateIST(rcp.date)}
                                               </td>
                                               <td className="px-3 py-2 uppercase">
                                                 {rcp.mode.replace(/_/g, " ")}
@@ -736,7 +756,7 @@ export function PaymentsReceiptsPage() {
                                                     })
                                                   }
                                                 >
-                                                  <Download className="mr-1 h-3 w-3" /> Receipt PDF
+                                                  <Download className="mr-1 h-3 w-3" /> Slip PDF
                                                 </Button>
                                                 {can("payments:delete") && (
                                                   <Button
@@ -850,23 +870,43 @@ export function PaymentsReceiptsPage() {
                               className="px-4 py-3 text-right"
                               onClick={(e) => e.stopPropagation()}
                             >
-                              {can("payments:create") && (
+                              <div className="inline-flex items-center justify-end gap-2">
+                                {can("payments:create") && (
+                                  <Button
+                                    size="sm"
+                                    variant={row.remaining_amount > 0 ? "default" : "outline"}
+                                    onClick={() => openPayStaffModal(row)}
+                                  >
+                                    <Plus className="mr-1 h-3.5 w-3.5" />
+                                    {row.remaining_amount > 0 ? "Add Payment" : "Pay Advance"}
+                                  </Button>
+                                )}
                                 <Button
                                   size="sm"
-                                  variant={row.remaining_amount > 0 ? "default" : "outline"}
-                                  onClick={() => openPayStaffModal(row)}
+                                  variant={isOpen ? "secondary" : "outline"}
+                                  onClick={() =>
+                                    setExpandedStaff((prev) => ({
+                                      ...prev,
+                                      [row.employee_id]: !prev[row.employee_id],
+                                    }))
+                                  }
                                 >
-                                  <Plus className="mr-1 h-3.5 w-3.5" />
-                                  {row.remaining_amount > 0 ? "Pay Salary" : "Advance / Pay"}
+                                  <Receipt className="mr-1 h-3.5 w-3.5" />
+                                  Slips ({row.payments.length})
+                                  {isOpen ? (
+                                    <ChevronDown className="ml-1 h-3.5 w-3.5" />
+                                  ) : (
+                                    <ChevronRight className="ml-1 h-3.5 w-3.5" />
+                                  )}
                                 </Button>
-                              )}
+                              </div>
                             </td>
                           </tr>
                           {isOpen && (
                             <tr key={`${row.employee_id}-detail`} className="bg-muted/20">
                               <td colSpan={8} className="px-6 py-4">
                                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                  Salary Payout Vouchers ({row.payments.length})
+                                  Date-wise Payment Slips ({row.payments.length})
                                 </p>
                                 {row.payments.length === 0 ? (
                                   <p className="text-xs text-muted-foreground italic">
@@ -877,22 +917,22 @@ export function PaymentsReceiptsPage() {
                                     <table className="w-full text-xs">
                                       <thead className="bg-muted/40 text-muted-foreground">
                                         <tr>
-                                          <th className="px-3 py-2 text-left">Voucher No</th>
-                                          <th className="px-3 py-2 text-left">Date</th>
+                                          <th className="px-3 py-2 text-left">Payment Date</th>
+                                          <th className="px-3 py-2 text-left">Slip / Voucher No</th>
                                           <th className="px-3 py-2 text-left">Mode / Ref</th>
                                           <th className="px-3 py-2 text-left">Paid By &amp; Note</th>
                                           <th className="px-3 py-2 text-right">Amount</th>
-                                          <th className="px-3 py-2 text-right">Actions</th>
+                                          <th className="px-3 py-2 text-right">Slip PDF</th>
                                         </tr>
                                       </thead>
                                       <tbody className="divide-y divide-border">
                                         {row.payments.map((sp) => (
                                           <tr key={sp.id}>
+                                            <td className="px-3 py-2 tabular-nums font-medium">
+                                              {formatSlashDateIST(sp.date)}
+                                            </td>
                                             <td className="px-3 py-2 font-semibold text-indigo-400">
                                               {sp.voucher_no || "PAY"}
-                                            </td>
-                                            <td className="px-3 py-2 tabular-nums">
-                                              {formatSlashDateIST(sp.date)}
                                             </td>
                                             <td className="px-3 py-2 uppercase">
                                               {sp.mode.replace(/_/g, " ")}
@@ -928,7 +968,7 @@ export function PaymentsReceiptsPage() {
                                                   })
                                                 }
                                               >
-                                                <Download className="mr-1 h-3 w-3" /> Voucher PDF
+                                                <Download className="mr-1 h-3 w-3" /> Slip PDF
                                               </Button>
                                               {can("payments:delete") && (
                                                 <Button
