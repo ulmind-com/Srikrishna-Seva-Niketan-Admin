@@ -245,7 +245,9 @@ export function calculateDutyScheduleIST(params: {
           .filter((d): d is string => Boolean(d))
       )
     ).sort();
-    if (uniqueDates.length > 0) {
+    const sIso = sDate.toISODate();
+    const eIso = eDate.toISODate();
+    if (uniqueDates.length > 1 || (sIso === eIso && sIso && uniqueDates.includes(sIso))) {
       grossDays = uniqueDates.length;
       let customHours = 0;
       for (const w of shiftWindows) {
@@ -258,6 +260,10 @@ export function calculateDutyScheduleIST(params: {
         }
       }
       totalHours = customHours > 0 ? customHours : grossDays * 12;
+    } else {
+      const calDays = Math.round(eDate.startOf("day").diff(sDate.startOf("day"), "days").days) + 1;
+      grossDays = calDays;
+      totalHours = grossDays * 12;
     }
   } else if (shift === "full_24h" && startTime && endTime) {
     let effEnd = eDt;
