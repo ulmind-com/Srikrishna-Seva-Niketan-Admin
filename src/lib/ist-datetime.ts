@@ -5,6 +5,7 @@ export const IST_ZONE = "Asia/Kolkata";
 export type DutyShift = "morning" | "day" | "night" | "full_24h" | "custom";
 
 export interface ShiftWindowInput {
+  date?: string | null;
   start?: string | null;
   end?: string | null;
 }
@@ -236,7 +237,29 @@ export function calculateDutyScheduleIST(params: {
   let grossDays = 0;
   let totalHours = 0;
 
-  if (shift === "full_24h" && startTime && endTime) {
+  if (shift === "custom" && shiftWindows && shiftWindows.some((w) => w.date)) {
+    const uniqueDates = Array.from(
+      new Set(
+        shiftWindows
+          .map((w) => parseIST(w.date)?.toISODate())
+          .filter((d): d is string => Boolean(d))
+      )
+    ).sort();
+    if (uniqueDates.length > 0) {
+      grossDays = uniqueDates.length;
+      let customHours = 0;
+      for (const w of shiftWindows) {
+        if (!w.date || !w.start || !w.end) continue;
+        const ws = combineDateTimeIST(w.date, w.start);
+        let we = combineDateTimeIST(w.date, w.end);
+        if (ws && we) {
+          if (we <= ws) we = we.plus({ days: 1 });
+          customHours += we.diff(ws, "hours").hours;
+        }
+      }
+      totalHours = customHours > 0 ? customHours : grossDays * 12;
+    }
+  } else if (shift === "full_24h" && startTime && endTime) {
     let effEnd = eDt;
     if (effEnd.toMillis() === sDt.toMillis()) {
       if (isHandover) {

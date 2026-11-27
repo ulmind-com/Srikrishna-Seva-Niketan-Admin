@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Calendar, Clock, UserCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ShiftWindowsField, type ShiftWindow } from "./ShiftWindowsField";
 import { cn } from "@/lib/utils";
 import { calculateDutyScheduleIST, todayIST } from "@/lib/ist-datetime";
 
@@ -62,15 +63,42 @@ export function DutyScheduleField({
     });
   }, [hasEndDate, startDate, endDate, startTime, endTime, currentShift, shiftWindows, dutyBreaks, watch]);
 
+  const syncCustomWindows = (windows: ShiftWindow[]) => {
+    setValue("shift_windows", windows, { shouldDirty: true });
+    const dates = windows
+      .map((w) => (w.date ? String(w.date).slice(0, 10) : ""))
+      .filter(Boolean)
+      .sort();
+    if (dates.length > 0) {
+      setValue("start_date", dates[0], { shouldDirty: true });
+      setValue("end_date", dates[dates.length - 1], { shouldDirty: true });
+      setHasEndDate(true);
+    }
+    const first = windows[0];
+    const last = windows[windows.length - 1];
+    if (first?.start) setValue("start_time", first.start, { shouldDirty: true });
+    if (last?.end) setValue("end_time", last.end, { shouldDirty: true });
+  };
+
   const handleShiftChange = (shiftId: string) => {
     setValue("shift", shiftId, { shouldDirty: true });
+    if (shiftId === "custom") {
+      const baseDate = startDate ? String(startDate).slice(0, 10) : todayIST();
+      const existingWins: ShiftWindow[] =
+        Array.isArray(shiftWindows) && shiftWindows.length > 0
+          ? shiftWindows.map((w: ShiftWindow) => ({
+              date: w.date || baseDate,
+              start: w.start || "07:00",
+              end: w.end || "12:00",
+            }))
+          : [{ date: baseDate, start: "07:00", end: "12:00" }];
+      syncCustomWindows(existingWins);
+      return;
+    }
     const opt = SHIFT_OPTIONS.find((s) => s.id === shiftId);
     if (opt) {
       setValue("start_time", opt.defStart, { shouldDirty: true });
       setValue("end_time", opt.defEnd, { shouldDirty: true });
-    }
-    if (shiftId === "custom") {
-      setValue("shift_windows", [], { shouldDirty: true });
     }
   };
 
@@ -79,9 +107,6 @@ export function DutyScheduleField({
     setValue("start_time", nextStart, { shouldDirty: true });
     if (currentShift === "full_24h" && (!watch("end_time") || endTime === prevStart)) {
       setValue("end_time", nextStart, { shouldDirty: true });
-    }
-    if (currentShift === "custom" && shiftWindows.length > 0) {
-      setValue("shift_windows", [], { shouldDirty: true });
     }
   };
 
@@ -140,152 +165,147 @@ export function DutyScheduleField({
         </div>
       </div>
 
-      {/* 2. Start Schedule: Calendar Date + Shift Time(s) */}
-      <div className="rounded-xl border border-border/60 bg-muted/20 p-3 space-y-2">
-        <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-          <Calendar className="h-3.5 w-3.5 text-primary" />
-          <Clock className="h-3.5 w-3.5 text-primary" />
-          <span>
-            {currentShift === "custom"
-              ? "Start Date & Shift Time (কাজের শুরু ও শিফটের সময়) *"
-              : "Start Schedule (কাজের শুরুর তারিখ ও সময়) *"}
-          </span>
-        </Label>
-        <div
-          className={cn(
-            "grid grid-cols-1 gap-3",
-            currentShift === "custom" ? "sm:grid-cols-3" : "sm:grid-cols-2"
-          )}
-        >
-          <div className="space-y-1">
-            <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
-              <Calendar className="h-3 w-3 text-primary" /> Start Date (শুরুর তারিখ)
+      {currentShift === "custom" ? (
+        /* 2. Custom Shift Builder: each row has Start Date + Start Time + End Time + "+ Add Custom Shift" */
+        <div className="rounded-xl border border-border/60 bg-muted/20 p-3 space-y-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5 text-primary" />
+              <Clock className="h-3.5 w-3.5 text-primary" />
+              <span>Custom Shift Schedule (তারিখ, শুরু ও শেষের সময়) *</span>
+            </Label>
+            <span className="text-[10px] text-muted-foreground">
+              প্রয়োজনে + বাটন দিয়ে আরও তারিখ বা সময় যোগ করুন
             </span>
-            <Input
-              type="date"
-              value={startDate ? String(startDate).slice(0, 10) : ""}
-              onChange={(e) => setValue("start_date", e.target.value, { shouldDirty: true })}
-              required
-              className="h-9"
-            />
           </div>
-          <div className="space-y-1">
-            <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
-              <Clock className="h-3 w-3 text-primary" />{" "}
-              {currentShift === "custom" ? "Shift Start Time (কখন শুরু)" : "Start Time (কখন থেকে কাজ শুরু)"}
-            </span>
-            <Input
-              type="time"
-              value={startTime || "08:00"}
-              onChange={(e) => handleStartTimeChange(e.target.value)}
-              className="h-9"
-            />
-          </div>
-          {currentShift === "custom" && (
-            <div className="space-y-1">
-              <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
-                <Clock className="h-3 w-3 text-primary" /> Shift End Time (কখন শেষ)
+          <ShiftWindowsField
+            value={shiftWindows}
+            onChange={syncCustomWindows}
+            defaultDate={startDate ? String(startDate).slice(0, 10) : todayIST()}
+          />
+          {liveSummary && (
+            <div className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-1.5 text-[11px] flex flex-wrap items-center justify-between gap-2">
+              <span className="text-muted-foreground">
+                Range: <strong className="text-foreground">{String(startDate).slice(0, 10)}</strong> →{" "}
+                <strong className="text-foreground">{String(endDate).slice(0, 10)}</strong>
               </span>
-              <Input
-                type="time"
-                value={endTime || "20:00"}
-                onChange={(e) => {
-                  setValue("end_time", e.target.value, { shouldDirty: true });
-                  if (shiftWindows.length > 0) {
-                    setValue("shift_windows", [], { shouldDirty: true });
-                  }
-                }}
-                className="h-9"
-              />
+              <span className="font-bold text-primary">
+                {liveSummary.days} Day{liveSummary.days === 1 ? "" : "s"} ({liveSummary.hours} hrs)
+              </span>
             </div>
           )}
         </div>
-      </div>
-
-      {/* 3. End Schedule: Calendar Date + Clock Time with ON/OFF Switch */}
-      <div className="rounded-xl border border-border/60 bg-muted/20 p-3 space-y-2">
-        <div className="flex items-center justify-between">
-          <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-            <Calendar className="h-3.5 w-3.5 text-primary" />
-            <Clock className="h-3.5 w-3.5 text-primary" />
-            <span>
-              {currentShift === "custom"
-                ? "End Date (কাজের সমাপ্তির তারিখ)"
-                : "End Schedule (কাজের সমাপ্তির তারিখ ও সময়)"}
-            </span>
-          </Label>
-          <button
-            type="button"
-            onClick={handleToggleEndDate}
-            className={cn(
-              "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border transition-all cursor-pointer",
-              hasEndDate
-                ? "bg-primary text-primary-foreground border-primary shadow-2xs"
-                : "bg-muted text-muted-foreground hover:bg-muted/80 border-border"
-            )}
-          >
-            <span>{hasEndDate ? "ON (নির্দিষ্ট সমাপ্তি)" : "OFF (অনির্দিষ্টকাল)"}</span>
-          </button>
-        </div>
-
-        {hasEndDate ? (
-          <div className="space-y-2.5 pt-1">
-            <div
-              className={cn(
-                "grid grid-cols-1 gap-3",
-                currentShift === "custom" ? "sm:grid-cols-1" : "sm:grid-cols-2"
-              )}
-            >
+      ) : (
+        <>
+          {/* 2. Start Schedule: Calendar Date + Start Time */}
+          <div className="rounded-xl border border-border/60 bg-muted/20 p-3 space-y-2">
+            <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5 text-primary" />
+              <Clock className="h-3.5 w-3.5 text-primary" />
+              <span>Start Schedule (কাজের শুরুর তারিখ ও সময়) *</span>
+            </Label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
-                  <Calendar className="h-3 w-3 text-primary" /> End Date (ক্যালেন্ডার থেকে শেষ তারিখ)
+                  <Calendar className="h-3 w-3 text-primary" /> Start Date (শুরুর তারিখ)
                 </span>
                 <Input
                   type="date"
-                  value={endDate ? String(endDate).slice(0, 10) : ""}
-                  min={startDate ? String(startDate).slice(0, 10) : undefined}
-                  onChange={(e) => setValue("end_date", e.target.value, { shouldDirty: true })}
+                  value={startDate ? String(startDate).slice(0, 10) : ""}
+                  onChange={(e) => setValue("start_date", e.target.value, { shouldDirty: true })}
+                  required
                   className="h-9"
                 />
               </div>
-              {currentShift !== "custom" && (
-                <div className="space-y-1">
-                  <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
-                    <Clock className="h-3 w-3 text-primary" /> End Time (ক্লক / সমাপ্তির সময়)
-                  </span>
-                  <Input
-                    type="time"
-                    value={endTime || (currentShift === "full_24h" ? startTime : "20:00")}
-                    onChange={(e) => setValue("end_time", e.target.value, { shouldDirty: true })}
-                    className="h-9"
-                  />
-                </div>
-              )}
+              <div className="space-y-1">
+                <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
+                  <Clock className="h-3 w-3 text-primary" /> Start Time (কখন থেকে কাজ শুরু)
+                </span>
+                <Input
+                  type="time"
+                  value={startTime || "08:00"}
+                  onChange={(e) => handleStartTimeChange(e.target.value)}
+                  className="h-9"
+                />
+              </div>
             </div>
-            {liveSummary && (
-              <div className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-1.5 text-[11px] flex flex-wrap items-center justify-between gap-2">
-                <span className="text-muted-foreground">
-                  IST: <strong className="text-foreground">{liveSummary.startLabel}</strong> →{" "}
-                  <strong className="text-foreground">{liveSummary.endLabel}</strong>
+          </div>
+
+          {/* 3. End Schedule: Calendar Date + Clock Time with ON/OFF Switch */}
+          <div className="rounded-xl border border-border/60 bg-muted/20 p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5 text-primary" />
+                <Clock className="h-3.5 w-3.5 text-primary" />
+                <span>End Schedule (কাজের সমাপ্তির তারিখ ও সময়)</span>
+              </Label>
+              <button
+                type="button"
+                onClick={handleToggleEndDate}
+                className={cn(
+                  "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border transition-all cursor-pointer",
+                  hasEndDate
+                    ? "bg-primary text-primary-foreground border-primary shadow-2xs"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80 border-border"
+                )}
+              >
+                <span>{hasEndDate ? "ON (নির্দিষ্ট সমাপ্তি)" : "OFF (অনির্দিষ্টকাল)"}</span>
+              </button>
+            </div>
+
+            {hasEndDate ? (
+              <div className="space-y-2.5 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
+                      <Calendar className="h-3 w-3 text-primary" /> End Date (ক্যালেন্ডার থেকে শেষ তারিখ)
+                    </span>
+                    <Input
+                      type="date"
+                      value={endDate ? String(endDate).slice(0, 10) : ""}
+                      min={startDate ? String(startDate).slice(0, 10) : undefined}
+                      onChange={(e) => setValue("end_date", e.target.value, { shouldDirty: true })}
+                      className="h-9"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
+                      <Clock className="h-3 w-3 text-primary" /> End Time (ক্লক / সমাপ্তির সময়)
+                    </span>
+                    <Input
+                      type="time"
+                      value={endTime || (currentShift === "full_24h" ? startTime : "20:00")}
+                      onChange={(e) => setValue("end_time", e.target.value, { shouldDirty: true })}
+                      className="h-9"
+                    />
+                  </div>
+                </div>
+                {liveSummary && (
+                  <div className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-1.5 text-[11px] flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-muted-foreground">
+                      IST: <strong className="text-foreground">{liveSummary.startLabel}</strong> →{" "}
+                      <strong className="text-foreground">{liveSummary.endLabel}</strong>
+                    </span>
+                    <span className="font-bold text-primary">
+                      {liveSummary.days} Day{liveSummary.days === 1 ? "" : "s"} ({liveSummary.hours} hrs)
+                    </span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-border bg-card/60 p-2.5 text-center">
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-500">
+                  <UserCheck className="h-3.5 w-3.5" />
+                  Ongoing / চলমান ডিউটি (মাসিক বিলিং)
                 </span>
-                <span className="font-bold text-primary">
-                  {liveSummary.days} Day{liveSummary.days === 1 ? "" : "s"} ({liveSummary.hours} hrs)
-                </span>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  কাজের কোনো নির্দিষ্ট শেষ তারিখ নেই, অনির্দিষ্টকাল চলমান থাকবে এবং প্রতি মাসের শেষে বিল তৈরি হবে।
+                </p>
               </div>
             )}
           </div>
-        ) : (
-          <div className="rounded-xl border border-dashed border-border bg-card/60 p-2.5 text-center">
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-500">
-              <UserCheck className="h-3.5 w-3.5" />
-              Ongoing / চলমান ডিউটি (মাসিক বিলিং)
-            </span>
-            <p className="text-[10px] text-muted-foreground mt-0.5">
-              কাজের কোনো নির্দিষ্ট শেষ তারিখ নেই, অনির্দিষ্টকাল চলমান থাকবে এবং প্রতি মাসের শেষে বিল তৈরি হবে।
-            </p>
-          </div>
-        )}
-      </div>
+        </>
+      )}
     </div>
   );
 }
