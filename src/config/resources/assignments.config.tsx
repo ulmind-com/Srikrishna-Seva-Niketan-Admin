@@ -35,7 +35,10 @@ const STATUS_VARIANT: Record<string, "success" | "secondary" | "warning" | "dang
   replaced: "warning",
 };
 
-export const assignmentsConfig: ResourceConfig<Assignment> = {
+export function createAssignmentsConfig(opts?: {
+  onViewBreaks?: (assignment: Assignment) => void;
+}): ResourceConfig<Assignment> {
+  return {
   name: "Assignment",
   titlePlural: "Assignments / Shifts",
   description:
@@ -130,9 +133,17 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
               </Badge>
             )}
             {r.duty_breaks && r.duty_breaks.length > 0 && (
-              <span className="inline-flex w-fit items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-400">
+              <button
+                type="button"
+                title="Click to view break / leave dates & details"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  opts?.onViewBreaks?.(r);
+                }}
+                className="inline-flex w-fit items-center gap-1 rounded-md border border-amber-500/40 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-400 hover:bg-amber-500/25 hover:border-amber-400 cursor-pointer transition-colors"
+              >
                 ⏸️ {r.duty_breaks.length} {r.duty_breaks.length === 1 ? "Break" : "Breaks"}
-              </span>
+              </button>
             )}
           </div>
           <span className="flex flex-col gap-0.5 text-[11px] tabular-nums text-muted-foreground">
@@ -442,4 +453,7 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
     { name: "daily_other_expense", label: "Daily Other Expense (₹/day)", type: "number", min: 0, helper: "Travel, kit, etc. per day — multiplied by duty days (e.g. ₹50 × 5d = ₹250).", section: "Billing" },
     { name: "notes", label: "Notes", type: "textarea", section: "Billing", colSpan: 2 },
   ],
-};
+  };
+}
+
+export const assignmentsConfig: ResourceConfig<Assignment> = createAssignmentsConfig();

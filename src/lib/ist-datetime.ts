@@ -307,3 +307,45 @@ export function calculateDutyScheduleIST(params: {
     endLabel: eDt.toFormat("dd MMM, hh:mm a"),
   };
 }
+
+/** Format an IST duty-break / leave range & dynamic duration for UI display. */
+export function computeBreakSummaryIST(
+  startDate?: string | null,
+  endDate?: string | null,
+  startTime?: string | null,
+  endTime?: string | null
+): { label: string; days: number; hours: number } {
+  const sD = parseIST(startDate);
+  const eD = parseIST(endDate || startDate);
+  if (!sD || !eD) {
+    return { label: "—", days: 0, hours: 0 };
+  }
+  const sIso = sD.toISODate() || "";
+  const eIso = eD.toISODate() || "";
+  if (startTime && endTime) {
+    const bs = combineDateTimeIST(sIso, startTime);
+    let be = combineDateTimeIST(eIso, endTime);
+    if (bs && be) {
+      if (be.toMillis() === bs.toMillis() && sD.hasSame(eD, "day")) {
+        be = bs.plus({ days: 1 });
+      } else if (be <= bs) {
+        be = be.plus({ days: 1 });
+      }
+      const hrs = Math.round(be.diff(bs, "hours").hours * 10) / 10;
+      const days = Math.round((hrs / 24) * 2) / 2;
+      return {
+        label: `${bs.toFormat("dd MMM yyyy, hh:mm a")} → ${be.toFormat("dd MMM yyyy, hh:mm a")}`,
+        days,
+        hours: hrs,
+      };
+    }
+  }
+  const days = Math.max(1, Math.round(eD.startOf("day").diff(sD.startOf("day"), "days").days) + 1);
+  return {
+    label: sD.hasSame(eD, "day")
+      ? sD.toFormat("dd MMM yyyy")
+      : `${sD.toFormat("dd MMM yyyy")} → ${eD.toFormat("dd MMM yyyy")}`,
+    days,
+    hours: days * 24,
+  };
+}

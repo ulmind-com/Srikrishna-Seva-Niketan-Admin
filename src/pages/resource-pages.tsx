@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   BellRing,
@@ -18,6 +18,7 @@ import { AdminCompleteDutyDialog } from "@/components/assignments/AdminCompleteD
 import { DutyBreakDialog } from "@/components/assignments/DutyBreakDialog";
 import { LeaveRecordDialog } from "@/components/assignments/LeaveRecordDialog";
 import { AssignmentHistoryDialog } from "@/components/assignments/AssignmentHistoryDialog";
+import { BreakDetailsDialog } from "@/components/assignments/BreakDetailsDialog";
 import type { Assignment } from "@/types/models";
 import { pushNotificationService } from "@/services/push-notification.service";
 import { ResourceView } from "@/components/resource/ResourceView";
@@ -30,7 +31,7 @@ import { staffConfig } from "@/config/resources/staff.config";
 import { locationsConfig } from "@/config/resources/locations.config";
 import { employeesConfig } from "@/config/resources/employees.config";
 import { customersConfig } from "@/config/resources/customers.config";
-import { assignmentsConfig } from "@/config/resources/assignments.config";
+import { createAssignmentsConfig } from "@/config/resources/assignments.config";
 import { expensesConfig } from "@/config/resources/expenses.config";
 import { paymentsConfig } from "@/config/resources/payments.config";
 import {
@@ -60,6 +61,11 @@ export const AssignmentsPage = () => {
   const [leaveAssignment, setLeaveAssignment] = useState<Assignment | null>(null);
 
   const [historyAssignment, setHistoryAssignment] = useState<Assignment | null>(null);
+  const [breakViewAssignment, setBreakViewAssignment] = useState<Assignment | null>(null);
+  const config = useMemo(
+    () => createAssignmentsConfig({ onViewBreaks: setBreakViewAssignment }),
+    []
+  );
 
   const handleSendPush = async (assignment: Assignment) => {
     setPushingId(assignment.id);
@@ -87,7 +93,7 @@ export const AssignmentsPage = () => {
   return (
     <>
       <ResourceView
-        config={assignmentsConfig}
+        config={config}
         extraRowAction={(assignment) => (
           <div className="flex items-center gap-1">
             <Button
@@ -190,6 +196,12 @@ export const AssignmentsPage = () => {
       <AssignmentHistoryDialog
         assignment={historyAssignment}
         onClose={() => setHistoryAssignment(null)}
+      />
+
+      <BreakDetailsDialog
+        assignment={breakViewAssignment}
+        onClose={() => setBreakViewAssignment(null)}
+        onManageBreaks={(asg) => setBreakAssignment(asg)}
       />
     </>
   );
