@@ -161,7 +161,8 @@ export function PayslipPage() {
         endDate
       ),
     enabled: validRange,
-    staleTime: 5_000,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   const { data: slip, isFetching: slipFetching } = useQuery({
@@ -169,6 +170,8 @@ export function PayslipPage() {
     queryFn: () =>
       payrollService.payslip(selected as string, undefined, startDate, endDate),
     enabled: !!selected && validRange,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   const rows = useMemo(() => {
@@ -609,10 +612,72 @@ export function PayslipPage() {
                     ))}
                   </tbody>
                   <tfoot>
-                    <tr className="border-t-2 border-border font-semibold">
-                      <td className="px-3 py-2" colSpan={5}>Total gross pay</td>
-                      <td className="px-3 py-2 text-right text-base text-primary font-bold">{inr(slip.summary.gross_pay)}</td>
-                    </tr>
+                    {(() => {
+                      const paidAmt = slip.summary.paid_amount ?? 0;
+                      const remAmt =
+                        slip.summary.remaining_amount ??
+                        Math.max(0, slip.summary.net_payable - paidAmt);
+                      const isPaidFull = slip.summary.net_payable > 0 && remAmt === 0;
+                      const isPartial = paidAmt > 0 && remAmt > 0;
+                      return (
+                        <>
+                          <tr className="border-t-2 border-border font-semibold bg-muted/20">
+                            <td className="px-3 py-2.5 text-right text-muted-foreground" colSpan={5}>
+                              Total Gross Pay
+                            </td>
+                            <td className="px-3 py-2.5 text-right text-base font-bold text-foreground">
+                              {inr(slip.summary.gross_pay)}
+                            </td>
+                          </tr>
+                          <tr className="border-t border-border/60 font-semibold">
+                            <td className="px-3 py-2 text-right text-emerald-500" colSpan={5}>
+                              Amount Paid
+                            </td>
+                            <td className="px-3 py-2 text-right text-base font-bold text-emerald-500">
+                              {inr(paidAmt)}
+                            </td>
+                          </tr>
+                          <tr
+                            className={`border-t-2 border-border font-bold ${
+                              isPaidFull
+                                ? "bg-emerald-500/10"
+                                : isPartial
+                                ? "bg-amber-500/10"
+                                : "bg-rose-500/5"
+                            }`}
+                          >
+                            <td className="px-3 py-3 text-right" colSpan={5}>
+                              <span
+                                className={
+                                  isPaidFull
+                                    ? "text-emerald-500"
+                                    : isPartial
+                                    ? "text-amber-500"
+                                    : "text-rose-500"
+                                }
+                              >
+                                {isPaidFull
+                                  ? "Remaining Balance (Payment Completed · Paid in Full ✓)"
+                                  : isPartial
+                                  ? "Remaining Balance Due (Partial Payment)"
+                                  : "Remaining Balance Due (Pending)"}
+                              </span>
+                            </td>
+                            <td
+                              className={`px-3 py-3 text-right text-base font-bold ${
+                                isPaidFull
+                                  ? "text-emerald-500"
+                                  : isPartial
+                                  ? "text-amber-500"
+                                  : "text-rose-500"
+                              }`}
+                            >
+                              {isPaidFull ? "₹0 (Paid ✓)" : inr(remAmt)}
+                            </td>
+                          </tr>
+                        </>
+                      );
+                    })()}
                   </tfoot>
                 </table>
               </div>

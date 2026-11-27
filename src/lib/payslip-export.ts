@@ -256,6 +256,42 @@ export function downloadPayslipPdf(slip: Payslip) {
         }
       }
     },
+    foot: [
+      [
+        { content: "Total Gross Pay", colSpan: 6, styles: { halign: "right", fontStyle: "bold", fillColor: [241, 245, 249], textColor: SLATE } },
+        { content: rupee(s.gross_pay), styles: { halign: "right", fontStyle: "bold", fillColor: [241, 245, 249], textColor: SLATE } },
+      ],
+      [
+        { content: "Amount Paid", colSpan: 6, styles: { halign: "right", fontStyle: "bold", fillColor: [236, 253, 245], textColor: EMERALD } },
+        { content: rupee(paidAmt), styles: { halign: "right", fontStyle: "bold", fillColor: [236, 253, 245], textColor: EMERALD } },
+      ],
+      [
+        {
+          content: isPaidFull
+            ? "Balance Remaining (PAID IN FULL)"
+            : isPartial
+            ? "Balance Remaining (PARTIAL)"
+            : "Balance Remaining (PENDING)",
+          colSpan: 6,
+          styles: {
+            halign: "right",
+            fontStyle: "bold",
+            fillColor: isPaidFull ? [220, 252, 231] : isPartial ? [254, 243, 199] : [255, 228, 230],
+            textColor: isPaidFull ? EMERALD : isPartial ? ([180, 83, 9] as [number, number, number]) : ROSE,
+          },
+        },
+        {
+          content: isPaidFull ? `${rupee(0)} (Settled)` : rupee(remAmt),
+          styles: {
+            halign: "right",
+            fontStyle: "bold",
+            fillColor: isPaidFull ? [220, 252, 231] : isPartial ? [254, 243, 199] : [255, 228, 230],
+            textColor: isPaidFull ? EMERALD : isPartial ? ([180, 83, 9] as [number, number, number]) : ROSE,
+          },
+        },
+      ],
+    ],
+    showFoot: "lastPage",
     margin: { left: marginX, right: marginX },
     didDrawPage: (data) => {
       doc.setFontSize(7.5);
