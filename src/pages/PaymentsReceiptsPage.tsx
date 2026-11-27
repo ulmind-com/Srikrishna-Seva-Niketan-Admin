@@ -12,7 +12,6 @@ import {
   Clock,
   CreditCard,
   Download,
-  FileText,
   History,
   Loader2,
   Plus,
@@ -36,7 +35,6 @@ import {
 } from "@/services/finance.service";
 import {
   downloadClientReceiptPdf,
-  downloadStaffStatementPdf,
   downloadStaffVoucherPdf,
 } from "@/lib/receipt-export";
 import {
@@ -180,17 +178,6 @@ export function PaymentsReceiptsPage() {
   const [expandedClients, setExpandedClients] = useState<Record<string, boolean>>({});
   const [expandedStaff, setExpandedStaff] = useState<Record<string, boolean>>({});
 
-  // Staff Bank Statement Modal state
-  const [stmtEmpId, setStmtEmpId] = useState<string | null>(null);
-  const [stmtStart, setStmtStart] = useState(monthRange.start);
-  const [stmtEnd, setStmtEnd] = useState(monthRange.end);
-
-  const openStaffStatement = (empId: string) => {
-    setStmtEmpId(empId);
-    setStmtStart(startDate);
-    setStmtEnd(endDate);
-  };
-
   // Receive Payment Dialog state
   const [receiveTarget, setReceiveTarget] = useState<{
     client: ClientLedgerRow;
@@ -271,19 +258,6 @@ export function PaymentsReceiptsPage() {
     staleTime: 5_000,
   });
 
-  const stmtValidRange = !!stmtStart && !!stmtEnd && stmtEnd >= stmtStart;
-  const staffStatementQ = useQuery({
-    queryKey: ["staff-statement", stmtEmpId, stmtStart, stmtEnd],
-    queryFn: () =>
-      financeService.staffStatement({
-        employee_id: stmtEmpId as string,
-        start: stmtStart || undefined,
-        end: stmtEnd || undefined,
-      }),
-    enabled: !!stmtEmpId && stmtValidRange,
-    staleTime: 0,
-  });
-
   const historyQ = useQuery({
     queryKey: ["payment-history", startDate, endDate, branch, historyDirection, historyMode, search],
     queryFn: () =>
@@ -302,7 +276,6 @@ export function PaymentsReceiptsPage() {
   const invalidateAllFinance = () => {
     qc.invalidateQueries({ queryKey: ["client-ledger"] });
     qc.invalidateQueries({ queryKey: ["staff-ledger"] });
-    qc.invalidateQueries({ queryKey: ["staff-statement"] });
     qc.invalidateQueries({ queryKey: ["payment-history"] });
     qc.invalidateQueries({ queryKey: ["monthly-bills"] });
     qc.invalidateQueries({ queryKey: ["payroll-run"] });
@@ -461,7 +434,7 @@ export function PaymentsReceiptsPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Payments &amp; Receipts</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Track real-time client collections, partial payments, PDF receipts, bank-statement style staff salary payouts &amp; statements, and full cash flow.
+              Track real-time client collections, partial payments, PDF receipts, date-range staff salary payouts &amp; slips, and full cash flow.
             </p>
           </div>
 
@@ -499,8 +472,8 @@ export function PaymentsReceiptsPage() {
 
         {/* Unified Statement Date Range & Search Bar */}
         <div className="rounded-2xl border border-border bg-card p-3.5 space-y-2.5">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <div className="relative flex-1 min-w-[200px]">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[220px]">
               <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 value={search}
@@ -510,7 +483,7 @@ export function PaymentsReceiptsPage() {
               />
             </div>
 
-            <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs font-medium text-muted-foreground">From</span>
               <Input
                 type="date"
@@ -519,7 +492,7 @@ export function PaymentsReceiptsPage() {
                   setStartDate(e.target.value);
                   setQuickMonth("");
                 }}
-                className="w-[142px]"
+                className="w-[158px] shrink-0"
               />
               <span className="text-xs font-medium text-muted-foreground">To</span>
               <Input
@@ -530,7 +503,7 @@ export function PaymentsReceiptsPage() {
                   setEndDate(e.target.value);
                   setQuickMonth("");
                 }}
-                className="w-[142px]"
+                className="w-[158px] shrink-0"
               />
             </div>
 
@@ -539,12 +512,12 @@ export function PaymentsReceiptsPage() {
               title="Quick select whole month"
               value={quickMonth}
               onChange={(e) => applyMonthPreset(e.target.value)}
-              className="w-[155px]"
+              className="w-[196px] shrink-0"
             />
 
             {user?.is_superuser && locations.length > 0 && (
               <Select value={branch} onValueChange={setBranch}>
-                <SelectTrigger className="w-[165px]">
+                <SelectTrigger className="w-[170px] shrink-0">
                   <SelectValue placeholder="All branches" />
                 </SelectTrigger>
                 <SelectContent>
@@ -933,11 +906,11 @@ export function PaymentsReceiptsPage() {
 
         {/* ================= TAB 2: STAFF PAYMENTS ================= */}
         <TabsContent value="staff" className="mt-5 space-y-4">
-          {/* Staff Bank-Statement Filter & Direct Statement Launcher */}
+          {/* Staff Filter */}
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card p-3.5">
             <div className="flex flex-wrap items-center gap-2.5">
               <Select value={staffFilterId} onValueChange={setStaffFilterId}>
-                <SelectTrigger className="w-[230px]">
+                <SelectTrigger className="w-[240px]">
                   <SelectValue placeholder="All Staff Members" />
                 </SelectTrigger>
                 <SelectContent className="max-h-72">
@@ -960,26 +933,6 @@ export function PaymentsReceiptsPage() {
                   Show All
                 </Button>
               )}
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={!validRange || (staffFilterId === "all" && filteredStaff.length === 0)}
-                onClick={() => {
-                  const targetId =
-                    staffFilterId !== "all"
-                      ? staffFilterId
-                      : filteredStaff[0]?.employee_id;
-                  if (targetId) openStaffStatement(targetId);
-                }}
-              >
-                <FileText className="mr-1.5 h-4 w-4 text-indigo-400" />
-                {staffFilterId !== "all"
-                  ? "View / Print Staff Statement"
-                  : "Open Staff Statement"}
-              </Button>
             </div>
           </div>
 
@@ -1058,7 +1011,7 @@ export function PaymentsReceiptsPage() {
                               className="px-4 py-3 text-right"
                               onClick={(e) => e.stopPropagation()}
                             >
-                              <div className="inline-flex items-center justify-end gap-1.5">
+                              <div className="inline-flex items-center justify-end gap-2">
                                 {can("payments:create") && (
                                   <Button
                                     size="sm"
@@ -1069,15 +1022,6 @@ export function PaymentsReceiptsPage() {
                                     {row.remaining_amount > 0 ? "Add Payment" : "Pay Advance"}
                                   </Button>
                                 )}
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => openStaffStatement(row.employee_id)}
-                                  title="Open Bank-Statement style salary & payment statement"
-                                >
-                                  <FileText className="mr-1 h-3.5 w-3.5 text-indigo-400" />
-                                  Statement
-                                </Button>
                                 <Button
                                   size="sm"
                                   variant={isOpen ? "secondary" : "outline"}
@@ -1102,21 +1046,10 @@ export function PaymentsReceiptsPage() {
                           {isOpen && (
                             <tr key={`${row.employee_id}-detail`} className="bg-muted/20">
                               <td colSpan={8} className="px-6 py-4 space-y-3">
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                    Date-wise Payment Slips ({row.payments.length}) ·{" "}
-                                    {formatSlashDateIST(startDate)} – {formatSlashDateIST(endDate)}
-                                  </p>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-7 px-2.5 text-xs"
-                                    onClick={() => openStaffStatement(row.employee_id)}
-                                  >
-                                    <FileText className="mr-1 h-3 w-3 text-indigo-400" />
-                                    Full Bank-Style Statement &amp; PDF
-                                  </Button>
-                                </div>
+                                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                  Date-wise Payment Slips ({row.payments.length}) ·{" "}
+                                  {formatSlashDateIST(startDate)} – {formatSlashDateIST(endDate)}
+                                </p>
                                 {row.payments.length === 0 ? (
                                   <p className="text-xs text-muted-foreground italic">
                                     No salary payments recorded in {formatSlashDateIST(startDate)} – {formatSlashDateIST(endDate)}.
@@ -1800,315 +1733,6 @@ export function PaymentsReceiptsPage() {
             >
               Continue
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ================= BANK-STATEMENT STYLE STAFF PAYMENT STATEMENT MODAL ================= */}
-      <Dialog open={!!stmtEmpId} onOpenChange={(o) => !o && setStmtEmpId(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex flex-wrap items-center gap-2">
-              <FileText className="h-5 w-5 text-indigo-400" />
-              Staff Payment &amp; Salary Statement
-              {staffStatementQ.data?.summary && (
-                <StatusBadge status={staffStatementQ.data.summary.status} />
-              )}
-            </DialogTitle>
-            <DialogDescription>
-              Bank-statement style date-to-date account passbook showing duty earnings, payment vouchers, and running balance.
-            </DialogDescription>
-          </DialogHeader>
-
-          {/* Modal Controls: Staff Switcher + From Date -> To Date */}
-          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-4 rounded-xl border border-border bg-muted/30 p-3">
-            <div className="sm:col-span-2 space-y-1">
-              <Label className="text-[11px] uppercase text-muted-foreground">Staff Member</Label>
-              <Select
-                value={stmtEmpId || ""}
-                onValueChange={(v) => setStmtEmpId(v)}
-              >
-                <SelectTrigger className="h-9 bg-background">
-                  <SelectValue placeholder="Choose staff..." />
-                </SelectTrigger>
-                <SelectContent className="max-h-72">
-                  {allVerifiedStaff.map((e) => (
-                    <SelectItem key={e.id} value={e.id}>
-                      {e.name} ({e.code})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-[11px] uppercase text-muted-foreground">From Date</Label>
-              <Input
-                type="date"
-                className="h-9 bg-background"
-                value={stmtStart}
-                onChange={(e) => setStmtStart(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-[11px] uppercase text-muted-foreground">To Date</Label>
-              <Input
-                type="date"
-                className="h-9 bg-background"
-                min={stmtStart}
-                value={stmtEnd}
-                onChange={(e) => setStmtEnd(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto space-y-4 pr-1">
-            {!stmtValidRange ? (
-              <p className="py-10 text-center text-sm text-rose-500">
-                Please select a valid From Date and To Date.
-              </p>
-            ) : staffStatementQ.isLoading ? (
-              <div className="py-16 text-center">
-                <Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : staffStatementQ.data ? (
-              <>
-                {/* Employee Info + 4 KPI Summary Cards */}
-                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground px-1">
-                  <div>
-                    <span className="text-sm font-semibold text-foreground">
-                      {staffStatementQ.data.employee.name}
-                    </span>{" "}
-                    · {staffStatementQ.data.employee.code} · {staffStatementQ.data.employee.category}
-                    {staffStatementQ.data.employee.location_name
-                      ? ` · ${staffStatementQ.data.employee.location_name}`
-                      : ""}
-                  </div>
-                  <div>
-                    Rate:{" "}
-                    <strong className="text-foreground">
-                      {staffStatementQ.data.employee.daily_rate
-                        ? `${inr(staffStatementQ.data.employee.daily_rate)}/day`
-                        : "—"}
-                    </strong>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-                  <div className="rounded-xl border border-border bg-card p-3">
-                    <p className="text-[11px] uppercase text-muted-foreground">Payable Days</p>
-                    <p className="mt-0.5 text-xl font-bold tabular-nums">
-                      {staffStatementQ.data.summary.payable_days}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {staffStatementQ.data.summary.present_days}P · {staffStatementQ.data.summary.half_days}H · {staffStatementQ.data.summary.off_days} Off
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-border bg-card p-3">
-                    <p className="text-[11px] uppercase text-muted-foreground">Salary Earned</p>
-                    <p className="mt-0.5 text-xl font-bold tabular-nums">
-                      {inr(staffStatementQ.data.summary.salary_due)}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {formatSlashDateIST(stmtStart)} – {formatSlashDateIST(stmtEnd)}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-border bg-card p-3">
-                    <p className="text-[11px] uppercase text-muted-foreground">Total Paid</p>
-                    <p className="mt-0.5 text-xl font-bold tabular-nums text-emerald-500">
-                      {inr(staffStatementQ.data.summary.paid_amount)}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {staffStatementQ.data.summary.payment_count} payment slip(s)
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-border bg-card p-3">
-                    <p className="text-[11px] uppercase text-muted-foreground">
-                      {staffStatementQ.data.summary.advance_amount > 0 ? "Advance Paid" : "Balance Due"}
-                    </p>
-                    <p
-                      className={`mt-0.5 text-xl font-bold tabular-nums ${
-                        staffStatementQ.data.summary.remaining_amount > 0
-                          ? "text-rose-500"
-                          : "text-emerald-500"
-                      }`}
-                    >
-                      {inr(
-                        staffStatementQ.data.summary.advance_amount > 0
-                          ? staffStatementQ.data.summary.advance_amount
-                          : staffStatementQ.data.summary.remaining_amount
-                      )}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground">Closing period balance</p>
-                  </div>
-                </div>
-
-                {/* Statement View: Simple Duty Summary + One Clean Payment History Table */}
-                {(() => {
-                  const custMap = new Map<string, { days: number; amount: number }>();
-                  for (const d of staffStatementQ.data.daily_entries) {
-                    if (d.status !== "present" && d.status !== "half_day") continue;
-                    const key = d.customer_name || "Duty";
-                    const cur = custMap.get(key) || { days: 0, amount: 0 };
-                    cur.days += d.status === "half_day" ? 0.5 : 1;
-                    cur.amount += d.amount || 0;
-                    custMap.set(key, cur);
-                  }
-                  const workSummary = Array.from(custMap.entries());
-                  return workSummary.length > 0 ? (
-                    <div className="rounded-xl border border-border bg-muted/20 px-3.5 py-2.5 text-xs text-muted-foreground">
-                      <span className="font-semibold text-foreground">Work Summary: </span>
-                      {workSummary
-                        .map(([cust, v]) => `${cust} (${v.days}d · ${inr(v.amount)})`)
-                        .join(" · ")}
-                    </div>
-                  ) : null;
-                })()}
-
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Payment History ({staffStatementQ.data.payments.length}) ·{" "}
-                    {formatSlashDateIST(stmtStart)} – {formatSlashDateIST(stmtEnd)}
-                  </p>
-                  <div className="overflow-x-auto rounded-xl border border-border bg-card">
-                    <table className="w-full text-xs">
-                      <thead className="bg-muted/50 text-muted-foreground">
-                        <tr>
-                          <th className="px-3 py-2.5 text-left">Payment Date</th>
-                          <th className="px-3 py-2.5 text-left">Voucher No</th>
-                          <th className="px-3 py-2.5 text-left">Mode &amp; Ref</th>
-                          <th className="px-3 py-2.5 text-left">Paid By &amp; Note</th>
-                          <th className="px-3 py-2.5 text-right">Amount Paid</th>
-                          <th className="px-3 py-2.5 text-right">Slip PDF</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {staffStatementQ.data.payments.length === 0 ? (
-                          <tr>
-                            <td colSpan={6} className="py-8 text-center text-muted-foreground italic">
-                              No salary payments recorded in this date range.
-                            </td>
-                          </tr>
-                        ) : (
-                          staffStatementQ.data.payments.map((sp) => (
-                            <tr key={sp.id}>
-                              <td className="px-3 py-2 tabular-nums font-medium">
-                                {formatSlashDateIST(sp.date)}
-                              </td>
-                              <td className="px-3 py-2 font-semibold text-indigo-400">
-                                {sp.voucher_no}
-                              </td>
-                              <td className="px-3 py-2 uppercase">
-                                {sp.mode.replace(/_/g, " ")}
-                                {sp.transaction_id ? ` · ${sp.transaction_id}` : ""}
-                              </td>
-                              <td className="px-3 py-2 text-muted-foreground">
-                                {[sp.paid_by, sp.note].filter(Boolean).join(" — ") || "—"}
-                              </td>
-                              <td className="px-3 py-2 text-right tabular-nums font-semibold text-indigo-400">
-                                {inr(sp.amount)}
-                              </td>
-                              <td className="px-3 py-2 text-right">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 px-2 text-xs"
-                                  onClick={() => {
-                                    const d = staffStatementQ.data;
-                                    if (!d) return;
-                                    downloadStaffVoucherPdf({
-                                      voucher_no: sp.voucher_no,
-                                      employee_name: d.employee.name,
-                                      code: d.employee.code,
-                                      category: d.employee.category,
-                                      month: sp.month || d.period.month,
-                                      amount: sp.amount,
-                                      date: sp.date,
-                                      mode: sp.mode,
-                                      transaction_id: sp.transaction_id,
-                                      paid_by: sp.paid_by,
-                                      note: sp.note,
-                                      salary_due: d.summary.salary_due,
-                                      total_paid: d.summary.paid_amount,
-                                      remaining_amount: d.summary.remaining_amount,
-                                    });
-                                  }}
-                                >
-                                  <Download className="mr-1 h-3 w-3" /> Slip PDF
-                                </Button>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                      <tfoot className="border-t border-border bg-muted/30 text-xs font-semibold">
-                        <tr>
-                          <td colSpan={4} className="px-3 py-2 text-right text-muted-foreground">
-                            Total Salary ({staffStatementQ.data.summary.payable_days} Days)
-                          </td>
-                          <td className="px-3 py-2 text-right tabular-nums">
-                            {inr(staffStatementQ.data.summary.salary_due)}
-                          </td>
-                          <td />
-                        </tr>
-                        <tr>
-                          <td colSpan={4} className="px-3 py-2 text-right text-emerald-500">
-                            Total Paid
-                          </td>
-                          <td className="px-3 py-2 text-right tabular-nums text-emerald-500">
-                            {inr(staffStatementQ.data.summary.paid_amount)}
-                          </td>
-                          <td />
-                        </tr>
-                        <tr>
-                          <td
-                            colSpan={4}
-                            className={`px-3 py-2 text-right ${
-                              staffStatementQ.data.summary.remaining_amount > 0
-                                ? "text-rose-500"
-                                : "text-emerald-500"
-                            }`}
-                          >
-                            {staffStatementQ.data.summary.advance_amount > 0
-                              ? "Advance Paid"
-                              : "Balance Remaining"}
-                          </td>
-                          <td
-                            className={`px-3 py-2 text-right tabular-nums ${
-                              staffStatementQ.data.summary.remaining_amount > 0
-                                ? "text-rose-500"
-                                : "text-emerald-500"
-                            }`}
-                          >
-                            {staffStatementQ.data.summary.advance_amount > 0
-                              ? inr(staffStatementQ.data.summary.advance_amount)
-                              : inr(staffStatementQ.data.summary.remaining_amount)}
-                          </td>
-                          <td />
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                </div>
-              </>
-            ) : null}
-          </div>
-
-          <DialogFooter className="gap-2 pt-2 border-t border-border">
-            <Button variant="outline" onClick={() => setStmtEmpId(null)}>
-              Close
-            </Button>
-            {staffStatementQ.data && (
-              <Button
-                onClick={() => {
-                  if (staffStatementQ.data) {
-                    downloadStaffStatementPdf(staffStatementQ.data);
-                  }
-                }}
-              >
-                <Download className="mr-1.5 h-4 w-4" />
-                Download Statement PDF
-              </Button>
-            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
