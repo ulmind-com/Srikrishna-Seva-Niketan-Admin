@@ -11,6 +11,7 @@ import {
 } from "@/components/common/AssignmentProgress";
 import { DateCell } from "./cells";
 import { loadEmployeeOptions } from "./branch-field";
+import { isAssignmentEndedIST } from "@/lib/staff-status";
 
 const SHIFT_LABEL: Record<string, string> = {
   morning: "Morning",
@@ -320,13 +321,18 @@ export const assignmentsConfig: ResourceConfig<Assignment> = {
           );
         }
         const isReplaced = r.status === "replaced" || Boolean(r.replaced_by_employee_name);
+        const effStatus = isReplaced
+          ? "replaced"
+          : r.status !== "cancelled" && isAssignmentEndedIST(r)
+          ? "completed"
+          : r.status;
         return (
           <div className="flex flex-col gap-2 items-start">
             <Badge
-              variant={isReplaced ? "warning" : (STATUS_VARIANT[r.status] ?? "outline")}
+              variant={isReplaced ? "warning" : (STATUS_VARIANT[effStatus] ?? "outline")}
               className={`capitalize ${isReplaced ? "bg-amber-500/15 text-amber-400 border-amber-500/30" : ""}`}
             >
-              {isReplaced ? "Replaced" : r.status}
+              {isReplaced ? "Replaced" : effStatus}
             </Badge>
             {response}
           </div>
