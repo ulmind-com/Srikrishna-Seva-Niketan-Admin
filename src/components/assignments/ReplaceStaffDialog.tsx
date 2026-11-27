@@ -26,10 +26,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { SearchableStaffSelect } from "@/components/common/SearchableStaffSelect";
-import {
-  ShiftWindowsField,
-  type ShiftWindow,
-} from "@/components/resource/fields/ShiftWindowsField";
 import type { Assignment, ShiftType } from "@/types/models";
 import { formatDate } from "@/lib/utils";
 import { calculateDutyScheduleIST, todayIST } from "@/lib/ist-datetime";
@@ -56,10 +52,6 @@ export function ReplaceStaffDialog({
   const [shift, setShift] = useState<ShiftType>("full_24h");
   const [startTime, setStartTime] = useState("08:00");
   const [endTime, setEndTime] = useState("20:00");
-  const [shiftWindows, setShiftWindows] = useState<ShiftWindow[]>([
-    { start: "06:00", end: "18:00" },
-    { start: "20:00", end: "02:00" },
-  ]);
   const [reason, setReason] = useState("");
 
   // Initialize from existing assignment when opened
@@ -71,15 +63,6 @@ export function ReplaceStaffDialog({
       setHasEndDate(Boolean(existingEnd));
       const asgShift = (assignment.shift || "full_24h") as ShiftType;
       setShift(asgShift);
-
-      if (assignment.shift_windows && assignment.shift_windows.length > 0) {
-        setShiftWindows(assignment.shift_windows.map((w) => ({ start: w.start || "", end: w.end || "" })));
-      } else {
-        setShiftWindows([
-          { start: "06:00", end: "18:00" },
-          { start: "20:00", end: "02:00" },
-        ]);
-      }
 
       const effStart =
         assignment.start_time ||
@@ -169,7 +152,6 @@ export function ReplaceStaffDialog({
             startTime,
             endTime,
             shift,
-            shiftWindows: shift === "custom" ? shiftWindows : undefined,
           })
         : null;
     return {
@@ -179,15 +161,7 @@ export function ReplaceStaffDialog({
       prevDays: prevSummary?.days ?? null,
       newDays: newSummary?.days ?? null,
     };
-  }, [assignment, effectiveDate, hasEndDate, endDate, startTime, endTime, shift, shiftWindows]);
-
-  const customWindowsText = useMemo(() => {
-    if (shift !== "custom" || !shiftWindows.length) return "";
-    return shiftWindows
-      .filter((w) => w.start || w.end)
-      .map((w) => `${w.start || "?"} - ${w.end || "?"}`)
-      .join(", ");
-  }, [shift, shiftWindows]);
+  }, [assignment, effectiveDate, hasEndDate, endDate, startTime, endTime, shift]);
 
   const replaceMutation = useMutation({
     mutationFn: () => {
@@ -196,19 +170,14 @@ export function ReplaceStaffDialog({
       if (!effectiveDate) throw new Error("Please choose the start date (শুরুর তারিখ)");
       if (hasEndDate && !endDate) throw new Error("Please choose the end date (শেষের তারিখ)");
 
-      const isCustom = shift === "custom";
-      const validWindows = isCustom
-        ? shiftWindows.filter((w) => w.start || w.end)
-        : undefined;
-
       return resourceServices.assignments.replaceStaff(assignment.id, {
         new_employee_id: newEmployeeId,
         effective_date: effectiveDate,
         end_date: hasEndDate && endDate.trim() ? endDate.trim() : null,
         shift: shift,
-        start_time: isCustom && validWindows?.length ? validWindows[0].start || startTime : startTime.trim() || undefined,
-        end_time: hasEndDate ? (isCustom && validWindows?.length ? validWindows[validWindows.length - 1].end || endTime : endTime.trim() || undefined) : null,
-        shift_windows: isCustom && validWindows?.length ? validWindows : undefined,
+        start_time: startTime.trim() || undefined,
+        end_time: hasEndDate || shift === "custom" ? (endTime.trim() || undefined) : null,
+        shift_windows: shift === "custom" ? [] : undefined,
         reason: reason.trim() || undefined,
       });
     },
@@ -348,17 +317,21 @@ export function ReplaceStaffDialog({
               </div>
             </div>
 
-            {/* Start Schedule: Calendar + Clock */}
+            {/* Start Schedule: Calendar + Shift Time(s) */}
             <div className="rounded-xl border border-border/60 bg-muted/20 p-3 space-y-2">
               <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                 <Calendar className="h-3.5 w-3.5 text-primary" />
                 <Clock className="h-3.5 w-3.5 text-primary" />
-                <span>Effective Start Schedule (শুরুর তারিখ ও সময়) *</span>
+                <span>
+                  {shift === "custom"
+                    ? "Effective Start Date & Shift Time (শুরুর তারিখ ও শিফট টাইম) *"
+                    : "Effective Start Schedule (শুরুর তারিখ ও সময়) *"}
+                </span>
               </Label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className={`grid grid-cols-1 gap-3 ${shift === "custom" ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
                 <div className="space-y-1">
                   <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
-                    <Calendar className="h-3 w-3 text-primary" /> Start Date (ক্যালেন্ডার থেকে শুরুর তারিখ)
+                    <Calendar className="h-3 w-3 text-primary" /> Start Date (শুরুর তারিখ)
                   </span>
                   <Input
                     type="date"
@@ -371,7 +344,8 @@ export function ReplaceStaffDialog({
                 </div>
                 <div className="space-y-1">
                   <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
-                    <Clock className="h-3 w-3 text-primary" /> Start Time (ক্লক / কখন থেকে কাজ শুরু)
+                    <Clock className="h-3 w-3 text-primary" />{" "}
+                    {shift === "custom" ? "Shift Start Time (কখন শুরু)" : "Start Time (কখন থেকে কাজ শুরু)"}
                   </span>
                   <Input
                     type="time"
@@ -387,6 +361,19 @@ export function ReplaceStaffDialog({
                     className="h-9"
                   />
                 </div>
+                {shift === "custom" && (
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
+                      <Clock className="h-3 w-3 text-primary" /> Shift End Time (কখন শেষ)
+                    </span>
+                    <Input
+                      type="time"
+                      value={endTime}
+                      onChange={(e) => setEndTime(e.target.value)}
+                      className="h-9"
+                    />
+                  </div>
+                )}
               </div>
             </div>
 
@@ -396,7 +383,11 @@ export function ReplaceStaffDialog({
                 <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                   <Calendar className="h-3.5 w-3.5 text-primary" />
                   <Clock className="h-3.5 w-3.5 text-primary" />
-                  <span>End Schedule (কাজের সমাপ্তির তারিখ ও সময়)</span>
+                  <span>
+                    {shift === "custom"
+                      ? "End Date (কাজের সমাপ্তির তারিখ)"
+                      : "End Schedule (কাজের সমাপ্তির তারিখ ও সময়)"}
+                  </span>
                 </Label>
                 <button
                   type="button"
@@ -420,7 +411,7 @@ export function ReplaceStaffDialog({
               </div>
 
               {hasEndDate ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div className={`grid grid-cols-1 gap-3 pt-1 ${shift === "custom" ? "sm:grid-cols-1" : "sm:grid-cols-2"}`}>
                   <div className="space-y-1">
                     <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
                       <Calendar className="h-3 w-3 text-primary" /> End Date (ক্যালেন্ডার থেকে শেষ তারিখ)
@@ -435,17 +426,19 @@ export function ReplaceStaffDialog({
                       className="h-9"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
-                      <Clock className="h-3 w-3 text-primary" /> End Time (ক্লক / সমাপ্তির সময়)
-                    </span>
-                    <Input
-                      type="time"
-                      value={endTime}
-                      onChange={(e) => setEndTime(e.target.value)}
-                      className="h-9"
-                    />
-                  </div>
+                  {shift !== "custom" && (
+                    <div className="space-y-1">
+                      <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
+                        <Clock className="h-3 w-3 text-primary" /> End Time (ক্লক / সমাপ্তির সময়)
+                      </span>
+                      <Input
+                        type="time"
+                        value={endTime}
+                        onChange={(e) => setEndTime(e.target.value)}
+                        className="h-9"
+                      />
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="rounded-xl border border-dashed border-border bg-card/60 p-2.5 text-center">
@@ -459,25 +452,6 @@ export function ReplaceStaffDialog({
                 </div>
               )}
             </div>
-
-            {/* Custom Split Windows */}
-            {shift === "custom" && (
-              <div className="space-y-2 pt-1 border-t border-border/60">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5 text-primary" />
-                    Custom Shift Windows (স্প্লিট শিফট বা একাধিক সময়সূচী)
-                  </Label>
-                  <span className="text-[10px] text-muted-foreground">
-                    প্রয়োজনে একাধিক সময় যোগ করুন
-                  </span>
-                </div>
-                <ShiftWindowsField
-                  value={shiftWindows}
-                  onChange={(windows) => setShiftWindows(windows)}
-                />
-              </div>
-            )}
           </div>
 
           {/* Reason / Note */}
@@ -518,11 +492,7 @@ export function ReplaceStaffDialog({
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground pl-6 text-[11px]">
                   <span>Shift: <strong className="text-foreground capitalize">{shift}</strong></span>
-                  {shift === "custom" && customWindowsText ? (
-                    <span>Windows: <strong className="text-foreground">{customWindowsText}</strong></span>
-                  ) : (
-                    <span>Time: <strong className="text-foreground">{startTime} - {endTime}</strong></span>
-                  )}
+                  <span>Time: <strong className="text-foreground">{startTime} - {endTime}</strong></span>
                 </div>
               </div>
 

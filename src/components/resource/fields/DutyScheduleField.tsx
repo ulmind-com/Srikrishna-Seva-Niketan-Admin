@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from "react";
 import { Calendar, Clock, UserCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ShiftWindowsField, type ShiftWindow } from "./ShiftWindowsField";
 import { cn } from "@/lib/utils";
 import { calculateDutyScheduleIST, todayIST } from "@/lib/ist-datetime";
 
@@ -70,6 +69,9 @@ export function DutyScheduleField({
       setValue("start_time", opt.defStart, { shouldDirty: true });
       setValue("end_time", opt.defEnd, { shouldDirty: true });
     }
+    if (shiftId === "custom") {
+      setValue("shift_windows", [], { shouldDirty: true });
+    }
   };
 
   const handleStartTimeChange = (nextStart: string) => {
@@ -78,6 +80,9 @@ export function DutyScheduleField({
     if (currentShift === "full_24h" && (!watch("end_time") || endTime === prevStart)) {
       setValue("end_time", nextStart, { shouldDirty: true });
     }
+    if (currentShift === "custom" && shiftWindows.length > 0) {
+      setValue("shift_windows", [], { shouldDirty: true });
+    }
   };
 
   const handleToggleEndDate = () => {
@@ -85,16 +90,20 @@ export function DutyScheduleField({
     setHasEndDate(nextState);
     if (!nextState) {
       setValue("end_date", null, { shouldDirty: true });
-      setValue("end_time", null, { shouldDirty: true });
+      if (currentShift !== "custom") {
+        setValue("end_time", null, { shouldDirty: true });
+      }
     } else {
       const defEnd = startDate || todayIST();
       setValue("end_date", defEnd, { shouldDirty: true });
-      const opt = SHIFT_OPTIONS.find((s) => s.id === currentShift);
-      setValue(
-        "end_time",
-        currentShift === "full_24h" ? startTime || "08:00" : opt?.defEnd || "20:00",
-        { shouldDirty: true }
-      );
+      if (currentShift !== "custom") {
+        const opt = SHIFT_OPTIONS.find((s) => s.id === currentShift);
+        setValue(
+          "end_time",
+          currentShift === "full_24h" ? startTime || "08:00" : opt?.defEnd || "20:00",
+          { shouldDirty: true }
+        );
+      }
     }
   };
 
@@ -131,17 +140,26 @@ export function DutyScheduleField({
         </div>
       </div>
 
-      {/* 2. Start Schedule: Calendar Date + Clock Time side by side */}
+      {/* 2. Start Schedule: Calendar Date + Shift Time(s) */}
       <div className="rounded-xl border border-border/60 bg-muted/20 p-3 space-y-2">
         <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
           <Calendar className="h-3.5 w-3.5 text-primary" />
           <Clock className="h-3.5 w-3.5 text-primary" />
-          <span>Start Schedule (কাজের শুরুর তারিখ ও সময়) *</span>
+          <span>
+            {currentShift === "custom"
+              ? "Start Date & Shift Time (কাজের শুরু ও শিফটের সময়) *"
+              : "Start Schedule (কাজের শুরুর তারিখ ও সময়) *"}
+          </span>
         </Label>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div
+          className={cn(
+            "grid grid-cols-1 gap-3",
+            currentShift === "custom" ? "sm:grid-cols-3" : "sm:grid-cols-2"
+          )}
+        >
           <div className="space-y-1">
             <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
-              <Calendar className="h-3 w-3 text-primary" /> Start Date (ক্যালেন্ডার থেকে শুরুর তারিখ)
+              <Calendar className="h-3 w-3 text-primary" /> Start Date (শুরুর তারিখ)
             </span>
             <Input
               type="date"
@@ -153,7 +171,8 @@ export function DutyScheduleField({
           </div>
           <div className="space-y-1">
             <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
-              <Clock className="h-3 w-3 text-primary" /> Start Time (ক্লক / কখন থেকে কাজ শুরু)
+              <Clock className="h-3 w-3 text-primary" />{" "}
+              {currentShift === "custom" ? "Shift Start Time (কখন শুরু)" : "Start Time (কখন থেকে কাজ শুরু)"}
             </span>
             <Input
               type="time"
@@ -162,6 +181,24 @@ export function DutyScheduleField({
               className="h-9"
             />
           </div>
+          {currentShift === "custom" && (
+            <div className="space-y-1">
+              <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
+                <Clock className="h-3 w-3 text-primary" /> Shift End Time (কখন শেষ)
+              </span>
+              <Input
+                type="time"
+                value={endTime || "20:00"}
+                onChange={(e) => {
+                  setValue("end_time", e.target.value, { shouldDirty: true });
+                  if (shiftWindows.length > 0) {
+                    setValue("shift_windows", [], { shouldDirty: true });
+                  }
+                }}
+                className="h-9"
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -171,7 +208,11 @@ export function DutyScheduleField({
           <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
             <Calendar className="h-3.5 w-3.5 text-primary" />
             <Clock className="h-3.5 w-3.5 text-primary" />
-            <span>End Schedule (কাজের সমাপ্তির তারিখ ও সময়)</span>
+            <span>
+              {currentShift === "custom"
+                ? "End Date (কাজের সমাপ্তির তারিখ)"
+                : "End Schedule (কাজের সমাপ্তির তারিখ ও সময়)"}
+            </span>
           </Label>
           <button
             type="button"
@@ -189,7 +230,12 @@ export function DutyScheduleField({
 
         {hasEndDate ? (
           <div className="space-y-2.5 pt-1">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div
+              className={cn(
+                "grid grid-cols-1 gap-3",
+                currentShift === "custom" ? "sm:grid-cols-1" : "sm:grid-cols-2"
+              )}
+            >
               <div className="space-y-1">
                 <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
                   <Calendar className="h-3 w-3 text-primary" /> End Date (ক্যালেন্ডার থেকে শেষ তারিখ)
@@ -202,17 +248,19 @@ export function DutyScheduleField({
                   className="h-9"
                 />
               </div>
-              <div className="space-y-1">
-                <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
-                  <Clock className="h-3 w-3 text-primary" /> End Time (ক্লক / সমাপ্তির সময়)
-                </span>
-                <Input
-                  type="time"
-                  value={endTime || (currentShift === "full_24h" ? startTime : "20:00")}
-                  onChange={(e) => setValue("end_time", e.target.value, { shouldDirty: true })}
-                  className="h-9"
-                />
-              </div>
+              {currentShift !== "custom" && (
+                <div className="space-y-1">
+                  <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
+                    <Clock className="h-3 w-3 text-primary" /> End Time (ক্লক / সমাপ্তির সময়)
+                  </span>
+                  <Input
+                    type="time"
+                    value={endTime || (currentShift === "full_24h" ? startTime : "20:00")}
+                    onChange={(e) => setValue("end_time", e.target.value, { shouldDirty: true })}
+                    className="h-9"
+                  />
+                </div>
+              )}
             </div>
             {liveSummary && (
               <div className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-1.5 text-[11px] flex flex-wrap items-center justify-between gap-2">
@@ -238,27 +286,6 @@ export function DutyScheduleField({
           </div>
         )}
       </div>
-
-      {/* 4. Custom Shift Windows (Shown when shift == custom) */}
-      {currentShift === "custom" && (
-        <div className="space-y-2 pt-2 border-t border-border/60">
-          <div className="flex items-center justify-between">
-            <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-              <Clock className="h-3.5 w-3.5 text-primary" />
-              Custom Shift Windows (স্প্লিট শিফট বা একাধিক সময়সূচী)
-            </Label>
-            <span className="text-[10px] text-muted-foreground">
-              প্রয়োজনে একাধিক উইন্ডো যোগ করুন
-            </span>
-          </div>
-          <ShiftWindowsField
-            value={shiftWindows}
-            onChange={(windows: ShiftWindow[]) =>
-              setValue("shift_windows", windows, { shouldDirty: true })
-            }
-          />
-        </div>
-      )}
     </div>
   );
 }
