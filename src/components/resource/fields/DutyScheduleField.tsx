@@ -137,41 +137,81 @@ export function DutyScheduleField({
         </div>
       </div>
 
-      {/* 2. Start Schedule: Calendar Date + Clock Time side by side */}
-      <div className="rounded-xl border border-border/60 bg-muted/20 p-3 space-y-2">
-        <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-          <Calendar className="h-3.5 w-3.5 text-primary" />
-          <Clock className="h-3.5 w-3.5 text-primary" />
-          <span>Start Schedule (কাজের শুরুর তারিখ ও সময়) *</span>
-        </Label>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
-              <Calendar className="h-3 w-3 text-primary" /> Start Date (ক্যালেন্ডার থেকে শুরুর তারিখ)
+      {currentShift === "custom" ? (
+        /* 2. Custom Shift Windows at top (ONLY for Custom shift; replaces redundant Start Schedule) */
+        <div className="rounded-xl border border-border/60 bg-muted/20 p-3 space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5 text-primary" />
+              <Clock className="h-3.5 w-3.5 text-primary" />
+              <span>Custom Shift Windows (তারিখ, শুরু ও শেষের সময়) *</span>
+            </Label>
+            <span className="text-[10px] text-muted-foreground">
+              + বাটনে ক্লিক করে আরও শিফট যোগ করুন
             </span>
-            <Input
-              type="date"
-              value={startDate ? String(startDate).slice(0, 10) : ""}
-              onChange={(e) => setValue("start_date", e.target.value, { shouldDirty: true })}
-              required
-              className="h-9"
-            />
           </div>
-          <div className="space-y-1">
-            <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
-              <Clock className="h-3 w-3 text-primary" /> Start Time (ক্লক / কখন থেকে কাজ শুরু)
-            </span>
-            <Input
-              type="time"
-              value={startTime || "08:00"}
-              onChange={(e) => handleStartTimeChange(e.target.value)}
-              className="h-9"
-            />
+          <ShiftWindowsField
+            value={shiftWindows}
+            onChange={(windows: ShiftWindow[]) => {
+              setValue("shift_windows", windows, { shouldDirty: true });
+              const dates = windows
+                .map((w) => (w.date ? String(w.date).slice(0, 10) : ""))
+                .filter(Boolean)
+                .sort();
+              if (dates.length > 0) {
+                setValue("start_date", dates[0], { shouldDirty: true });
+                if (hasEndDate && endDate && dates[dates.length - 1] > String(endDate).slice(0, 10)) {
+                  setValue("end_date", dates[dates.length - 1], { shouldDirty: true });
+                }
+              }
+              if (windows[0]?.start) {
+                setValue("start_time", windows[0].start, { shouldDirty: true });
+              }
+              const lastEnd = windows[windows.length - 1]?.end;
+              if (lastEnd) {
+                setValue("end_time", lastEnd, { shouldDirty: true });
+              }
+            }}
+            defaultDate={startDate ? String(startDate).slice(0, 10) : todayIST()}
+          />
+        </div>
+      ) : (
+        /* 2. Start Schedule: Calendar Date + Clock Time side by side (for 24h / Day / Night) */
+        <div className="rounded-xl border border-border/60 bg-muted/20 p-3 space-y-2">
+          <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+            <Calendar className="h-3.5 w-3.5 text-primary" />
+            <Clock className="h-3.5 w-3.5 text-primary" />
+            <span>Start Schedule (কাজের শুরুর তারিখ ও সময়) *</span>
+          </Label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
+                <Calendar className="h-3 w-3 text-primary" /> Start Date (ক্যালেন্ডার থেকে শুরুর তারিখ)
+              </span>
+              <Input
+                type="date"
+                value={startDate ? String(startDate).slice(0, 10) : ""}
+                onChange={(e) => setValue("start_date", e.target.value, { shouldDirty: true })}
+                required
+                className="h-9"
+              />
+            </div>
+            <div className="space-y-1">
+              <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
+                <Clock className="h-3 w-3 text-primary" /> Start Time (ক্লক / কখন থেকে কাজ শুরু)
+              </span>
+              <Input
+                type="time"
+                value={startTime || "08:00"}
+                onChange={(e) => handleStartTimeChange(e.target.value)}
+                className="h-9"
+              />
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* 3. End Schedule: Calendar Date + Clock Time with ON/OFF Switch */}
+      {/* 3. End Schedule: Calendar Date + Clock Time with ON/OFF Switch (ALWAYS preserved) */}
       <div className="rounded-xl border border-border/60 bg-muted/20 p-3 space-y-2">
         <div className="flex items-center justify-between">
           <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
@@ -244,28 +284,6 @@ export function DutyScheduleField({
           </div>
         )}
       </div>
-
-      {/* 4. Custom Shift Windows (Shown ONLY when shift == custom) */}
-      {currentShift === "custom" && (
-        <div className="space-y-2 pt-2 border-t border-border/60">
-          <div className="flex items-center justify-between">
-            <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-              <Clock className="h-3.5 w-3.5 text-primary" />
-              Custom Shift Windows (তারিখ, শুরু ও শেষের সময়)
-            </Label>
-            <span className="text-[10px] text-muted-foreground">
-              + বাটনে ক্লিক করে আরও শিফট যোগ করুন
-            </span>
-          </div>
-          <ShiftWindowsField
-            value={shiftWindows}
-            onChange={(windows: ShiftWindow[]) =>
-              setValue("shift_windows", windows, { shouldDirty: true })
-            }
-            defaultDate={startDate ? String(startDate).slice(0, 10) : todayIST()}
-          />
-        </div>
-      )}
     </div>
   );
 }
