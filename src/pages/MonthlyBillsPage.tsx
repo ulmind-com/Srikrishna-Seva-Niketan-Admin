@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import { toast } from "sonner";
 import {
@@ -11,28 +11,15 @@ import {
   UserCheck,
   Stethoscope,
   Printer,
-  IndianRupee,
 } from "lucide-react";
 import { billingService, type MonthlyBillGroup } from "@/services/billing.service";
-import { financeService, type PaymentMode } from "@/services/finance.service";
-import { downloadClientReceiptPdf } from "@/lib/receipt-export";
-import { todayIST } from "@/lib/ist-datetime";
 import { resourceServices } from "@/services/resources";
 import { settingsService } from "@/services/settings.service";
 import { formatBillNo } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -89,47 +76,6 @@ export function MonthlyBillsPage() {
   const [busy, setBusy] = useState(false);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [selectedBill, setSelectedBill] = useState<MonthlyBillGroup | null>(null);
-  const [collectBill, setCollectBill] = useState<MonthlyBillGroup | null>(null);
-  const [collectAmount, setCollectAmount] = useState("");
-  const [collectMode, setCollectMode] = useState<PaymentMode>("upi");
-  const [collectDate, setCollectDate] = useState(todayIST());
-  const [collectTxnId, setCollectTxnId] = useState("");
-  const [collectNote, setCollectNote] = useState("");
-
-  const collectMut = useMutation({
-    mutationFn: financeService.recordClientPayment,
-    onSuccess: (created) => {
-      toast.success(`Collected ${rupee(created.amount)} (${created.receipt_no || "Receipt"})`);
-      if (collectBill) {
-        downloadClientReceiptPdf({
-          receipt_no: created.receipt_no,
-          customer_name: collectBill.customer_name,
-          phone: collectBill.customer_phone,
-          location_name: collectBill.location_name,
-          bill_no: created.bill_no ?? collectBill.bill_no,
-          bill_no_formatted: created.bill_no_formatted,
-          amount: created.amount,
-          date: created.date,
-          mode: created.mode,
-          transaction_id: created.transaction_id,
-          received_by: created.received_by,
-          note: created.note,
-          invoiced_amount: collectBill.total_amount,
-          total_received: (collectBill.paid_amount ?? 0) + created.amount,
-          outstanding_amount: Math.max(
-            0,
-            collectBill.total_amount - ((collectBill.paid_amount ?? 0) + created.amount)
-          ),
-        });
-      }
-      setCollectBill(null);
-      qc.invalidateQueries({ queryKey: ["monthly-bills"] });
-      qc.invalidateQueries({ queryKey: ["client-ledger"] });
-      qc.invalidateQueries({ queryKey: ["payment-history"] });
-      qc.invalidateQueries({ queryKey: ["reports"] });
-    },
-    onError: (err: Error) => toast.error(err.message || "Payment collection failed"),
-  });
 
   // Locations / Branches
   const { data: locations } = useQuery({
@@ -397,8 +343,21 @@ export function MonthlyBillsPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Clients / Invoices" value={String(totals?.bills ?? 0)} />
         <Stat label="Total Billed Amount" value={rupee(totals?.total_amount)} tone="text-sky-500" />
-        <Stat label="Actual Cash Received" value={rupee(totals?.total_paid ?? 0)} tone="text-emerald-500" />
-        <Stat label="Outstanding Balance" value={rupee(totals?.total_outstanding ?? 0)} tone="text-rose-500" />
+        <Stat
+          label="Actual Cash Received"
+          value={rupee(
+            totals?.total_paid ?? bills.reduce((sum, b) => sum + (b.paid_amount ?? 0), 0)
+          )}
+          tone="text-emerald-500"
+        />
+        <Stat
+          label="Outstanding Balance"
+          value={rupee(
+            totals?.total_outstanding ??
+              bills.reduce((sum, b) => sum + (b.outstanding_amount ?? b.total_amount), 0)
+          )}
+          tone="text-rose-500"
+        />
       </div>
 
       {/* Bills Table */}
@@ -519,36 +478,16 @@ export function MonthlyBillsPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1.5">
-                          {(b.outstanding_amount ?? b.total_amount) > 0 && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setCollectBill(b);
-                                setCollectAmount(String(b.outstanding_amount ?? b.total_amount));
-                                setCollectDate(todayIST());
-                                setCollectMode("upi");
-                                setCollectTxnId("");
-                                setCollectNote("");
-                              }}
-                              className="h-8 gap-1 border-emerald-500/40 text-emerald-500 hover:bg-emerald-500/10"
-                            >
-                              <IndianRupee className="h-3.5 w-3.5" />
-                              <span>Collect</span>
-                            </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={busy}
-                            onClick={() => handleViewBill(b)}
-                            className="h-8 gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
-                          >
-                            <Receipt className="h-3.5 w-3.5" />
-                            <span>Bill PDF</span>
-                          </Button>
-                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busy}
+                          onClick={() => handleViewBill(b)}
+                          className="h-8 gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+                        >
+                          <Receipt className="h-3.5 w-3.5" />
+                          <span>Bill PDF</span>
+                        </Button>
                       </TableCell>
                     </TableRow>
 
@@ -655,104 +594,6 @@ export function MonthlyBillsPage() {
         onClose={() => setSelectedBill(null)}
         authorizedSignatureUrl={authorizedSignatureUrl}
       />
-
-      {/* Quick Receive Payment Modal */}
-      <Dialog open={!!collectBill} onOpenChange={(o) => !o && setCollectBill(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Collect Client Payment</DialogTitle>
-            <DialogDescription>
-              {collectBill?.customer_name} · Total Billed {rupee(collectBill?.total_amount)} · Due{" "}
-              <span className="font-semibold text-rose-500">
-                {rupee(collectBill?.outstanding_amount ?? collectBill?.total_amount)}
-              </span>
-            </DialogDescription>
-          </DialogHeader>
-          {collectBill && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>Amount (₹)</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={collectAmount}
-                    onChange={(e) => setCollectAmount(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Date</Label>
-                  <Input
-                    type="date"
-                    value={collectDate}
-                    onChange={(e) => setCollectDate(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>Mode</Label>
-                  <Select value={collectMode} onValueChange={(v) => setCollectMode(v as PaymentMode)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cash">Cash</SelectItem>
-                      <SelectItem value="upi">UPI / QR</SelectItem>
-                      <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                      <SelectItem value="card">Card</SelectItem>
-                      <SelectItem value="cheque">Cheque</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Txn / UPI Ref</Label>
-                  <Input
-                    value={collectTxnId}
-                    onChange={(e) => setCollectTxnId(e.target.value)}
-                    placeholder="Optional ref"
-                  />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Note</Label>
-                <Input
-                  value={collectNote}
-                  onChange={(e) => setCollectNote(e.target.value)}
-                  placeholder="Optional payment note"
-                />
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCollectBill(null)}>
-              Cancel
-            </Button>
-            <Button
-              disabled={collectMut.isPending || !collectAmount || Number(collectAmount) <= 0}
-              onClick={() => {
-                if (!collectBill) return;
-                const amt = Number(collectAmount);
-                const due = collectBill.outstanding_amount ?? collectBill.total_amount;
-                collectMut.mutate({
-                  customer_id: collectBill.customer_id,
-                  assignment_id: collectBill.line_items?.[0]?.assignment_id,
-                  bill_no: collectBill.bill_no ?? undefined,
-                  amount: amt,
-                  date: collectDate || undefined,
-                  mode: collectMode,
-                  status: amt < due ? "partial" : "paid",
-                  transaction_id: collectTxnId || undefined,
-                  note: collectNote || undefined,
-                });
-              }}
-            >
-              {collectMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Record &amp; Download Receipt
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
