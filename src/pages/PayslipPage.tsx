@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
-import { FileDown, Loader2, Printer, ReceiptText, Search, Wallet, X } from "lucide-react";
+import { CheckCircle2, Clock, FileDown, Loader2, Printer, ReceiptText, Search, Wallet, X } from "lucide-react";
 import { downloadPayslipPdf } from "@/lib/payslip-export";
 import {
   currentMonthRangeIST,
@@ -328,7 +328,13 @@ export function PayslipPage() {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Remaining Balance</p>
-              <p className="mt-1 text-2xl font-bold tracking-tight text-rose-500">{inr(run?.totals.total_remaining ?? 0)}</p>
+              <p
+                className={`mt-1 text-2xl font-bold tracking-tight ${
+                  (run?.totals.total_remaining ?? 0) === 0 ? "text-emerald-500" : "text-rose-500"
+                }`}
+              >
+                {inr(run?.totals.total_remaining ?? 0)}
+              </p>
             </div>
             <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary">
               <Wallet className="h-5 w-5" />
@@ -352,18 +358,23 @@ export function PayslipPage() {
                 <th className="px-3 py-3 text-right font-medium">Rate</th>
                 <th className="px-3 py-3 text-right font-medium">Earned</th>
                 <th className="px-3 py-3 text-right font-medium">Paid</th>
-                <th className="px-4 py-3 text-right font-medium">Remaining</th>
+                <th className="px-3 py-3 text-right font-medium">Remaining</th>
+                <th className="px-3 py-3 text-center font-medium">Status</th>
                 <th className="px-3 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {isLoading ? (
-                <tr><td colSpan={11} className="py-12 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" /></td></tr>
+                <tr><td colSpan={12} className="py-12 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" /></td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={11} className="py-12 text-center text-muted-foreground">No staff for this period.</td></tr>
+                <tr><td colSpan={12} className="py-12 text-center text-muted-foreground">No staff for this period.</td></tr>
               ) : (
                 rows.map((r) => {
                   const effectiveRate = r.daily_rate || (r.payable_days > 0 && r.gross_pay > 0 ? Math.round(r.gross_pay / r.payable_days) : null);
+                  const paidAmt = r.paid_amount ?? 0;
+                  const remAmt = r.remaining_amount ?? Math.max(0, r.gross_pay - paidAmt);
+                  const isPaidFull = r.gross_pay > 0 && remAmt === 0;
+                  const isPartial = paidAmt > 0 && remAmt > 0;
                   return (
                     <tr key={r.employee_id} className="hover:bg-muted/30">
                       <td className="px-4 py-3">
@@ -382,8 +393,31 @@ export function PayslipPage() {
                       <td className="px-3 py-3 text-center font-bold text-foreground">{r.payable_days}</td>
                       <td className="px-3 py-3 text-right text-muted-foreground">{effectiveRate ? inr(effectiveRate) : "—"}</td>
                       <td className="px-3 py-3 text-right font-semibold">{inr(r.gross_pay)}</td>
-                      <td className="px-3 py-3 text-right font-semibold text-emerald-500">{inr(r.paid_amount ?? 0)}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-rose-500">{inr(r.remaining_amount ?? Math.max(0, r.gross_pay - (r.paid_amount ?? 0)))}</td>
+                      <td className="px-3 py-3 text-right font-semibold text-emerald-500">{inr(paidAmt)}</td>
+                      <td
+                        className={`px-3 py-3 text-right font-semibold ${
+                          isPaidFull ? "text-emerald-500" : isPartial ? "text-amber-500" : "text-rose-500"
+                        }`}
+                      >
+                        {inr(remAmt)}
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        {r.gross_pay <= 0 && paidAmt <= 0 ? (
+                          <Badge variant="secondary">—</Badge>
+                        ) : isPaidFull ? (
+                          <Badge className="bg-emerald-500/15 text-emerald-500 border-emerald-500/30">
+                            <CheckCircle2 className="mr-1 h-3 w-3" /> Paid
+                          </Badge>
+                        ) : isPartial ? (
+                          <Badge className="bg-amber-500/15 text-amber-500 border-amber-500/30">
+                            <Clock className="mr-1 h-3 w-3" /> Partial
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-rose-500/15 text-rose-500 border-rose-500/30">
+                            Pending
+                          </Badge>
+                        )}
+                      </td>
                       <td className="px-3 py-3 text-right">
                         <Button variant="outline" size="sm" onClick={() => setSelected(r.employee_id)}>
                           <ReceiptText className="mr-1 h-3.5 w-3.5" /> Slip
@@ -427,11 +461,32 @@ export function PayslipPage() {
             <div id="payslip-print" className="p-6">
               {(() => {
                 const slipRate = slip.employee.daily_rate || (slip.summary.payable_days > 0 && slip.summary.gross_pay > 0 ? Math.round(slip.summary.gross_pay / slip.summary.payable_days) : null);
+                const paidAmt = slip.summary.paid_amount ?? 0;
+                const remAmt = slip.summary.remaining_amount ?? Math.max(0, slip.summary.net_payable - paidAmt);
+                const isPaidFull = slip.summary.net_payable > 0 && remAmt === 0;
+                const isPartial = paidAmt > 0 && remAmt > 0;
                 return (
                   <>
                     <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-4">
                       <div>
-                        <h2 className="text-lg font-bold">Shri Krishna Nursing</h2>
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <h2 className="text-lg font-bold">Shri Krishna Nursing</h2>
+                          {slip.summary.net_payable > 0 && (
+                            isPaidFull ? (
+                              <Badge className="bg-emerald-500/15 text-emerald-500 border-emerald-500/30">
+                                <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> PAID IN FULL
+                              </Badge>
+                            ) : isPartial ? (
+                              <Badge className="bg-amber-500/15 text-amber-500 border-amber-500/30">
+                                <Clock className="mr-1 h-3.5 w-3.5" /> PARTIALLY PAID
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-rose-500/15 text-rose-500 border-rose-500/30">
+                                PAYMENT PENDING
+                              </Badge>
+                            )
+                          )}
+                        </div>
                         <p className="text-sm text-muted-foreground">
                           Salary slip · {formatSlashDateIST(slip.period.start)} – {formatSlashDateIST(slip.period.end)}
                         </p>
@@ -462,13 +517,41 @@ export function PayslipPage() {
                           <p className="text-xl font-bold">{s.value}</p>
                         </div>
                       ))}
-                      <div className="col-span-2 rounded-xl border border-primary bg-primary/5 p-3 sm:col-span-2">
-                        <p className="text-xs text-muted-foreground">Net Payable Salary · Paid {inr(slip.summary.paid_amount ?? 0)}</p>
-                        <div className="flex items-baseline justify-between gap-2">
-                          <p className="text-2xl font-bold text-primary">{inr(slip.summary.net_payable)}</p>
-                          <span className="text-xs font-semibold text-rose-500">
-                            Balance: {inr(slip.summary.remaining_amount ?? Math.max(0, slip.summary.net_payable - (slip.summary.paid_amount ?? 0)))}
+                      <div
+                        className={`col-span-2 rounded-xl border p-3 sm:col-span-2 ${
+                          isPaidFull
+                            ? "border-emerald-500/50 bg-emerald-500/10"
+                            : isPartial
+                            ? "border-amber-500/50 bg-amber-500/10"
+                            : "border-primary bg-primary/5"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                          <span>
+                            {isPaidFull
+                              ? `Payment Status: PAID · Total Earned ${inr(slip.summary.net_payable)}`
+                              : isPartial
+                              ? `Payment Status: PARTIAL · Earned ${inr(slip.summary.net_payable)}`
+                              : "Net Payable Salary · Payment Pending"}
                           </span>
+                          <span className="font-semibold text-emerald-500">
+                            Paid: {inr(paidAmt)}
+                          </span>
+                        </div>
+                        <div className="mt-1 flex items-baseline justify-between gap-2">
+                          {isPaidFull ? (
+                            <p className="text-2xl font-bold text-emerald-500">
+                              ₹0 Payable (Settled ✓)
+                            </p>
+                          ) : isPartial ? (
+                            <p className="text-2xl font-bold text-amber-500">
+                              {inr(remAmt)} Remaining Due
+                            </p>
+                          ) : (
+                            <p className="text-2xl font-bold text-primary">
+                              {inr(slip.summary.net_payable)}
+                            </p>
+                          )}
                         </div>
                         {slip.summary.leave_deduction > 0 && (
                           <p className="mt-0.5 text-[11px] text-muted-foreground">

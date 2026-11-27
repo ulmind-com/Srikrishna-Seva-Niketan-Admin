@@ -129,7 +129,7 @@ export const AssignmentsPage = () => {
                 onClick={() => setCompleteAssignment(assignment)}
                 className="gap-2 cursor-pointer font-medium text-emerald-400 focus:text-emerald-300"
               >
-                <CheckCircle2 className="h-4 w-4 text-emerald-400" /> কাজ সম্পন্ন ও ক্যাশ আদায় (Complete &amp; Cash)
+                <CheckCircle2 className="h-4 w-4 text-emerald-400" /> কাজ সম্পন্ন (Mark Duty Completed)
               </DropdownMenuItem>
             )}
             <DropdownMenuItem
@@ -155,12 +155,6 @@ export const AssignmentsPage = () => {
               className="gap-2 cursor-pointer font-medium text-purple-400 focus:text-purple-300"
             >
               <History className="h-4 w-4 text-purple-400" /> View Assignment History
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => setReplaceAssignment(assignment)}
-              className="gap-2 cursor-pointer font-medium text-blue-400 focus:text-blue-300"
-            >
-              <UserCheck className="h-4 w-4 text-blue-400" /> Replace Staff (স্টাফ পরিবর্তন)
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => handleSendPush(assignment)}
