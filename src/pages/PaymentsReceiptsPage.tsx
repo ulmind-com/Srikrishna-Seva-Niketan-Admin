@@ -12,6 +12,7 @@ import {
   Clock,
   CreditCard,
   Download,
+  FileText,
   History,
   Loader2,
   Plus,
@@ -35,6 +36,7 @@ import {
 } from "@/services/finance.service";
 import {
   downloadClientReceiptPdf,
+  downloadStaffStatementPdf,
   downloadStaffVoucherPdf,
 } from "@/lib/receipt-export";
 import {
@@ -42,6 +44,7 @@ import {
   currentMonthRangeIST,
   formatSlashDateIST,
   monthLabelIST,
+  nowIST,
   todayIST,
 } from "@/lib/ist-datetime";
 import { Button } from "@/components/ui/button";
@@ -133,13 +136,62 @@ export function PaymentsReceiptsPage() {
   const [branch, setBranch] = useState("all");
   const [startDate, setStartDate] = useState(monthRange.start);
   const [endDate, setEndDate] = useState(monthRange.end);
-  const [staffMonth, setStaffMonth] = useState(currentMonthIST());
+  const [quickMonth, setQuickMonth] = useState(currentMonthIST());
+  const [staffFilterId, setStaffFilterId] = useState("all");
   const [search, setSearch] = useState("");
   const [historyDirection, setHistoryDirection] = useState("all");
   const [historyMode, setHistoryMode] = useState("all");
 
+  const validRange = !!startDate && !!endDate && endDate >= startDate;
+  const derivedMonth = startDate ? startDate.slice(0, 7) : currentMonthIST();
+
+  const applyMonthPreset = (ym: string) => {
+    if (!ym) return;
+    setQuickMonth(ym);
+    const [y, m] = ym.split("-").map(Number);
+    const lastDay = new Date(y, m, 0).getDate();
+    setStartDate(`${ym}-01`);
+    setEndDate(`${ym}-${String(lastDay).padStart(2, "0")}`);
+  };
+
+  const applyRangePreset = (preset: "this_month" | "last_month" | "last_15" | "last_30") => {
+    const today = nowIST();
+    if (preset === "this_month") {
+      const r = currentMonthRangeIST();
+      setStartDate(r.start);
+      setEndDate(r.end);
+      setQuickMonth(r.start.slice(0, 7));
+    } else if (preset === "last_month") {
+      const prev = today.minus({ months: 1 });
+      setStartDate(prev.startOf("month").toISODate() || "");
+      setEndDate(prev.endOf("month").toISODate() || "");
+      setQuickMonth(prev.toFormat("yyyy-MM"));
+    } else if (preset === "last_15") {
+      setStartDate(today.minus({ days: 14 }).toISODate() || "");
+      setEndDate(today.toISODate() || "");
+      setQuickMonth("");
+    } else if (preset === "last_30") {
+      setStartDate(today.minus({ days: 29 }).toISODate() || "");
+      setEndDate(today.toISODate() || "");
+      setQuickMonth("");
+    }
+  };
+
   const [expandedClients, setExpandedClients] = useState<Record<string, boolean>>({});
   const [expandedStaff, setExpandedStaff] = useState<Record<string, boolean>>({});
+
+  // Staff Bank Statement Modal state
+  const [stmtEmpId, setStmtEmpId] = useState<string | null>(null);
+  const [stmtStart, setStmtStart] = useState(monthRange.start);
+  const [stmtEnd, setStmtEnd] = useState(monthRange.end);
+  const [stmtViewTab, setStmtViewTab] = useState<"passbook" | "vouchers">("passbook");
+
+  const openStaffStatement = (empId: string) => {
+    setStmtEmpId(empId);
+    setStmtStart(startDate);
+    setStmtEnd(endDate);
+    setStmtViewTab("passbook");
+  };
 
   // Receive Payment Dialog state
   const [receiveTarget, setReceiveTarget] = useState<{
@@ -204,17 +256,34 @@ export function PaymentsReceiptsPage() {
         end: endDate || undefined,
         location_id: locParam,
       }),
+    enabled: validRange,
     staleTime: 5_000,
   });
 
   const staffLedgerQ = useQuery({
-    queryKey: ["staff-ledger", staffMonth, branch],
+    queryKey: ["staff-ledger", startDate, endDate, branch, staffFilterId],
     queryFn: () =>
       financeService.staffLedger({
-        month: staffMonth,
+        start: startDate || undefined,
+        end: endDate || undefined,
         location_id: locParam,
+        employee_id: staffFilterId !== "all" ? staffFilterId : undefined,
       }),
+    enabled: validRange,
     staleTime: 5_000,
+  });
+
+  const stmtValidRange = !!stmtStart && !!stmtEnd && stmtEnd >= stmtStart;
+  const staffStatementQ = useQuery({
+    queryKey: ["staff-statement", stmtEmpId, stmtStart, stmtEnd],
+    queryFn: () =>
+      financeService.staffStatement({
+        employee_id: stmtEmpId as string,
+        start: stmtStart || undefined,
+        end: stmtEnd || undefined,
+      }),
+    enabled: !!stmtEmpId && stmtValidRange,
+    staleTime: 0,
   });
 
   const historyQ = useQuery({
@@ -228,12 +297,14 @@ export function PaymentsReceiptsPage() {
         mode: historyMode !== "all" ? historyMode : undefined,
         search: search || undefined,
       }),
+    enabled: validRange,
     staleTime: 5_000,
   });
 
   const invalidateAllFinance = () => {
     qc.invalidateQueries({ queryKey: ["client-ledger"] });
     qc.invalidateQueries({ queryKey: ["staff-ledger"] });
+    qc.invalidateQueries({ queryKey: ["staff-statement"] });
     qc.invalidateQueries({ queryKey: ["payment-history"] });
     qc.invalidateQueries({ queryKey: ["monthly-bills"] });
     qc.invalidateQueries({ queryKey: ["payroll-run"] });
@@ -296,7 +367,7 @@ export function PaymentsReceiptsPage() {
           employee_name: s.employee_name,
           code: s.code,
           category: s.category,
-          month: created.month || staffMonth,
+          month: created.month || derivedMonth,
           amount: created.amount,
           date: created.date,
           mode: created.mode,
@@ -386,69 +457,18 @@ export function PaymentsReceiptsPage() {
         <title>Payments &amp; Receipts</title>
       </Helmet>
 
-      {/* Header & Global Filters */}
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Payments &amp; Receipts</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Track real-time client collections, partial payments, PDF receipts, staff salary payouts, and full cash flow.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search client, staff, receipt..."
-              className="w-[210px] pl-8"
-            />
+      {/* Header & Global Bank-Statement Date Range Filters */}
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Payments &amp; Receipts</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Track real-time client collections, partial payments, PDF receipts, bank-statement style staff salary payouts &amp; statements, and full cash flow.
+            </p>
           </div>
 
-          {activeTab === "staff" ? (
-            <Input
-              type="month"
-              value={staffMonth}
-              onChange={(e) => e.target.value && setStaffMonth(e.target.value)}
-              className="w-auto"
-            />
-          ) : (
-            <div className="flex items-center gap-1.5">
-              <Input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-[140px]"
-              />
-              <span className="text-xs text-muted-foreground">to</span>
-              <Input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-[140px]"
-              />
-            </div>
-          )}
-
-          {user?.is_superuser && locations.length > 0 && (
-            <Select value={branch} onValueChange={setBranch}>
-              <SelectTrigger className="w-[170px]">
-                <SelectValue placeholder="All branches" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All branches</SelectItem>
-                {locations.map((l) => (
-                  <SelectItem key={l.id} value={l.id}>
-                    {l.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-
           {can("payments:create") && (
-            <>
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 size="sm"
                 onClick={() => {
@@ -465,15 +485,135 @@ export function PaymentsReceiptsPage() {
                 variant="outline"
                 onClick={() => {
                   setQuickEmpId(
-                    filteredStaff[0]?.employee_id || allVerifiedStaff[0]?.id || ""
+                    (staffFilterId !== "all" ? staffFilterId : "") ||
+                      filteredStaff[0]?.employee_id ||
+                      allVerifiedStaff[0]?.id ||
+                      ""
                   );
                   setQuickStaffOpen(true);
                 }}
               >
                 <Plus className="mr-1.5 h-4 w-4" /> Pay Staff
               </Button>
-            </>
+            </div>
           )}
+        </div>
+
+        {/* Unified Statement Date Range & Search Bar */}
+        <div className="rounded-2xl border border-border bg-card p-3.5 space-y-2.5">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search client, staff, receipt, voucher..."
+                className="pl-8"
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">From</span>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  setQuickMonth("");
+                }}
+                className="w-[142px]"
+              />
+              <span className="text-xs font-medium text-muted-foreground">To</span>
+              <Input
+                type="date"
+                min={startDate}
+                value={endDate}
+                onChange={(e) => {
+                  setEndDate(e.target.value);
+                  setQuickMonth("");
+                }}
+                className="w-[142px]"
+              />
+            </div>
+
+            <Input
+              type="month"
+              title="Quick select whole month"
+              value={quickMonth}
+              onChange={(e) => applyMonthPreset(e.target.value)}
+              className="w-[155px]"
+            />
+
+            {user?.is_superuser && locations.length > 0 && (
+              <Select value={branch} onValueChange={setBranch}>
+                <SelectTrigger className="w-[165px]">
+                  <SelectValue placeholder="All branches" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All branches</SelectItem>
+                  {locations.map((l) => (
+                    <SelectItem key={l.id} value={l.id}>
+                      {l.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span>Quick Range:</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-6 px-2.5 text-[11px]"
+                onClick={() => applyRangePreset("this_month")}
+              >
+                This Month
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-6 px-2.5 text-[11px]"
+                onClick={() => applyRangePreset("last_15")}
+              >
+                Last 15 Days
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-6 px-2.5 text-[11px]"
+                onClick={() => applyRangePreset("last_30")}
+              >
+                Last 30 Days
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-6 px-2.5 text-[11px]"
+                onClick={() => applyRangePreset("last_month")}
+              >
+                Previous Month
+              </Button>
+            </div>
+            {validRange ? (
+              <span>
+                Showing period:{" "}
+                <strong className="text-foreground">
+                  {formatSlashDateIST(startDate)} – {formatSlashDateIST(endDate)}
+                </strong>
+              </span>
+            ) : (
+              <span className="text-rose-500 font-medium">
+                To Date must be on or after From Date
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -494,7 +634,7 @@ export function PaymentsReceiptsPage() {
           icon={<Clock className="h-5 w-5 text-rose-500" />}
         />
         <KpiCard
-          title={`Staff Paid (${monthLabelIST(staffMonth)})`}
+          title={`Staff Paid (${quickMonth ? monthLabelIST(quickMonth) : `${formatSlashDateIST(startDate)} – ${formatSlashDateIST(endDate)}`})`}
           value={inr(sSum?.total_paid)}
           subtitle={`Total Salary Due: ${inr(sSum?.total_salary_due)}`}
           tone="text-indigo-400"
@@ -794,7 +934,57 @@ export function PaymentsReceiptsPage() {
         </TabsContent>
 
         {/* ================= TAB 2: STAFF PAYMENTS ================= */}
-        <TabsContent value="staff" className="mt-5 space-y-5">
+        <TabsContent value="staff" className="mt-5 space-y-4">
+          {/* Staff Bank-Statement Filter & Direct Statement Launcher */}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card p-3.5">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <Select value={staffFilterId} onValueChange={setStaffFilterId}>
+                <SelectTrigger className="w-[230px]">
+                  <SelectValue placeholder="All Staff Members" />
+                </SelectTrigger>
+                <SelectContent className="max-h-72">
+                  <SelectItem value="all">All Staff Members</SelectItem>
+                  {allVerifiedStaff.map((e) => (
+                    <SelectItem key={e.id} value={e.id}>
+                      {e.name} ({e.code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {staffFilterId !== "all" && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-xs text-muted-foreground"
+                  onClick={() => setStaffFilterId("all")}
+                >
+                  Show All
+                </Button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!validRange || (staffFilterId === "all" && filteredStaff.length === 0)}
+                onClick={() => {
+                  const targetId =
+                    staffFilterId !== "all"
+                      ? staffFilterId
+                      : filteredStaff[0]?.employee_id;
+                  if (targetId) openStaffStatement(targetId);
+                }}
+              >
+                <FileText className="mr-1.5 h-4 w-4 text-indigo-400" />
+                {staffFilterId !== "all"
+                  ? "View / Print Staff Statement"
+                  : "Open Staff Statement"}
+              </Button>
+            </div>
+          </div>
+
           <div className="overflow-hidden rounded-2xl border border-border bg-card">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -820,7 +1010,7 @@ export function PaymentsReceiptsPage() {
                   ) : filteredStaff.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="py-12 text-center text-muted-foreground">
-                        No staff payroll entries for {monthLabelIST(staffMonth)}.
+                        No staff payroll entries for {formatSlashDateIST(startDate)} – {formatSlashDateIST(endDate)}.
                       </td>
                     </tr>
                   ) : (
@@ -870,7 +1060,7 @@ export function PaymentsReceiptsPage() {
                               className="px-4 py-3 text-right"
                               onClick={(e) => e.stopPropagation()}
                             >
-                              <div className="inline-flex items-center justify-end gap-2">
+                              <div className="inline-flex items-center justify-end gap-1.5">
                                 {can("payments:create") && (
                                   <Button
                                     size="sm"
@@ -881,6 +1071,15 @@ export function PaymentsReceiptsPage() {
                                     {row.remaining_amount > 0 ? "Add Payment" : "Pay Advance"}
                                   </Button>
                                 )}
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => openStaffStatement(row.employee_id)}
+                                  title="Open Bank-Statement style salary & payment statement"
+                                >
+                                  <FileText className="mr-1 h-3.5 w-3.5 text-indigo-400" />
+                                  Statement
+                                </Button>
                                 <Button
                                   size="sm"
                                   variant={isOpen ? "secondary" : "outline"}
@@ -904,13 +1103,25 @@ export function PaymentsReceiptsPage() {
                           </tr>
                           {isOpen && (
                             <tr key={`${row.employee_id}-detail`} className="bg-muted/20">
-                              <td colSpan={8} className="px-6 py-4">
-                                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                  Date-wise Payment Slips ({row.payments.length})
-                                </p>
+                              <td colSpan={8} className="px-6 py-4 space-y-3">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                    Date-wise Payment Slips ({row.payments.length}) ·{" "}
+                                    {formatSlashDateIST(startDate)} – {formatSlashDateIST(endDate)}
+                                  </p>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 px-2.5 text-xs"
+                                    onClick={() => openStaffStatement(row.employee_id)}
+                                  >
+                                    <FileText className="mr-1 h-3 w-3 text-indigo-400" />
+                                    Full Bank-Style Statement &amp; PDF
+                                  </Button>
+                                </div>
                                 {row.payments.length === 0 ? (
                                   <p className="text-xs text-muted-foreground italic">
-                                    No salary payments recorded for this month yet.
+                                    No salary payments recorded in {formatSlashDateIST(startDate)} – {formatSlashDateIST(endDate)}.
                                   </p>
                                 ) : (
                                   <div className="overflow-x-auto rounded-xl border border-border bg-card">
@@ -955,7 +1166,7 @@ export function PaymentsReceiptsPage() {
                                                     employee_name: row.employee_name,
                                                     code: row.code,
                                                     category: row.category,
-                                                    month: sp.month || staffMonth,
+                                                    month: sp.month || derivedMonth,
                                                     amount: sp.amount,
                                                     date: sp.date,
                                                     mode: sp.mode,
@@ -1355,7 +1566,7 @@ export function PaymentsReceiptsPage() {
           <DialogHeader>
             <DialogTitle>Record Staff Salary Payment</DialogTitle>
             <DialogDescription>
-              {payStaffTarget?.employee_name} · Month {monthLabelIST(staffMonth)} · Remaining{" "}
+              {payStaffTarget?.employee_name} · {formatSlashDateIST(startDate)} – {formatSlashDateIST(endDate)} · Remaining{" "}
               <span className="font-semibold text-rose-500">
                 {inr(payStaffTarget?.remaining_amount)}
               </span>
@@ -1443,7 +1654,7 @@ export function PaymentsReceiptsPage() {
                 if (!payStaffTarget) return;
                 recordStaffMut.mutate({
                   employee_id: payStaffTarget.employee_id,
-                  month: staffMonth,
+                  month: stDate ? stDate.slice(0, 7) : derivedMonth,
                   amount: Number(stAmount),
                   date: stDate || undefined,
                   mode: stMode,
@@ -1532,7 +1743,7 @@ export function PaymentsReceiptsPage() {
           <DialogHeader>
             <DialogTitle>Select Staff Member</DialogTitle>
             <DialogDescription>
-              Choose any verified staff member to pay salary or advance for {monthLabelIST(staffMonth)}.
+              Choose any verified staff member to pay salary or advance ({formatSlashDateIST(startDate)} – {formatSlashDateIST(endDate)}).
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
@@ -1591,6 +1802,364 @@ export function PaymentsReceiptsPage() {
             >
               Continue
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ================= BANK-STATEMENT STYLE STAFF PAYMENT STATEMENT MODAL ================= */}
+      <Dialog open={!!stmtEmpId} onOpenChange={(o) => !o && setStmtEmpId(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex flex-wrap items-center gap-2">
+              <FileText className="h-5 w-5 text-indigo-400" />
+              Staff Payment &amp; Salary Statement
+              {staffStatementQ.data?.summary && (
+                <StatusBadge status={staffStatementQ.data.summary.status} />
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              Bank-statement style date-to-date account passbook showing duty earnings, payment vouchers, and running balance.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Modal Controls: Staff Switcher + From Date -> To Date */}
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-4 rounded-xl border border-border bg-muted/30 p-3">
+            <div className="sm:col-span-2 space-y-1">
+              <Label className="text-[11px] uppercase text-muted-foreground">Staff Member</Label>
+              <Select
+                value={stmtEmpId || ""}
+                onValueChange={(v) => setStmtEmpId(v)}
+              >
+                <SelectTrigger className="h-9 bg-background">
+                  <SelectValue placeholder="Choose staff..." />
+                </SelectTrigger>
+                <SelectContent className="max-h-72">
+                  {allVerifiedStaff.map((e) => (
+                    <SelectItem key={e.id} value={e.id}>
+                      {e.name} ({e.code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] uppercase text-muted-foreground">From Date</Label>
+              <Input
+                type="date"
+                className="h-9 bg-background"
+                value={stmtStart}
+                onChange={(e) => setStmtStart(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] uppercase text-muted-foreground">To Date</Label>
+              <Input
+                type="date"
+                className="h-9 bg-background"
+                min={stmtStart}
+                value={stmtEnd}
+                onChange={(e) => setStmtEnd(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+            {!stmtValidRange ? (
+              <p className="py-10 text-center text-sm text-rose-500">
+                Please select a valid From Date and To Date.
+              </p>
+            ) : staffStatementQ.isLoading ? (
+              <div className="py-16 text-center">
+                <Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : staffStatementQ.data ? (
+              <>
+                {/* Employee Info + 4 KPI Summary Cards */}
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground px-1">
+                  <div>
+                    <span className="text-sm font-semibold text-foreground">
+                      {staffStatementQ.data.employee.name}
+                    </span>{" "}
+                    · {staffStatementQ.data.employee.code} · {staffStatementQ.data.employee.category}
+                    {staffStatementQ.data.employee.location_name
+                      ? ` · ${staffStatementQ.data.employee.location_name}`
+                      : ""}
+                  </div>
+                  <div>
+                    Rate:{" "}
+                    <strong className="text-foreground">
+                      {staffStatementQ.data.employee.daily_rate
+                        ? `${inr(staffStatementQ.data.employee.daily_rate)}/day`
+                        : "—"}
+                    </strong>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                  <div className="rounded-xl border border-border bg-card p-3">
+                    <p className="text-[11px] uppercase text-muted-foreground">Payable Days</p>
+                    <p className="mt-0.5 text-xl font-bold tabular-nums">
+                      {staffStatementQ.data.summary.payable_days}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {staffStatementQ.data.summary.present_days}P · {staffStatementQ.data.summary.half_days}H · {staffStatementQ.data.summary.off_days} Off
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-border bg-card p-3">
+                    <p className="text-[11px] uppercase text-muted-foreground">Salary Earned</p>
+                    <p className="mt-0.5 text-xl font-bold tabular-nums">
+                      {inr(staffStatementQ.data.summary.salary_due)}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {formatSlashDateIST(stmtStart)} – {formatSlashDateIST(stmtEnd)}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-border bg-card p-3">
+                    <p className="text-[11px] uppercase text-muted-foreground">Total Paid</p>
+                    <p className="mt-0.5 text-xl font-bold tabular-nums text-emerald-500">
+                      {inr(staffStatementQ.data.summary.paid_amount)}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {staffStatementQ.data.summary.payment_count} payment slip(s)
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-border bg-card p-3">
+                    <p className="text-[11px] uppercase text-muted-foreground">
+                      {staffStatementQ.data.summary.advance_amount > 0 ? "Advance Paid" : "Balance Due"}
+                    </p>
+                    <p
+                      className={`mt-0.5 text-xl font-bold tabular-nums ${
+                        staffStatementQ.data.summary.remaining_amount > 0
+                          ? "text-rose-500"
+                          : "text-emerald-500"
+                      }`}
+                    >
+                      {inr(
+                        staffStatementQ.data.summary.advance_amount > 0
+                          ? staffStatementQ.data.summary.advance_amount
+                          : staffStatementQ.data.summary.remaining_amount
+                      )}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">Closing period balance</p>
+                  </div>
+                </div>
+
+                {/* Statement View Switcher */}
+                <div className="flex items-center gap-2 border-b border-border pb-2">
+                  <Button
+                    size="sm"
+                    variant={stmtViewTab === "passbook" ? "default" : "outline"}
+                    className="h-8 text-xs"
+                    onClick={() => setStmtViewTab("passbook")}
+                  >
+                    Passbook Ledger ({staffStatementQ.data.passbook.length})
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={stmtViewTab === "vouchers" ? "default" : "outline"}
+                    className="h-8 text-xs"
+                    onClick={() => setStmtViewTab("vouchers")}
+                  >
+                    Payment Receipts / Slips ({staffStatementQ.data.payments.length})
+                  </Button>
+                </div>
+
+                {stmtViewTab === "passbook" ? (
+                  <div className="overflow-x-auto rounded-xl border border-border bg-card">
+                    <table className="w-full text-xs">
+                      <thead className="bg-muted/50 text-muted-foreground">
+                        <tr>
+                          <th className="px-3 py-2.5 text-left">Date</th>
+                          <th className="px-3 py-2 text-left">Ref / Voucher</th>
+                          <th className="px-3 py-2 text-left">Particulars</th>
+                          <th className="px-3 py-2 text-right">Earned (+)</th>
+                          <th className="px-3 py-2 text-right">Paid (-)</th>
+                          <th className="px-3 py-2 text-right">Running Balance</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {staffStatementQ.data.passbook.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="py-8 text-center text-muted-foreground italic">
+                              No duty records or salary payments in this date range.
+                            </td>
+                          </tr>
+                        ) : (
+                          staffStatementQ.data.passbook.map((entry, idx) => (
+                            <tr
+                              key={`${entry.date}-${entry.entry_type}-${idx}`}
+                              className={
+                                entry.entry_type === "payout"
+                                  ? "bg-indigo-500/10 hover:bg-indigo-500/15"
+                                  : "hover:bg-muted/30"
+                              }
+                            >
+                              <td className="px-3 py-2 tabular-nums whitespace-nowrap font-medium">
+                                {formatSlashDateIST(entry.date)}
+                              </td>
+                              <td
+                                className={`px-3 py-2 whitespace-nowrap font-semibold ${
+                                  entry.entry_type === "payout"
+                                    ? "text-indigo-400"
+                                    : "text-muted-foreground"
+                                }`}
+                              >
+                                {entry.ref_no}
+                              </td>
+                              <td className="px-3 py-2">
+                                <span>{entry.particulars}</span>
+                                {entry.entry_type === "earning" && entry.note && (
+                                  <span className="ml-1.5 text-[11px] text-muted-foreground">
+                                    ({entry.note})
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 text-right tabular-nums text-emerald-500 font-medium">
+                                {entry.credit > 0 ? `+${inr(entry.credit)}` : "—"}
+                              </td>
+                              <td className="px-3 py-2 text-right tabular-nums text-indigo-400 font-semibold">
+                                {entry.debit > 0 ? `-${inr(entry.debit)}` : "—"}
+                              </td>
+                              <td
+                                className={`px-3 py-2 text-right tabular-nums font-bold ${
+                                  entry.running_balance > 0
+                                    ? "text-rose-500"
+                                    : "text-emerald-500"
+                                }`}
+                              >
+                                {entry.running_balance < 0
+                                  ? `Adv ${inr(Math.abs(entry.running_balance))}`
+                                  : inr(entry.running_balance)}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                      <tfoot className="bg-muted/40 font-semibold border-t border-border">
+                        <tr>
+                          <td colSpan={3} className="px-3 py-2.5 text-right uppercase text-[11px] text-muted-foreground">
+                            Period Totals
+                          </td>
+                          <td className="px-3 py-2.5 text-right tabular-nums text-emerald-500">
+                            {inr(staffStatementQ.data.summary.salary_due)}
+                          </td>
+                          <td className="px-3 py-2.5 text-right tabular-nums text-indigo-400">
+                            {inr(staffStatementQ.data.summary.paid_amount)}
+                          </td>
+                          <td
+                            className={`px-3 py-2.5 text-right tabular-nums ${
+                              staffStatementQ.data.summary.remaining_amount > 0
+                                ? "text-rose-500"
+                                : "text-emerald-500"
+                            }`}
+                          >
+                            {staffStatementQ.data.summary.advance_amount > 0
+                              ? `Adv ${inr(staffStatementQ.data.summary.advance_amount)}`
+                              : inr(staffStatementQ.data.summary.remaining_amount)}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-xl border border-border bg-card">
+                    <table className="w-full text-xs">
+                      <thead className="bg-muted/50 text-muted-foreground">
+                        <tr>
+                          <th className="px-3 py-2.5 text-left">Payment Date</th>
+                          <th className="px-3 py-2.5 text-left">Voucher No</th>
+                          <th className="px-3 py-2.5 text-left">Mode &amp; Ref</th>
+                          <th className="px-3 py-2.5 text-left">Paid By &amp; Note</th>
+                          <th className="px-3 py-2.5 text-right">Amount Paid</th>
+                          <th className="px-3 py-2.5 text-right">Cumulative Paid</th>
+                          <th className="px-3 py-2.5 text-right">Slip PDF</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {staffStatementQ.data.payments.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="py-8 text-center text-muted-foreground italic">
+                              No salary payouts recorded in this date range.
+                            </td>
+                          </tr>
+                        ) : (
+                          staffStatementQ.data.payments.map((sp) => (
+                            <tr key={sp.id}>
+                              <td className="px-3 py-2 tabular-nums font-medium">
+                                {formatSlashDateIST(sp.date)}
+                              </td>
+                              <td className="px-3 py-2 font-semibold text-indigo-400">
+                                {sp.voucher_no}
+                              </td>
+                              <td className="px-3 py-2 uppercase">
+                                {sp.mode.replace(/_/g, " ")}
+                                {sp.transaction_id ? ` · ${sp.transaction_id}` : ""}
+                              </td>
+                              <td className="px-3 py-2 text-muted-foreground">
+                                {[sp.paid_by, sp.note].filter(Boolean).join(" — ") || "—"}
+                              </td>
+                              <td className="px-3 py-2 text-right tabular-nums font-semibold text-indigo-400">
+                                {inr(sp.amount)}
+                              </td>
+                              <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                                {inr(sp.running_paid)}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 px-2 text-xs"
+                                  onClick={() => {
+                                    const d = staffStatementQ.data;
+                                    if (!d) return;
+                                    downloadStaffVoucherPdf({
+                                      voucher_no: sp.voucher_no,
+                                      employee_name: d.employee.name,
+                                      code: d.employee.code,
+                                      category: d.employee.category,
+                                      month: sp.month || d.period.month,
+                                      amount: sp.amount,
+                                      date: sp.date,
+                                      mode: sp.mode,
+                                      transaction_id: sp.transaction_id,
+                                      paid_by: sp.paid_by,
+                                      note: sp.note,
+                                      salary_due: d.summary.salary_due,
+                                      total_paid: d.summary.paid_amount,
+                                      remaining_amount: d.summary.remaining_amount,
+                                    });
+                                  }}
+                                >
+                                  <Download className="mr-1 h-3 w-3" /> Slip PDF
+                                </Button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            ) : null}
+          </div>
+
+          <DialogFooter className="gap-2 pt-2 border-t border-border">
+            <Button variant="outline" onClick={() => setStmtEmpId(null)}>
+              Close
+            </Button>
+            {staffStatementQ.data && (
+              <Button
+                onClick={() => {
+                  if (staffStatementQ.data) {
+                    downloadStaffStatementPdf(staffStatementQ.data);
+                  }
+                }}
+              >
+                <Download className="mr-1.5 h-4 w-4" />
+                Download Statement PDF
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

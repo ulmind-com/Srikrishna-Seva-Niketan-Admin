@@ -124,6 +124,7 @@ export const endpoints = {
     root: "/payments",
     clientLedger: "/payments/client-ledger",
     staffLedger: "/payments/staff-ledger",
+    staffStatement: "/payments/staff-statement",
     staff: "/payments/staff",
     staffItem: (id: string) => `/payments/staff/${id}`,
     history: "/payments/history",

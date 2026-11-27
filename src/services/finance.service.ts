@@ -194,6 +194,84 @@ export interface CreatedStaffPaymentResponse {
   note?: string | null;
 }
 
+export interface StaffStatementPaymentRow {
+  id: string;
+  voucher_no: string;
+  amount: number;
+  date?: string | null;
+  month?: string | null;
+  mode: PaymentMode | string;
+  transaction_id?: string | null;
+  paid_by?: string | null;
+  note?: string | null;
+  running_paid: number;
+  balance_after: number;
+}
+
+export interface StaffStatementPassbookRow {
+  date: string;
+  entry_type: "earning" | "payout" | string;
+  ref_no: string;
+  particulars: string;
+  customer_name?: string | null;
+  mode?: string | null;
+  transaction_id?: string | null;
+  paid_by?: string | null;
+  note?: string | null;
+  voucher_id?: string | null;
+  credit: number;
+  debit: number;
+  running_balance: number;
+}
+
+export interface StaffStatementDutyDay {
+  date: string;
+  status: string;
+  shift: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  duration?: string | null;
+  customer_name?: string | null;
+  pay_rate?: number | null;
+  amount: number;
+}
+
+export interface StaffStatementResponse {
+  employee: {
+    id: string;
+    name: string;
+    code: string;
+    category: string;
+    phone?: string | null;
+    daily_rate?: number | null;
+    location_id: string;
+    location_name?: string | null;
+  };
+  period: {
+    month: string;
+    start: string;
+    end: string;
+    days: number;
+  };
+  summary: {
+    worked_days: number;
+    present_days: number;
+    half_days: number;
+    off_days: number;
+    absent_days: number;
+    payable_days: number;
+    salary_due: number;
+    paid_amount: number;
+    remaining_amount: number;
+    advance_amount: number;
+    status: "paid" | "partial" | "pending" | "advance" | "no_due" | string;
+    payment_count: number;
+  };
+  daily_entries: StaffStatementDutyDay[];
+  payments: StaffStatementPaymentRow[];
+  passbook: StaffStatementPassbookRow[];
+}
+
 export const financeService = {
   clientLedger: (params?: {
     start?: string;
@@ -213,7 +291,15 @@ export const financeService = {
     start?: string;
     end?: string;
     location_id?: string;
+    employee_id?: string;
   }) => http.get<StaffLedgerResponse>(endpoints.payments.staffLedger, params),
+
+  staffStatement: (params: {
+    employee_id: string;
+    start?: string;
+    end?: string;
+    month?: string;
+  }) => http.get<StaffStatementResponse>(endpoints.payments.staffStatement, params),
 
   recordStaffPayment: (payload: CreateStaffPaymentPayload) =>
     http.post<CreatedStaffPaymentResponse>(endpoints.payments.staff, payload),
