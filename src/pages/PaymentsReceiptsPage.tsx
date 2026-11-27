@@ -184,13 +184,11 @@ export function PaymentsReceiptsPage() {
   const [stmtEmpId, setStmtEmpId] = useState<string | null>(null);
   const [stmtStart, setStmtStart] = useState(monthRange.start);
   const [stmtEnd, setStmtEnd] = useState(monthRange.end);
-  const [stmtViewTab, setStmtViewTab] = useState<"passbook" | "vouchers">("passbook");
 
   const openStaffStatement = (empId: string) => {
     setStmtEmpId(empId);
     setStmtStart(startDate);
     setStmtEnd(endDate);
-    setStmtViewTab("passbook");
   };
 
   // Receive Payment Dialog state
@@ -1944,124 +1942,33 @@ export function PaymentsReceiptsPage() {
                   </div>
                 </div>
 
-                {/* Statement View Switcher */}
-                <div className="flex items-center gap-2 border-b border-border pb-2">
-                  <Button
-                    size="sm"
-                    variant={stmtViewTab === "passbook" ? "default" : "outline"}
-                    className="h-8 text-xs"
-                    onClick={() => setStmtViewTab("passbook")}
-                  >
-                    Passbook Ledger ({staffStatementQ.data.passbook.length})
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={stmtViewTab === "vouchers" ? "default" : "outline"}
-                    className="h-8 text-xs"
-                    onClick={() => setStmtViewTab("vouchers")}
-                  >
-                    Payment Receipts / Slips ({staffStatementQ.data.payments.length})
-                  </Button>
-                </div>
+                {/* Statement View: Simple Duty Summary + One Clean Payment History Table */}
+                {(() => {
+                  const custMap = new Map<string, { days: number; amount: number }>();
+                  for (const d of staffStatementQ.data.daily_entries) {
+                    if (d.status !== "present" && d.status !== "half_day") continue;
+                    const key = d.customer_name || "Duty";
+                    const cur = custMap.get(key) || { days: 0, amount: 0 };
+                    cur.days += d.status === "half_day" ? 0.5 : 1;
+                    cur.amount += d.amount || 0;
+                    custMap.set(key, cur);
+                  }
+                  const workSummary = Array.from(custMap.entries());
+                  return workSummary.length > 0 ? (
+                    <div className="rounded-xl border border-border bg-muted/20 px-3.5 py-2.5 text-xs text-muted-foreground">
+                      <span className="font-semibold text-foreground">Work Summary: </span>
+                      {workSummary
+                        .map(([cust, v]) => `${cust} (${v.days}d · ${inr(v.amount)})`)
+                        .join(" · ")}
+                    </div>
+                  ) : null;
+                })()}
 
-                {stmtViewTab === "passbook" ? (
-                  <div className="overflow-x-auto rounded-xl border border-border bg-card">
-                    <table className="w-full text-xs">
-                      <thead className="bg-muted/50 text-muted-foreground">
-                        <tr>
-                          <th className="px-3 py-2.5 text-left">Date</th>
-                          <th className="px-3 py-2 text-left">Ref / Voucher</th>
-                          <th className="px-3 py-2 text-left">Particulars</th>
-                          <th className="px-3 py-2 text-right">Earned (+)</th>
-                          <th className="px-3 py-2 text-right">Paid (-)</th>
-                          <th className="px-3 py-2 text-right">Running Balance</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {staffStatementQ.data.passbook.length === 0 ? (
-                          <tr>
-                            <td colSpan={6} className="py-8 text-center text-muted-foreground italic">
-                              No duty records or salary payments in this date range.
-                            </td>
-                          </tr>
-                        ) : (
-                          staffStatementQ.data.passbook.map((entry, idx) => (
-                            <tr
-                              key={`${entry.date}-${entry.entry_type}-${idx}`}
-                              className={
-                                entry.entry_type === "payout"
-                                  ? "bg-indigo-500/10 hover:bg-indigo-500/15"
-                                  : "hover:bg-muted/30"
-                              }
-                            >
-                              <td className="px-3 py-2 tabular-nums whitespace-nowrap font-medium">
-                                {formatSlashDateIST(entry.date)}
-                              </td>
-                              <td
-                                className={`px-3 py-2 whitespace-nowrap font-semibold ${
-                                  entry.entry_type === "payout"
-                                    ? "text-indigo-400"
-                                    : "text-muted-foreground"
-                                }`}
-                              >
-                                {entry.ref_no}
-                              </td>
-                              <td className="px-3 py-2">
-                                <span>{entry.particulars}</span>
-                                {entry.entry_type === "earning" && entry.note && (
-                                  <span className="ml-1.5 text-[11px] text-muted-foreground">
-                                    ({entry.note})
-                                  </span>
-                                )}
-                              </td>
-                              <td className="px-3 py-2 text-right tabular-nums text-emerald-500 font-medium">
-                                {entry.credit > 0 ? `+${inr(entry.credit)}` : "—"}
-                              </td>
-                              <td className="px-3 py-2 text-right tabular-nums text-indigo-400 font-semibold">
-                                {entry.debit > 0 ? `-${inr(entry.debit)}` : "—"}
-                              </td>
-                              <td
-                                className={`px-3 py-2 text-right tabular-nums font-bold ${
-                                  entry.running_balance > 0
-                                    ? "text-rose-500"
-                                    : "text-emerald-500"
-                                }`}
-                              >
-                                {entry.running_balance < 0
-                                  ? `Adv ${inr(Math.abs(entry.running_balance))}`
-                                  : inr(entry.running_balance)}
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                      <tfoot className="bg-muted/40 font-semibold border-t border-border">
-                        <tr>
-                          <td colSpan={3} className="px-3 py-2.5 text-right uppercase text-[11px] text-muted-foreground">
-                            Period Totals
-                          </td>
-                          <td className="px-3 py-2.5 text-right tabular-nums text-emerald-500">
-                            {inr(staffStatementQ.data.summary.salary_due)}
-                          </td>
-                          <td className="px-3 py-2.5 text-right tabular-nums text-indigo-400">
-                            {inr(staffStatementQ.data.summary.paid_amount)}
-                          </td>
-                          <td
-                            className={`px-3 py-2.5 text-right tabular-nums ${
-                              staffStatementQ.data.summary.remaining_amount > 0
-                                ? "text-rose-500"
-                                : "text-emerald-500"
-                            }`}
-                          >
-                            {staffStatementQ.data.summary.advance_amount > 0
-                              ? `Adv ${inr(staffStatementQ.data.summary.advance_amount)}`
-                              : inr(staffStatementQ.data.summary.remaining_amount)}
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                ) : (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Payment History ({staffStatementQ.data.payments.length}) ·{" "}
+                    {formatSlashDateIST(stmtStart)} – {formatSlashDateIST(stmtEnd)}
+                  </p>
                   <div className="overflow-x-auto rounded-xl border border-border bg-card">
                     <table className="w-full text-xs">
                       <thead className="bg-muted/50 text-muted-foreground">
@@ -2071,15 +1978,14 @@ export function PaymentsReceiptsPage() {
                           <th className="px-3 py-2.5 text-left">Mode &amp; Ref</th>
                           <th className="px-3 py-2.5 text-left">Paid By &amp; Note</th>
                           <th className="px-3 py-2.5 text-right">Amount Paid</th>
-                          <th className="px-3 py-2.5 text-right">Cumulative Paid</th>
                           <th className="px-3 py-2.5 text-right">Slip PDF</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border">
                         {staffStatementQ.data.payments.length === 0 ? (
                           <tr>
-                            <td colSpan={7} className="py-8 text-center text-muted-foreground italic">
-                              No salary payouts recorded in this date range.
+                            <td colSpan={6} className="py-8 text-center text-muted-foreground italic">
+                              No salary payments recorded in this date range.
                             </td>
                           </tr>
                         ) : (
@@ -2100,9 +2006,6 @@ export function PaymentsReceiptsPage() {
                               </td>
                               <td className="px-3 py-2 text-right tabular-nums font-semibold text-indigo-400">
                                 {inr(sp.amount)}
-                              </td>
-                              <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
-                                {inr(sp.running_paid)}
                               </td>
                               <td className="px-3 py-2 text-right">
                                 <Button
@@ -2137,9 +2040,55 @@ export function PaymentsReceiptsPage() {
                           ))
                         )}
                       </tbody>
+                      <tfoot className="border-t border-border bg-muted/30 text-xs font-semibold">
+                        <tr>
+                          <td colSpan={4} className="px-3 py-2 text-right text-muted-foreground">
+                            Total Salary ({staffStatementQ.data.summary.payable_days} Days)
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums">
+                            {inr(staffStatementQ.data.summary.salary_due)}
+                          </td>
+                          <td />
+                        </tr>
+                        <tr>
+                          <td colSpan={4} className="px-3 py-2 text-right text-emerald-500">
+                            Total Paid
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums text-emerald-500">
+                            {inr(staffStatementQ.data.summary.paid_amount)}
+                          </td>
+                          <td />
+                        </tr>
+                        <tr>
+                          <td
+                            colSpan={4}
+                            className={`px-3 py-2 text-right ${
+                              staffStatementQ.data.summary.remaining_amount > 0
+                                ? "text-rose-500"
+                                : "text-emerald-500"
+                            }`}
+                          >
+                            {staffStatementQ.data.summary.advance_amount > 0
+                              ? "Advance Paid"
+                              : "Balance Remaining"}
+                          </td>
+                          <td
+                            className={`px-3 py-2 text-right tabular-nums ${
+                              staffStatementQ.data.summary.remaining_amount > 0
+                                ? "text-rose-500"
+                                : "text-emerald-500"
+                            }`}
+                          >
+                            {staffStatementQ.data.summary.advance_amount > 0
+                              ? inr(staffStatementQ.data.summary.advance_amount)
+                              : inr(staffStatementQ.data.summary.remaining_amount)}
+                          </td>
+                          <td />
+                        </tr>
+                      </tfoot>
                     </table>
                   </div>
-                )}
+                </div>
               </>
             ) : null}
           </div>

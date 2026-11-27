@@ -273,9 +273,9 @@ export function downloadStaffVoucherPdf(data: StaffVoucherPdfData) {
 }
 
 /**
- * Bank-statement style A4 Staff Salary & Payment Statement PDF for any [From Date → To Date].
- * Shows period summary, chronological passbook (duties earned vs payouts with running balance),
- * and full payment voucher history.
+ * Simple, clean A4 Staff Payment Statement PDF for any [From Date → To Date].
+ * Shows 1 summary strip, compact work summary, and 1 clean Payment Transactions table
+ * with Total Salary / Total Paid / Balance Remaining at the bottom.
  */
 export function downloadStaffStatementPdf(stmt: StaffStatementResponse) {
   const doc = new jsPDF({ unit: "pt", format: "a4", orientation: "portrait" });
@@ -343,23 +343,36 @@ export function downloadStaffStatementPdf(stmt: StaffStatementResponse) {
   const s = stmt.summary;
   const statusText =
     s.status === "paid"
-      ? "PAID IN FULL"
+      ? "PAID"
       : s.status === "partial"
-      ? "PARTIAL PAID"
+      ? "PARTIAL"
       : s.status === "advance"
-      ? "ADVANCE PAID"
+      ? "ADVANCE"
       : s.status === "no_due"
       ? "NO DUES"
       : "PENDING";
 
-  // Summary KPI Grid
+  // Compact Work Summary (customer-wise totals in 1 line, not 30 daily rows)
+  const customerTotals = new Map<string, { days: number; amount: number }>();
+  for (const d of stmt.daily_entries) {
+    if (d.status !== "present" && d.status !== "half_day") continue;
+    const key = d.customer_name || "Duty";
+    const cur = customerTotals.get(key) || { days: 0, amount: 0 };
+    cur.days += d.status === "half_day" ? 0.5 : 1;
+    cur.amount += d.amount || 0;
+    customerTotals.set(key, cur);
+  }
+  const workSummaryText = Array.from(customerTotals.entries())
+    .map(([cust, v]) => `${cust} (${v.days}d = ${rupee(v.amount)})`)
+    .join(", ");
+
+  // Simple 1-row Summary Strip
   autoTable(doc, {
     startY: y + 28,
     head: [
       [
         "Payable Days",
-        "Present / Half",
-        "Salary Earned",
+        "Total Salary",
         "Total Paid",
         s.advance_amount > 0 ? "Advance Paid" : "Balance Remaining",
         "Status",
@@ -367,8 +380,7 @@ export function downloadStaffStatementPdf(stmt: StaffStatementResponse) {
     ],
     body: [
       [
-        String(s.payable_days),
-        `${s.present_days}P / ${s.half_days}H`,
+        `${s.payable_days} Days`,
         rupee(s.salary_due),
         rupee(s.paid_amount),
         rupee(s.advance_amount > 0 ? s.advance_amount : s.remaining_amount),
@@ -376,86 +388,100 @@ export function downloadStaffStatementPdf(stmt: StaffStatementResponse) {
       ],
     ],
     theme: "grid",
-    styles: { fontSize: 8.5, cellPadding: 6, halign: "center", textColor: SLATE },
+    styles: { fontSize: 9, cellPadding: 7, halign: "center", textColor: SLATE },
     headStyles: { fillColor: SLATE, textColor: 255, fontSize: 8, fontStyle: "bold" },
     columnStyles: {
-      2: { fontStyle: "bold" },
-      3: { textColor: EMERALD, fontStyle: "bold" },
-      4: { textColor: s.remaining_amount > 0 ? ROSE : EMERALD, fontStyle: "bold" },
-      5: { fontStyle: "bold" },
+      1: { fontStyle: "bold" },
+      2: { textColor: EMERALD, fontStyle: "bold" },
+      3: { textColor: s.remaining_amount > 0 ? ROSE : EMERALD, fontStyle: "bold" },
+      4: { fontStyle: "bold" },
     },
     margin: { left: marginX, right: marginX },
   });
 
   let nextY =
-    (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 18;
+    (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 14;
 
-  // Section 1: Bank-Statement Passbook Ledger (Earnings + Payouts + Running Balance)
+  if (workSummaryText) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(...MUTED);
+    const wrapped = doc.splitTextToSize(`Duty Summary: ${workSummaryText}`, pageWidth - marginX * 2);
+    doc.text(wrapped, marginX, nextY);
+    nextY += wrapped.length * 11 + 8;
+  } else {
+    nextY += 6;
+  }
+
+  // Single Clean Payment Transactions Table (No confusing duplicates!)
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.setTextColor(...SLATE);
-  doc.text("ACCOUNT STATEMENT PASSBOOK (DATE-WISE LEDGER)", marginX, nextY);
+  doc.text(`PAYMENT HISTORY (${stmt.payments.length})`, marginX, nextY);
 
   autoTable(doc, {
     startY: nextY + 8,
-    head: [["Date", "Ref / Voucher", "Particulars", "Earned (+)", "Paid (-)", "Balance"]],
+    head: [["Date", "Voucher No", "Payment Mode & Ref", "Paid By & Note", "Amount Paid"]],
     body:
-      stmt.passbook.length > 0
-        ? stmt.passbook.map((row) => [
-            formatSlashDateIST(row.date),
-            row.ref_no,
-            row.particulars,
-            row.credit > 0 ? rupee(row.credit) : "—",
-            row.debit > 0 ? rupee(row.debit) : "—",
-            row.running_balance < 0
-              ? `Adv ${rupee(Math.abs(row.running_balance))}`
-              : rupee(row.running_balance),
+      stmt.payments.length > 0
+        ? stmt.payments.map((p) => [
+            formatSlashDateIST(p.date || ""),
+            p.voucher_no,
+            `${modeText(p.mode)}${p.transaction_id ? ` · ${p.transaction_id}` : ""}`,
+            [p.paid_by, p.note].filter(Boolean).join(" — ") || "—",
+            rupee(p.amount),
           ])
-        : [["—", "—", "No duties or payouts recorded in this date range.", "—", "—", "—"]],
+        : [["—", "—", "No payments recorded in this date range.", "—", rupee(0)]],
     theme: "striped",
-    styles: { fontSize: 8, cellPadding: 4, textColor: SLATE },
+    styles: { fontSize: 8.5, cellPadding: 6, textColor: SLATE },
     headStyles: { fillColor: INDIGO, textColor: 255, fontSize: 8, fontStyle: "bold" },
     columnStyles: {
-      0: { cellWidth: 62 },
-      1: { cellWidth: 70, fontStyle: "bold" },
-      2: { cellWidth: 205 },
-      3: { halign: "right", cellWidth: 62 },
-      4: { halign: "right", cellWidth: 62 },
-      5: { halign: "right", cellWidth: 62, fontStyle: "bold" },
-    },
-    didParseCell: (data) => {
-      if (data.section === "body" && stmt.passbook[data.row.index]) {
-        const raw = stmt.passbook[data.row.index];
-        if (raw.entry_type === "payout") {
-          data.cell.styles.fillColor = [238, 242, 255];
-          if (data.column.index === 4) {
-            data.cell.styles.textColor = INDIGO;
-            data.cell.styles.fontStyle = "bold";
-          }
-        }
-      }
+      0: { cellWidth: 68 },
+      1: { cellWidth: 74, fontStyle: "bold", textColor: INDIGO },
+      2: { cellWidth: 130 },
+      3: { cellWidth: 175 },
+      4: { halign: "right", cellWidth: 76, fontStyle: "bold", textColor: INDIGO },
     },
     foot: [
       [
         {
-          content: "STATEMENT TOTAL",
-          colSpan: 3,
+          content: `Total Salary (${s.payable_days} Days)`,
+          colSpan: 4,
           styles: { halign: "right", fontStyle: "bold", fillColor: [241, 245, 249], textColor: SLATE },
         },
         {
           content: rupee(s.salary_due),
           styles: { halign: "right", fontStyle: "bold", fillColor: [241, 245, 249], textColor: SLATE },
         },
+      ],
+      [
+        {
+          content: "Total Paid",
+          colSpan: 4,
+          styles: { halign: "right", fontStyle: "bold", fillColor: [236, 253, 245], textColor: EMERALD },
+        },
         {
           content: rupee(s.paid_amount),
-          styles: { halign: "right", fontStyle: "bold", fillColor: [238, 242, 255], textColor: INDIGO },
+          styles: { halign: "right", fontStyle: "bold", fillColor: [236, 253, 245], textColor: EMERALD },
+        },
+      ],
+      [
+        {
+          content: s.advance_amount > 0 ? "Advance Paid" : "Balance Remaining",
+          colSpan: 4,
+          styles: {
+            halign: "right",
+            fontStyle: "bold",
+            fillColor: s.remaining_amount > 0 ? [255, 228, 230] : [220, 252, 231],
+            textColor: s.remaining_amount > 0 ? ROSE : EMERALD,
+          },
         },
         {
           content:
             s.advance_amount > 0
-              ? `Adv ${rupee(s.advance_amount)}`
-              : s.remaining_amount === 0
-              ? "Rs 0"
+              ? rupee(s.advance_amount)
+              : s.remaining_amount === 0 && s.salary_due > 0
+              ? `${rupee(0)} (Settled)`
               : rupee(s.remaining_amount),
           styles: {
             halign: "right",
@@ -481,56 +507,16 @@ export function downloadStaffStatementPdf(stmt: StaffStatementResponse) {
     },
   });
 
-  nextY =
-    (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 18;
+  const nextAfterTable =
+    (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 38;
 
-  // Section 2: Payment Vouchers / Slips Breakdown (if any)
-  if (stmt.payments.length > 0) {
-    if (nextY > pageHeight - 120) {
-      doc.addPage();
-      nextY = 48;
-    }
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.setTextColor(...SLATE);
-    doc.text(`PAYMENT VOUCHERS / SLIPS (${stmt.payments.length})`, marginX, nextY);
-
-    autoTable(doc, {
-      startY: nextY + 8,
-      head: [["Date", "Voucher No", "Mode & Txn Ref", "Paid By & Note", "Amount Paid"]],
-      body: stmt.payments.map((p) => [
-        formatSlashDateIST(p.date || ""),
-        p.voucher_no,
-        `${modeText(p.mode)}${p.transaction_id ? ` · ${p.transaction_id}` : ""}`,
-        [p.paid_by, p.note].filter(Boolean).join(" — ") || "—",
-        rupee(p.amount),
-      ]),
-      theme: "grid",
-      styles: { fontSize: 8, cellPadding: 4, textColor: SLATE },
-      headStyles: { fillColor: SLATE, textColor: 255, fontSize: 8, fontStyle: "bold" },
-      columnStyles: {
-        0: { cellWidth: 64 },
-        1: { cellWidth: 68, fontStyle: "bold", textColor: INDIGO },
-        2: { cellWidth: 130 },
-        3: { cellWidth: 185 },
-        4: { halign: "right", cellWidth: 76, fontStyle: "bold", textColor: INDIGO },
-      },
-      margin: { left: marginX, right: marginX },
-    });
-
-    nextY =
-      (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 36;
-  } else {
-    nextY += 24;
-  }
-
-  if (nextY < pageHeight - 50) {
+  if (nextAfterTable < pageHeight - 50) {
     doc.setDrawColor(148, 163, 184);
-    doc.line(pageWidth - marginX - 160, nextY, pageWidth - marginX, nextY);
+    doc.line(pageWidth - marginX - 160, nextAfterTable, pageWidth - marginX, nextAfterTable);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(...MUTED);
-    doc.text("Authorised Signature", pageWidth - marginX, nextY + 12, { align: "right" });
+    doc.text("Authorised Signature", pageWidth - marginX, nextAfterTable + 12, { align: "right" });
   }
 
   const safeName = stmt.employee.name.replace(/[^a-z0-9]+/gi, "_").toLowerCase();
