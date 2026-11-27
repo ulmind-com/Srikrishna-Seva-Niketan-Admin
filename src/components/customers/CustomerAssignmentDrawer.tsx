@@ -727,7 +727,6 @@ export function CustomerAssignmentDrawer({
                               <option value="full_24h">24 Hours Shift</option>
                               <option value="day">Day Shift (8 AM - 8 PM)</option>
                               <option value="night">Night Shift (8 PM - 8 AM)</option>
-                              <option value="morning">Morning Shift</option>
                               <option value="custom">Custom Shift</option>
                             </select>
                           </div>

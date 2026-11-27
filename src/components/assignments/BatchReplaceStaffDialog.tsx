@@ -411,7 +411,6 @@ export function BatchReplaceStaffDialog({
                           <option value="full_24h">24 Hours Shift</option>
                           <option value="day">Day Shift (12h)</option>
                           <option value="night">Night Shift (12h)</option>
-                          <option value="morning">Morning Shift (8h)</option>
                           <option value="custom">Custom Shift (Split / Multi-time)</option>
                         </select>
                       </div>

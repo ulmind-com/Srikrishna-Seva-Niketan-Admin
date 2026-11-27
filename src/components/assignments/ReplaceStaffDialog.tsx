@@ -324,12 +324,11 @@ export function ReplaceStaffDialog({
               </Label>
 
               {/* Shift Type Pills */}
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
                   { id: "full_24h", label: "24 Hours", sub: "২৪ ঘণ্টা" },
                   { id: "day", label: "Day Shift", sub: "দিনের ডিউটি" },
                   { id: "night", label: "Night Shift", sub: "রাতের ডিউটি" },
-                  { id: "morning", label: "Morning", sub: "সকালের ডিউটি" },
                   { id: "custom", label: "Custom Shift", sub: "কাস্টম উইন্ডোজ" },
                 ].map((opt) => (
                   <button

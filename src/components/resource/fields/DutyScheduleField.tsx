@@ -16,7 +16,6 @@ const SHIFT_OPTIONS = [
   { id: "full_24h", label: "24 Hours", sub: "২৪ ঘণ্টা", defStart: "08:00", defEnd: "08:00" },
   { id: "day", label: "Day", sub: "দিনের ডিউটি", defStart: "08:00", defEnd: "20:00" },
   { id: "night", label: "Night", sub: "রাতের ডিউটি", defStart: "20:00", defEnd: "08:00" },
-  { id: "morning", label: "Morning", sub: "সকালের ডিউটি", defStart: "07:00", defEnd: "15:00" },
   { id: "custom", label: "Custom", sub: "কাস্টম শিফট", defStart: "08:00", defEnd: "20:00" },
 ];
 
@@ -109,7 +108,7 @@ export function DutyScheduleField({
             শিফট নির্বাচন করুন (টাইম ও ঘড়ি পরিবর্তনযোগ্য)
           </span>
         </Label>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {SHIFT_OPTIONS.map((opt) => {
             const isSelected = currentShift === opt.id;
             return (
